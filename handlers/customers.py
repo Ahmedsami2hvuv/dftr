@@ -765,7 +765,14 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = int(query.data.replace("cust_took_", ""))
     context.user_data["cust_txn_kind"] = "took"
     context.user_data["cust_txn_cid"] = cid
-    await query.edit_message_text("أخذت 🔴\n\nأرسل المبلغ (رقم):")
+    keyboard = [
+        [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
+        [InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel")],
+    ]
+    await query.edit_message_text(
+        "أخذت 🔴\n\nأرسل المبلغ (رقم):",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
     return CUST_AMOUNT
 
 
@@ -776,8 +783,42 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = int(query.data.replace("cust_gave_", ""))
     context.user_data["cust_txn_kind"] = "gave"
     context.user_data["cust_txn_cid"] = cid
-    await query.edit_message_text("أعطيت 🟢\n\nأرسل المبلغ (رقم):")
+    keyboard = [
+        [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
+        [InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel")],
+    ]
+    await query.edit_message_text(
+        "أعطيت 🟢\n\nأرسل المبلغ (رقم):",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
     return CUST_AMOUNT
+
+
+async def cust_txn_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رجوع للعميل وإلغاء حالة إدخال المعاملة."""
+    query = update.callback_query
+    await query.answer()
+    try:
+        cid = int(query.data.replace("cust_txn_back_", ""))
+    except Exception:
+        await query.edit_message_text("غير قادر على الرجوع.")
+        return ConversationHandler.END
+
+    for k in ("cust_txn_kind", "cust_txn_cid", "cust_txn_amount", "cust_txn_note_text", "cust_txn_photo_file_id"):
+        context.user_data.pop(k, None)
+
+    await customer_detail(update, context, cid, offset=0)
+    return ConversationHandler.END
+
+
+async def cust_txn_cancel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إلغاء العملية والعودة لقائمة العملاء."""
+    query = update.callback_query
+    await query.answer()
+    for k in ("cust_txn_kind", "cust_txn_cid", "cust_txn_amount", "cust_txn_note_text", "cust_txn_photo_file_id"):
+        context.user_data.pop(k, None)
+    await menu_customers(update, context)
+    return ConversationHandler.END
 
 
 async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -790,24 +831,32 @@ async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("أدخل رقماً صحيحاً.")
         return CUST_AMOUNT
     context.user_data["cust_txn_amount"] = amount
+    cid = context.user_data.get("cust_txn_cid")
     keyboard = [
         [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
+        [
+            InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}"),
+            InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
+        ],
     ]
     await update.message.reply_text(
-        "اختياري: اكتب ملاحظة.\n"
-        "إذا تريد تخطي الملاحظة اضغط زر (سكيب الملاحظة).",
+        "أرسل ملاحظة، و(إذا تريد) صورة.\n"
+        "إذا أرسلت صورة بدون ملاحظة كمل وارسل الملاحظة نصاً.\n"
+        "يمكنك أيضاً استخدام زر (سكيب الملاحظة).",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return CUST_NOTE
 
 
 async def cust_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    note = (update.message.text or "").strip()
+    # إذا كانت الملاحظة أُرسلت عبر caption للصور
+    note = context.user_data.get("cust_txn_note_text") or (update.message.text or "").strip()
     db = SessionLocal()
     try:
         cid = context.user_data.get("cust_txn_cid")
         kind = context.user_data.get("cust_txn_kind")
         amount = context.user_data.get("cust_txn_amount")
+        photo_file_id = context.user_data.get("cust_txn_photo_file_id")
         cust = db.query(Customer).filter(Customer.id == cid).first()
         if not cust:
             await update.message.reply_text("العميل غير موجود.")
@@ -816,7 +865,13 @@ async def cust_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user or cust.user_id != user.id:
             await update.message.reply_text("غير مسموح.")
             return ConversationHandler.END
-        t = CustomerTransaction(customer_id=cid, amount=amount, kind=kind, note=note or None)
+        t = CustomerTransaction(
+            customer_id=cid,
+            amount=amount,
+            kind=kind,
+            note=note or None,
+            photo_file_id=photo_file_id,
+        )
         db.add(t)
         db.commit()
         text, keyboard = await _build_customer_view(db, cust, offset=0)
@@ -826,9 +881,45 @@ async def cust_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     finally:
         db.close()
-    for k in ("cust_txn_kind", "cust_txn_cid", "cust_txn_amount"):
+    for k in (
+        "cust_txn_kind",
+        "cust_txn_cid",
+        "cust_txn_amount",
+        "cust_txn_note_text",
+        "cust_txn_photo_file_id",
+    ):
         context.user_data.pop(k, None)
     return ConversationHandler.END
+
+
+async def cust_note_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """استلام صورة الملاحظة داخل نفس خطوة CUST_NOTE."""
+    if not update.message.photo:
+        return CUST_NOTE
+
+    file_id = update.message.photo[-1].file_id
+    context.user_data["cust_txn_photo_file_id"] = file_id
+
+    # إذا المستخدم كتب caption فاعتبره ملاحظة مباشرة
+    caption = (update.message.caption or "").strip() if update.message.caption else ""
+    if caption:
+        context.user_data["cust_txn_note_text"] = caption
+        # نفذ الحفظ باستخدام cust_note مع قراءة الملاحظة من context
+        return await cust_note(update, context)
+
+    cid = context.user_data.get("cust_txn_cid")
+    keyboard = [
+        [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
+        [
+            InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}"),
+            InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
+        ],
+    ]
+    await update.message.reply_text(
+        "تم استلام الصورة ✅\n\nالآن أرسل الملاحظة نصاً (أو استخدم سكيب).",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return CUST_NOTE
 
 
 async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -840,6 +931,7 @@ async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYP
         cid = context.user_data.get("cust_txn_cid")
         kind = context.user_data.get("cust_txn_kind")
         amount = context.user_data.get("cust_txn_amount")
+        photo_file_id = context.user_data.get("cust_txn_photo_file_id")
         cust = db.query(Customer).filter(Customer.id == cid).first()
         if not cust:
             await query.edit_message_text("العميل غير موجود.")
@@ -848,7 +940,13 @@ async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYP
         if not user or cust.user_id != user.id:
             await query.edit_message_text("غير مسموح.")
             return ConversationHandler.END
-        t = CustomerTransaction(customer_id=cid, amount=amount, kind=kind, note=None)
+        t = CustomerTransaction(
+            customer_id=cid,
+            amount=amount,
+            kind=kind,
+            note=None,
+            photo_file_id=photo_file_id,
+        )
         db.add(t)
         db.commit()
         text, keyboard = await _build_customer_view(db, cust, offset=0)
@@ -858,7 +956,13 @@ async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYP
         )
     finally:
         db.close()
-    for k in ("cust_txn_kind", "cust_txn_cid", "cust_txn_amount"):
+    for k in (
+        "cust_txn_kind",
+        "cust_txn_cid",
+        "cust_txn_amount",
+        "cust_txn_note_text",
+        "cust_txn_photo_file_id",
+    ):
         context.user_data.pop(k, None)
     return ConversationHandler.END
 
