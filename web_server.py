@@ -96,7 +96,7 @@ def _render_page(token: str, offset: int) -> str:
             if getattr(t, "photo_file_id", None):
                 fid = quote(str(t.photo_file_id), safe="")
                 photo_html = (
-                    f"<div class='photo-wrap'><a href='/creditbook/photo/{fid}' target='_blank' rel='noopener'>"
+                    f"<div class='photo-wrap'><a href='/creditbook/photo-view/{fid}' target='_blank' rel='noopener'>"
                     f"<img class='photo' src='/creditbook/photo/{fid}' alt='صورة المعاملة'/></a></div>"
                 )
             remain = running_after_by_tx.get(t.id, bal)
@@ -161,10 +161,12 @@ def _render_page(token: str, offset: int) -> str:
               .tx {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 12px; margin: 10px 0; }}
               .top {{ color: #666; font-size: 12px; }}
               .main {{ margin-top: 6px; font-size: 15px; }}
-              .remain {{ margin-top: 6px; color: #0d47a1; font-size: 13px; }}
+              .remain {{ margin-top: 6px; font-size: 13px; }}
+              .remain.bal-red {{ color: #d32f2f; }}
+              .remain.bal-green {{ color: #2e7d32; }}
               .note {{ margin-top: 6px; color: #444; font-size: 13px; }}
               .photo-wrap {{ margin-top: 8px; }}
-              .photo {{ width: 100%; max-height: 260px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; }}
+              .photo {{ width: 68px; height: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; cursor: pointer; }}
               .btn {{ display: inline-block; padding: 10px 14px; background: #1976d2; color: #fff; text-decoration: none; border-radius: 10px; margin-top: 10px; }}
               .wa {{ background: #1b5e20; margin-left: 8px; }}
               .bot {{ background: #1565c0; }}
@@ -226,6 +228,7 @@ class Handler(BaseHTTPRequestHandler):
 
         m = re.match(r"^/creditbook/balance/(?P<token>[A-Za-z0-9_-]+)$", path)
         photo_match = re.match(r"^/creditbook/photo/(?P<fid>.+)$", path)
+        photo_view_match = re.match(r"^/creditbook/photo-view/(?P<fid>.+)$", path)
         if photo_match:
             file_id = unquote(photo_match.group("fid"))
             file_url = _resolve_telegram_file_url(file_id)
@@ -238,6 +241,38 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header("Location", file_url)
             self.end_headers()
+            return
+
+        if photo_view_match:
+            file_id = unquote(photo_view_match.group("fid"))
+            file_url = _resolve_telegram_file_url(file_id)
+            if not file_url:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write("الصورة غير متاحة".encode("utf-8"))
+                return
+            html = f"""
+            <!doctype html>
+            <html lang='ar' dir='rtl'>
+              <head>
+                <meta charset='utf-8'/>
+                <meta name='viewport' content='width=device-width, initial-scale=1'/>
+                <title>صورة المعاملة</title>
+                <style>
+                  body {{ margin: 0; background: #111; display: flex; justify-content: center; align-items: center; min-height: 100vh; }}
+                  img {{ max-width: 96vw; max-height: 96vh; border-radius: 8px; }}
+                </style>
+              </head>
+              <body>
+                <img src="{file_url}" alt="صورة المعاملة"/>
+              </body>
+            </html>
+            """
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(html.encode("utf-8"))
             return
 
         if not m:
