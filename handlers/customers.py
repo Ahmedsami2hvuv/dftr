@@ -205,16 +205,16 @@ async def _build_customer_view(db, cust: Customer, offset: int):
 
     # عرض الباقيات بجانب تعديل الحساب
     edit_btn = InlineKeyboardButton("✏️ تعديل الحساب", callback_data=f"cust_edit_{cust.id}")
+    share_btn = InlineKeyboardButton("📤 مشاركة", callback_data=f"cust_share_{cust.id}")
     if has_more:
         more_btn = InlineKeyboardButton(
             "➕ عرض الباقيات",
             callback_data=f"cust_tx_more_{cust.id}_{offset + TX_PAGE_SIZE}",
         )
-        keyboard.append([more_btn, edit_btn])
+        keyboard.append([more_btn])
+        keyboard.append([edit_btn, share_btn])
     else:
-        keyboard.append([edit_btn])
-
-    keyboard.append([InlineKeyboardButton("📤 مشاركة", callback_data=f"cust_share_{cust.id}")])
+        keyboard.append([edit_btn, share_btn])
 
     keyboard.append([InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")])
     return text, keyboard
