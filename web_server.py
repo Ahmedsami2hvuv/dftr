@@ -100,12 +100,13 @@ def _render_page(token: str, offset: int) -> str:
                     f"<img class='photo' src='/creditbook/photo/{fid}' alt='صورة المعاملة'/></a></div>"
                 )
             remain = running_after_by_tx.get(t.id, bal)
+            remain_class = "bal-red" if remain > 0 else ("bal-green" if remain < 0 else "")
             tx_rows.append(
                 f"""
                 <div class='tx'>
                   <div class='top'>{dt}</div>
                   <div class='main'>{_kind_icon(t.kind)} {_kind_label(t.kind)} - {_amount_to_str(t.amount)} د.ع.</div>
-                  <div class='remain'>الرصيد الحالي: {_amount_to_str(remain)} د.ع.</div>
+                  <div class='remain {remain_class}'>الرصيد الحالي: {_amount_to_str(remain)} د.ع.</div>
                   {photo_html}
                   {note_html}
                 </div>
@@ -117,7 +118,7 @@ def _render_page(token: str, offset: int) -> str:
             # offset button keep same token
             more_btn = f"<a class='btn' href='/creditbook/balance/{token}?lang=ar&offset={more_offset}'>➕ عرض الباقيات</a>"
 
-        balance_text = "الرصيد النهائي: "
+        balance_text = "الرصيد الحالي: "
         if bal > 0:
             balance_text += f"{bal:.2f}"
         elif bal < 0:
