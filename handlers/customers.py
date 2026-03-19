@@ -566,8 +566,14 @@ async def cust_tx_edit_photo_done(update: Update, context: ContextTypes.DEFAULT_
         file_id = update.message.photo[-1].file_id
         tx.photo_file_id = file_id
         db.commit()
+        # بعد الحفظ: أرسل الصورة + تفاصيلها فوراً
         text, keyboard = await _render_tx_detail(db, tx)
-        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        await context.bot.send_photo(
+            chat_id=update.effective_user.id,
+            photo=file_id,
+            caption=text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
     finally:
         db.close()
     context.user_data.pop("tx_edit_id", None)
