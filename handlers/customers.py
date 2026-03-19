@@ -1181,14 +1181,16 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.add(link)
         db.commit()
         # رابط عرض المعاملات:
-        # 1) إذا WEB_BASE_URL مضبوط -> رابط موقع
-        # 2) fallback -> deep link داخل البوت (حتى لا يتعطل زر المشاركة)
+        # 1) رابط موقع عام (WEB_BASE_URL أو Railway domain)
+        # 2) fallback تليجرام فقط إذا ماكو دومين عام نهائياً
         base = (WEB_BASE_URL or "").strip().rstrip("/")
         if _is_public_http_url(base):
             view_url = f"{base}/creditbook/balance/{token}?lang=ar"
+            using_web = True
         else:
             me = await context.bot.get_me()
             view_url = f"https://t.me/{me.username}?start=view_{token}"
+            using_web = False
         if bal > 0:
             msg_balance = f"عليك رصيد {bal:.2f} {cur}"
         elif bal < 0:
@@ -1230,7 +1232,11 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]
             await _safe_edit_callback_text(
                 query,
-                "مشاركة 📤\n\nاستخدم الأزرار أدناه:\n\n" + share_text,
+                (
+                    "مشاركة 📤\n\nاستخدم الأزرار أدناه:\n\n"
+                    + share_text
+                    + ("\n\n⚠️ ملاحظة: لم يتم العثور على دومين ويب عام، لذلك الرابط احتياطي داخل تليجرام." if not using_web else "")
+                ),
                 keyboard,
             )
         except Exception:
