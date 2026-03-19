@@ -516,8 +516,35 @@ async def cust_tx_edit_photo_start(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
     tx_id = int(query.data.replace("cust_tx_edit_photo_", ""))
     context.user_data["tx_edit_id"] = tx_id
-    await query.edit_message_text("أرسل الصورة الآن (Photo).")
+    keyboard = [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_tx_edit_photo_back_{tx_id}")]]
+    await query.edit_message_text(
+        "أرسل الصورة الآن (Photo).\n\nإذا تريد ترجع اضغط زر الرجوع.",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
     return TX_EDIT_PHOTO
+
+
+async def cust_tx_edit_photo_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    tx_id = int(query.data.replace("cust_tx_edit_photo_back_", ""))
+    db = SessionLocal()
+    try:
+        tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
+        if not tx:
+            await query.edit_message_text("المعاملة غير موجودة.")
+            return ConversationHandler.END
+        cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
+        user = get_current_user(db, update.effective_user.id)
+        if not user or cust.user_id != user.id:
+            await query.edit_message_text("غير مسموح.")
+            return ConversationHandler.END
+        text, keyboard = await _render_tx_detail(db, tx)
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    finally:
+        db.close()
+    context.user_data.pop("tx_edit_id", None)
+    return ConversationHandler.END
 
 
 async def cust_tx_edit_photo_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
