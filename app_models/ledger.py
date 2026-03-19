@@ -123,4 +123,5 @@ class FeedbackMessage(Base):
     content_type = Column(String(32), nullable=False)  # text/photo/video/voice/document/sticker/...
     text = Column(Text, nullable=True)
     file_id = Column(String(255), nullable=True)
+    is_resolved = Column(Integer, default=0)  # 0 مفتوحة / 1 تمت المعالجة
     created_at = Column(DateTime, default=datetime.utcnow)

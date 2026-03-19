@@ -69,3 +69,12 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+
+        # حالة معالجة رسالة المشكلة/الاقتراح
+        try:
+            conn.execute(
+                text("ALTER TABLE feedback_messages ADD COLUMN IF NOT EXISTS is_resolved INTEGER DEFAULT 0")
+            )
+            conn.commit()
+        except Exception:
+            pass

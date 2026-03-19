@@ -9,6 +9,7 @@ from config import ADMIN_ID, BOT_USERNAME
 
 ADMIN_BROADCAST_CONTENT = 900
 ADMIN_BROADCAST_BUTTONS = 901
+ADMIN_FEEDBACK_SEARCH = 902
 
 
 def is_admin(user_id: int) -> bool:
@@ -178,15 +179,41 @@ async def admin_feedbacks_list(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     if not is_admin(update.effective_user.id):
         return
+    data = query.data or "admin_feedbacks"
+    # filters: all / open / done
+    if data == "admin_feedbacks_open":
+        filter_mode = "open"
+    elif data == "admin_feedbacks_done":
+        filter_mode = "done"
+    else:
+        filter_mode = "all"
+
     db = SessionLocal()
     try:
-        items = db.query(FeedbackMessage).order_by(FeedbackMessage.created_at.desc()).limit(30).all()
+        q = db.query(FeedbackMessage)
+        if filter_mode == "open":
+            q = q.filter(FeedbackMessage.is_resolved == 0)
+        elif filter_mode == "done":
+            q = q.filter(FeedbackMessage.is_resolved == 1)
+        items = q.order_by(FeedbackMessage.created_at.desc()).limit(30).all()
         keyboard = []
-        lines = ["المشاكل والاقتراحات (آخر 30):"]
+        title_map = {"all": "الكل", "open": "المفتوحة", "done": "المعالجة"}
+        lines = [f"المشاكل والاقتراحات ({title_map[filter_mode]} - آخر 30):"]
         for f in items:
             title = (f.user_name or "مستخدم")[:24]
-            lines.append(f"• {title} | {f.content_type} | {f.created_at.strftime('%Y-%m-%d %H:%M')}")
-            keyboard.append([InlineKeyboardButton(f"📩 {title}"[:64], callback_data=f"admin_feedback_{f.id}")])
+            st = "✅" if int(f.is_resolved or 0) == 1 else "🟡"
+            lines.append(f"• {st} {title} | {f.content_type} | {f.created_at.strftime('%Y-%m-%d %H:%M')}")
+            keyboard.append(
+                [InlineKeyboardButton(f"{st} {title}"[:64], callback_data=f"admin_feedback_{f.id}")]
+            )
+        keyboard.append(
+            [
+                InlineKeyboardButton("الكل", callback_data="admin_feedbacks"),
+                InlineKeyboardButton("المفتوحة", callback_data="admin_feedbacks_open"),
+                InlineKeyboardButton("المعالجة", callback_data="admin_feedbacks_done"),
+            ]
+        )
+        keyboard.append([InlineKeyboardButton("🔎 بحث", callback_data="admin_feedback_search")])
         keyboard.append([InlineKeyboardButton("◀ لوحة الأدمن", callback_data="admin_panel")])
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
     finally:
@@ -212,13 +239,97 @@ async def admin_feedback_detail(update: Update, context: ContextTypes.DEFAULT_TY
             f"Telegram ID: {f.user_telegram_id or '—'}\n"
             f"المصدر: {f.source or '—'}\n"
             f"النوع: {f.content_type}\n"
+            f"الحالة: {'✅ تمت المعالجة' if int(f.is_resolved or 0) == 1 else '🟡 مفتوحة'}\n"
             f"التاريخ: {f.created_at.strftime('%Y-%m-%d %H:%M')}\n\n"
             f"النص:\n{f.text or '—'}"
         )
-        kb = [[InlineKeyboardButton("◀ المشاكل والاقتراحات", callback_data="admin_feedbacks")]]
+        toggle_label = "↩ إعادة فتح" if int(f.is_resolved or 0) == 1 else "✅ تمت المعالجة"
+        kb = [
+            [InlineKeyboardButton(toggle_label, callback_data=f"admin_feedback_toggle_{f.id}")],
+            [InlineKeyboardButton("◀ المشاكل والاقتراحات", callback_data="admin_feedbacks")],
+        ]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
     finally:
         db.close()
+
+
+async def admin_feedback_toggle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id):
+        return
+    fid = int(query.data.replace("admin_feedback_toggle_", ""))
+    db = SessionLocal()
+    try:
+        f = db.query(FeedbackMessage).filter(FeedbackMessage.id == fid).first()
+        if not f:
+            await query.edit_message_text("العنصر غير موجود.")
+            return
+        f.is_resolved = 0 if int(f.is_resolved or 0) == 1 else 1
+        db.commit()
+    finally:
+        db.close()
+    # ارجع لعرض التفاصيل بعد التبديل
+    await admin_feedback_detail(update, context)
+
+
+async def admin_feedback_search_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id):
+        return ConversationHandler.END
+    keyboard = [[InlineKeyboardButton("❌ إلغاء ورجوع", callback_data="admin_feedback_search_cancel")]]
+    await query.edit_message_text(
+        "ابحث باسم المستخدم أو رقمه أو نص من الرسالة:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return ADMIN_FEEDBACK_SEARCH
+
+
+async def admin_feedback_search_do(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return ConversationHandler.END
+    qtext = (update.message.text or "").strip()
+    if not qtext:
+        await update.message.reply_text("اكتب كلمة بحث صحيحة.")
+        return ADMIN_FEEDBACK_SEARCH
+    db = SessionLocal()
+    try:
+        items = (
+            db.query(FeedbackMessage)
+            .filter(
+                (FeedbackMessage.user_name.ilike(f"%{qtext}%"))
+                | (FeedbackMessage.user_phone.ilike(f"%{qtext}%"))
+                | (FeedbackMessage.text.ilike(f"%{qtext}%"))
+            )
+            .order_by(FeedbackMessage.created_at.desc())
+            .limit(30)
+            .all()
+        )
+        lines = [f"نتائج البحث: {qtext}"]
+        keyboard = []
+        for f in items:
+            st = "✅" if int(f.is_resolved or 0) == 1 else "🟡"
+            title = (f.user_name or "مستخدم")[:24]
+            lines.append(f"• {st} {title} | {f.content_type} | {f.created_at.strftime('%Y-%m-%d %H:%M')}")
+            keyboard.append([InlineKeyboardButton(f"{st} {title}"[:64], callback_data=f"admin_feedback_{f.id}")])
+        keyboard.append([InlineKeyboardButton("◀ المشاكل والاقتراحات", callback_data="admin_feedbacks")])
+        await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+    finally:
+        db.close()
+    return ConversationHandler.END
+
+
+async def admin_feedback_search_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "تم الإلغاء ✅",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("◀ المشاكل والاقتراحات", callback_data="admin_feedbacks")]]
+        ),
+    )
+    return ConversationHandler.END
 
 
 async def admin_broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):

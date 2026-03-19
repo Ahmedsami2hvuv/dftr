@@ -94,6 +94,10 @@ from handlers.admin import (
     admin_user_detail,
     admin_feedbacks_list,
     admin_feedback_detail,
+    admin_feedback_toggle_status,
+    admin_feedback_search_start,
+    admin_feedback_search_do,
+    admin_feedback_search_cancel,
     admin_broadcast_start,
     admin_broadcast_receive_content,
     admin_broadcast_toggle_buttons,
@@ -103,6 +107,7 @@ from handlers.admin import (
     bc_update_click,
     ADMIN_BROADCAST_CONTENT,
     ADMIN_BROADCAST_BUTTONS,
+    ADMIN_FEEDBACK_SEARCH,
 )
 from handlers.feedback import (
     feedback_from_profile,
@@ -119,6 +124,9 @@ from handlers.customers import (
     cust_name,
     cust_phone,
     cust_phone_skip_click,
+    cust_search_start,
+    cust_search_query_done,
+    cust_search_cancel_click,
     cust_took,
     cust_gave,
     cust_amount,
@@ -160,6 +168,7 @@ from handlers.customers import (
     TX_EDIT_PHOTO,
     CUST_NAME,
     CUST_PHONE,
+    CUST_SEARCH_QUERY,
     CUST_AMOUNT,
     CUST_NOTE,
     CUST_EDIT_NAME,
@@ -313,6 +322,22 @@ def main():
     )
     app.add_handler(admin_broadcast_conv)
 
+    # محادثة بحث صندوق المشاكل/الاقتراحات (أدمن)
+    admin_feedback_search_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(admin_feedback_search_start, pattern="^admin_feedback_search$")],
+        states={
+            ADMIN_FEEDBACK_SEARCH: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_feedback_search_do),
+                CallbackQueryHandler(admin_feedback_search_cancel, pattern="^admin_feedback_search_cancel$"),
+            ]
+        },
+        fallbacks=[],
+        allow_reentry=True,
+        per_chat=True,
+        per_message=False,
+    )
+    app.add_handler(admin_feedback_search_conv)
+
     # محادثة إرسال مشكلة/اقتراح للمستخدمين
     feedback_conv = ConversationHandler(
         entry_points=[
@@ -351,7 +376,10 @@ def main():
     app.add_handler(CallbackQueryHandler(admin_users_list, pattern="^admin_users$"))
     app.add_handler(CallbackQueryHandler(admin_user_detail, pattern="^admin_user_\\d+$"))
     app.add_handler(CallbackQueryHandler(admin_feedbacks_list, pattern="^admin_feedbacks$"))
+    app.add_handler(CallbackQueryHandler(admin_feedbacks_list, pattern="^admin_feedbacks_open$"))
+    app.add_handler(CallbackQueryHandler(admin_feedbacks_list, pattern="^admin_feedbacks_done$"))
     app.add_handler(CallbackQueryHandler(admin_feedback_detail, pattern="^admin_feedback_\\d+$"))
+    app.add_handler(CallbackQueryHandler(admin_feedback_toggle_status, pattern="^admin_feedback_toggle_\\d+$"))
     app.add_handler(CallbackQueryHandler(bc_start_click, pattern="^bc_start$"))
     app.add_handler(CallbackQueryHandler(bc_update_click, pattern="^bc_update$"))
 
@@ -374,6 +402,22 @@ def main():
         per_message=False,
     )
     app.add_handler(cust_add_conv)
+
+    # بحث العملاء داخل دفتر الديون
+    cust_search_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(cust_search_start, pattern="^cust_search_start$")],
+        states={
+            CUST_SEARCH_QUERY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_search_query_done),
+                CallbackQueryHandler(cust_search_cancel_click, pattern="^cust_search_cancel$"),
+            ],
+        },
+        fallbacks=[],
+        allow_reentry=True,
+        per_chat=True,
+        per_message=False,
+    )
+    app.add_handler(cust_search_conv)
 
     cust_txn_conv = ConversationHandler(
         entry_points=[

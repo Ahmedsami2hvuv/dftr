@@ -16,11 +16,12 @@ from config import WEB_BASE_URL
 (
     CUST_NAME,
     CUST_PHONE,
+    CUST_SEARCH_QUERY,
     CUST_AMOUNT,
     CUST_NOTE,
     CUST_EDIT_NAME,
     CUST_EDIT_PHONE,
-) = range(6)
+) = range(7)
 
 TX_PAGE_SIZE = 15
 
@@ -244,7 +245,10 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
             return
         customers = db.query(Customer).filter(Customer.user_id == user.id).order_by(Customer.created_at.desc()).all()
-        keyboard = [[InlineKeyboardButton("➕ إضافة عميل", callback_data="cust_add")]]
+        keyboard = [
+            [InlineKeyboardButton("🔎 بحث", callback_data="cust_search_start")],
+            [InlineKeyboardButton("➕ إضافة عميل", callback_data="cust_add")],
+        ]
         total_out = 0.0  # الصادر الكلي (أعطيت)
         total_in = 0.0   # الوارد الكلي (أخذت)
         for c in customers:
@@ -272,6 +276,69 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     finally:
         db.close()
+
+
+async def cust_search_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    keyboard = [[InlineKeyboardButton("❌ إلغاء ورجوع", callback_data="cust_search_cancel")]]
+    await query.edit_message_text(
+        "بحث العملاء 🔎\n\n"
+        "اكتب اسم العميل أو جزء من الاسم:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return CUST_SEARCH_QUERY
+
+
+async def cust_search_query_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = (update.message.text or "").strip()
+    if not q:
+        await update.message.reply_text("اكتب نص بحث صحيح.")
+        return CUST_SEARCH_QUERY
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            return ConversationHandler.END
+        # بحث تقريبي بسيط: contains
+        matches = (
+            db.query(Customer)
+            .filter(Customer.user_id == user.id, Customer.name.ilike(f"%{q}%"))
+            .order_by(Customer.created_at.desc())
+            .limit(25)
+            .all()
+        )
+        if not matches:
+            kb = [
+                [InlineKeyboardButton("🔁 بحث جديد", callback_data="cust_search_start")],
+                [InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")],
+            ]
+            await update.message.reply_text(
+                "لا يوجد عملاء مطابقون لهذا البحث.",
+                reply_markup=InlineKeyboardMarkup(kb),
+            )
+            return ConversationHandler.END
+
+        kb = []
+        lines = [f"نتائج البحث: {q}"]
+        for c in matches:
+            bal, _, _ = _balance(c)
+            lines.append(f"• {c.name} ({bal:.2f})")
+            kb.append([InlineKeyboardButton(c.name[:64], callback_data=f"cust_{c.id}")])
+        kb.append([InlineKeyboardButton("🔁 بحث جديد", callback_data="cust_search_start")])
+        kb.append([InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")])
+        await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(kb))
+    finally:
+        db.close()
+    return ConversationHandler.END
+
+
+async def cust_search_cancel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await menu_customers(update, context)
+    return ConversationHandler.END
 
 
 async def cust_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
