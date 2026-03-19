@@ -78,13 +78,14 @@ async def debt_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("أدخل رقماً صحيحاً.")
         return DEBT_AMOUNT
     context.user_data["debt_amount"] = amount
-    await update.message.reply_text("اختياري: وصف (أو /تخطى أو /skip):")
+    await update.message.reply_text("اختياري: وصف (لتخطي اكتب: تخطى أو /skip):")
     return DEBT_DESC
 
 
 async def debt_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    desc = (update.message.text or "").strip()
-    if update.message.text and update.message.text.strip() in ("/تخطى", "/skip"):
+    raw = (update.message.text or "").strip()
+    desc = raw
+    if raw in ("تخطى", "skip", "/skip"):
         desc = ""
     db = SessionLocal()
     try:
