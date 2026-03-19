@@ -393,8 +393,8 @@ async def _build_customer_view(db, cust: Customer, offset: int):
         keyboard.append([InlineKeyboardButton("لا توجد معاملات بعد", callback_data="noop")])
     else:
         for t in txs:
-            # ترتيب: يوم/شهر/سنه
-            dt = t.created_at.strftime("%d/%m/%Y")
+            # تاريخ مختصر: يوم/شهر فقط
+            dt = t.created_at.strftime("%d/%m")
             note = (t.note or "").strip()
             note_short = (note[:10] + "…") if len(note) > 10 else note
             icon = _tx_kind_ar(t.kind)
@@ -402,8 +402,8 @@ async def _build_customer_view(db, cust: Customer, offset: int):
             remain = running_after_by_tx.get(t.id, bal)
             remain_str = f"{remain:.2f}"
             note_part = note_short if note_short else "—"
-            # اللون ثم السعر ثم الرصيد ثم الملاحظة ثم التاريخ
-            label = f"{icon} {amount_str} | رصيد {remain_str} | {note_part} | {dt}"
+            # اللون ثم المبلغ ثم الملاحظة ثم رمز الرصيد ثم التاريخ
+            label = f"{icon} {amount_str} | {note_part} | 💰 {remain_str} | {dt}"
             keyboard.append([InlineKeyboardButton(label[:64], callback_data=f"cust_tx_{t.id}")])
 
     # زر أخذت/أعطيت في آخر المعاملات
