@@ -1159,9 +1159,15 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
         link = ShareLink(customer_id=cust.id, token=token, expires_at=expires)
         db.add(link)
         db.commit()
-        # الرابط الذي يفتح من واتساب يجب أن يكون موقع الكتروني
-        base = (WEB_BASE_URL or "").rstrip("/")
-        view_url = f"{base}/creditbook/balance/{token}?lang=ar"
+        # رابط عرض المعاملات:
+        # 1) إذا WEB_BASE_URL مضبوط -> رابط موقع
+        # 2) fallback -> deep link داخل البوت (حتى لا يتعطل زر المشاركة)
+        base = (WEB_BASE_URL or "").strip().rstrip("/")
+        if base.startswith("http://") or base.startswith("https://"):
+            view_url = f"{base}/creditbook/balance/{token}?lang=ar"
+        else:
+            me = await context.bot.get_me()
+            view_url = f"https://t.me/{me.username}?start=view_{token}"
         if bal > 0:
             msg_balance = f"عليك رصيد {bal:.2f} {cur}"
         elif bal < 0:
@@ -1181,23 +1187,32 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else f"الرصيد صفر\n\n{view_url}"
         )
         wa_num = cust.phone and wa_number(cust.phone)
-        if wa_num:
-            wa_url = f"https://wa.me/{wa_num}?text={quote(wa_text)}"
-            keyboard = [
-                [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
-                [InlineKeyboardButton("فتح واتساب وإرسال الرسالة", url=wa_url)],
-                [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
-            ]
-        else:
-            keyboard = [
-                [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
-                [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
-            ]
-        await _safe_edit_callback_text(
-            query,
-            "مشاركة 📤\n\nانسخ النص أدناه أو استخدم الزر لفتح واتساب:\n\n" + share_text,
-            keyboard,
-        )
+        try:
+            if wa_num:
+                wa_url = f"https://wa.me/{wa_num}?text={quote(wa_text)}"
+                keyboard = [
+                    [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
+                    [InlineKeyboardButton("فتح واتساب وإرسال الرسالة", url=wa_url)],
+                    [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
+                ]
+            else:
+                keyboard = [
+                    [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
+                    [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
+                ]
+            await _safe_edit_callback_text(
+                query,
+                "مشاركة 📤\n\nانسخ النص أدناه أو استخدم الزر لفتح واتساب:\n\n" + share_text,
+                keyboard,
+            )
+        except Exception:
+            # fallback أخير: بدون URL buttons حتى لا يتعطل الزر نهائياً
+            keyboard = [[InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")]]
+            await _safe_edit_callback_text(
+                query,
+                "مشاركة 📤\n\nانسخ الرابط يدويًا:\n\n" + share_text,
+                keyboard,
+            )
     finally:
         db.close()
 
