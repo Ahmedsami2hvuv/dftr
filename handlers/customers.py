@@ -323,6 +323,16 @@ def _tx_kind_ar(kind: str) -> str:
     return "🔴" if kind == "took" else "🟢"
 
 
+async def _safe_edit_callback_text(callback_query, text: str, keyboard):
+    """حاول تعديل النص، وإذا كان زر على صورة عدّل الكابشن بدل النص."""
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard is not None else None
+    try:
+        await callback_query.edit_message_text(text, reply_markup=reply_markup)
+    except Exception:
+        # لرسائل الصور: نعدّل الكابشن بدل النص
+        await callback_query.edit_message_caption(text, reply_markup=reply_markup)
+
+
 async def _build_customer_view(db, cust: Customer, offset: int):
     bal, gave, took = _balance(cust)
     cur = "د.ع."
@@ -367,9 +377,11 @@ async def _build_customer_view(db, cust: Customer, offset: int):
             dt = t.created_at.strftime("%Y-%m-%d")
             note = (t.note or "").strip()
             note_short = (note[:10] + "…") if len(note) > 10 else note
-            label = f"{dt} {_tx_kind_ar(t.kind)} {float(t.amount):.2f}"
-            if note_short:
-                label += f" ({note_short})"
+            icon = _tx_kind_ar(t.kind)
+            amount_str = f"{float(t.amount):.2f}"
+            note_part = note_short if note_short else "بدون ملاحظة"
+            # اللون ثم السعر ثم الملاحظة ثم التاريخ
+            label = f"{icon} {amount_str} - {note_part} - {dt}"
             keyboard.append([InlineKeyboardButton(label[:64], callback_data=f"cust_tx_{t.id}")])
 
     # زر أخذت/أعطيت في آخر المعاملات
@@ -410,10 +422,7 @@ async def customer_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, cu
             await update.callback_query.edit_message_text("غير مسموح.")
             return
         text, keyboard = await _build_customer_view(db, cust, offset)
-        await update.callback_query.edit_message_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
+        await _safe_edit_callback_text(update.callback_query, text, keyboard)
     finally:
         db.close()
 
@@ -427,7 +436,7 @@ def _format_tx_amount(amount) -> str:
 
 async def _render_tx_detail(db, tx: CustomerTransaction):
     cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
-    kind_ar = _tx_kind_ar(tx.kind)
+    icon = _tx_kind_ar(tx.kind)
     dt = tx.created_at.strftime("%Y-%m-%d %H:%M")
     note = (tx.note or "").strip()
     has_photo = bool(getattr(tx, "photo_file_id", None))
@@ -435,10 +444,10 @@ async def _render_tx_detail(db, tx: CustomerTransaction):
     text = (
         "🧾 تفاصيل المعاملة\n\n"
         f"العميل: {cust.name}\n"
-        f"التاريخ: {dt}\n"
-        f"النوع: {kind_ar}\n"
-        f"المبلغ: {tx.amount} د.ع.\n"
+        f"اللون: {icon}\n"
+        f"السعر/المبلغ: {tx.amount} د.ع.\n"
         f"الملاحظة: {note if note else '—'}\n"
+        f"التاريخ: {dt}\n"
         + ("الصورة: موجودة ✅" if has_photo else "الصورة: غير مضافة")
     )
 
