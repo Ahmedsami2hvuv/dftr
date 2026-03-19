@@ -10,6 +10,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from database import SessionLocal
 from app_models import User, Customer, CustomerTransaction, ShareLink
 from utils.phone import normalize_phone, wa_number
+from config import WEB_BASE_URL
 
 (
     CUST_NAME,
@@ -812,8 +813,9 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
         link = ShareLink(customer_id=cust.id, token=token, expires_at=expires)
         db.add(link)
         db.commit()
-        # الرابط الذي يفتح من واتساب يجب أن يكون موقع الكتروني وليس البوت نفسه
-        view_url = f"https://pay.inyad.com/creditbook/balance/{token}?lang=ar"
+        # الرابط الذي يفتح من واتساب يجب أن يكون موقع الكتروني
+        base = (WEB_BASE_URL or "").rstrip("/")
+        view_url = f"{base}/creditbook/balance/{token}?lang=ar"
         if bal > 0:
             msg_balance = f"عليك رصيد {bal:.2f} {cur}"
         elif bal < 0:

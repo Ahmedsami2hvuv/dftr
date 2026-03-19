@@ -12,6 +12,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import logging
+import threading
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -79,6 +80,7 @@ from handlers.debts import (
 )
 from handlers.profile import menu_profile
 from handlers.admin import admin_panel, admin_users_list
+from web_server import start_web_server
 from handlers.customers import (
     menu_customers,
     cust_add_start,
@@ -130,6 +132,16 @@ def main():
     init_db()
 
     app = Application.builder().token(BOT_TOKEN).build()
+
+    # تشغيل الموقع البسيط الذي يعرض معاملات العميل من خلال رابط المشاركة
+    try:
+        from config import WEB_PORT
+
+        httpd = start_web_server(WEB_PORT)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        logger.info("الموقع يعمل على المنفذ: %s", WEB_PORT)
+    except Exception as e:
+        logger.warning("تعذر تشغيل الموقع: %s", e)
 
     app.add_handler(CommandHandler("start", cmd_start))
 
