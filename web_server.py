@@ -29,7 +29,10 @@ def _amount_to_str(x) -> str:
 
 
 def _kind_icon(kind: str) -> str:
-    return "🔴" if kind == "took" else "🟢"
+    # في صفحة المشاركة نعرض من منظور العميل (عكس منظور صاحب الحساب)
+    # gave (صاحب الحساب أعطى) => العميل أخذ => 🔴
+    # took (صاحب الحساب أخذ) => العميل أعطى => 🟢
+    return "🔴" if kind == "gave" else "🟢"
 
 
 def _render_page(token: str, offset: int) -> str:
@@ -199,8 +202,8 @@ def _render_page(token: str, offset: int) -> str:
 
 
 def _kind_label(kind: str) -> str:
-    # kind is "took" => أخذت (red), "gave" => أعطيت (green)
-    return "أخذت" if kind == "took" else "أعطيت"
+    # عرض من منظور العميل (عكس منظور صاحب الحساب)
+    return "أخذت" if kind == "gave" else "أعطيت"
 
 
 def _resolve_telegram_file_url(file_id: str) -> str | None:
