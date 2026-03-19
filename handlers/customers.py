@@ -484,15 +484,31 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
             await query.edit_message_text("غير مسموح.")
             return
         text, keyboard = await _render_tx_detail(db, tx)
-        # ملاحظة: أزرار التعديل كانت "مرات تتشتغل ومرات لا" بسبب رسالة الصورة.
-        # نخلي الأزرار دائماً على رسالة `edit_message_text` نفسها.
-        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        # نعرض التفاصيل أولاً، ثم الأزرار برسالة منفصلة (حسب طلب المستخدم).
         if getattr(tx, "photo_file_id", None):
             await context.bot.send_photo(
                 chat_id=update.effective_user.id,
                 photo=tx.photo_file_id,
                 caption=text,
             )
+        else:
+            await context.bot.send_message(
+                chat_id=update.effective_user.id,
+                text=text,
+            )
+
+        # بعدها نعرض الأزرار في رسالة مستقلة
+        await context.bot.send_message(
+            chat_id=update.effective_user.id,
+            text="اختر الإجراء المطلوب:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+        # نخلي رسالة الزر القديمة قصيرة بدون أزرار
+        try:
+            await query.edit_message_text("تم عرض تفاصيل المعاملة ✅")
+        except Exception:
+            pass
     finally:
         db.close()
 
@@ -1135,9 +1151,10 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
                 [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
             ]
-        await query.edit_message_text(
+        await _safe_edit_callback_text(
+            query,
             "مشاركة 📤\n\nانسخ النص أدناه أو استخدم الزر لفتح واتساب:\n\n" + share_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            keyboard,
         )
     finally:
         db.close()
