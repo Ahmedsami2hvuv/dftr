@@ -789,7 +789,7 @@ async def cust_tx_edit_photo_done(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أخذت (باللون الأحمر) — العميل دفع"""
+    """أخذت (باللون الأحمر)"""
     query = update.callback_query
     await query.answer()
     cid = int(query.data.replace("cust_took_", ""))

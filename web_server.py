@@ -88,9 +88,9 @@ def _render_page(token: str, offset: int) -> str:
 
         balance_text = "الرصيد: "
         if bal > 0:
-            balance_text += f"{bal:.2f} (مدين لك)"
+            balance_text += f"{bal:.2f}"
         elif bal < 0:
-            balance_text += f"{abs(bal):.2f} (أنت مدين)"
+            balance_text += f"{abs(bal):.2f}"
         else:
             balance_text += "0"
 
