@@ -65,6 +65,27 @@ from handlers.debts import (
 )
 from handlers.profile import menu_profile
 from handlers.admin import admin_panel, admin_users_list
+from handlers.customers import (
+    menu_customers,
+    cust_add_start,
+    cust_name,
+    cust_phone,
+    cust_took,
+    cust_gave,
+    cust_amount,
+    cust_note,
+    cust_edit_name_start,
+    cust_edit_phone_start,
+    cust_edit_name_done,
+    cust_edit_phone_done,
+    cust_callback_router,
+    CUST_NAME,
+    CUST_PHONE,
+    CUST_AMOUNT,
+    CUST_NOTE,
+    CUST_EDIT_NAME,
+    CUST_EDIT_PHONE,
+)
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -149,6 +170,51 @@ def main():
     app.add_handler(CallbackQueryHandler(menu_profile, pattern="^menu_profile$"))
     app.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
     app.add_handler(CallbackQueryHandler(admin_users_list, pattern="^admin_users$"))
+
+    # دفتر الديون (عملاء)
+    app.add_handler(CallbackQueryHandler(menu_customers, pattern="^menu_customers$"))
+
+    cust_add_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(cust_add_start, pattern="^cust_add$")],
+        states={
+            CUST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_name)],
+            CUST_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_phone)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(cust_add_conv)
+
+    cust_txn_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(cust_took, pattern="^cust_took_\\d+$"),
+            CallbackQueryHandler(cust_gave, pattern="^cust_gave_\\d+$"),
+        ],
+        states={
+            CUST_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_amount)],
+            CUST_NOTE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_note)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(cust_txn_conv)
+
+    cust_edit_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(cust_edit_name_start, pattern="^cust_editname_\\d+$"),
+            CallbackQueryHandler(cust_edit_phone_start, pattern="^cust_editphone_\\d+$"),
+        ],
+        states={
+            CUST_EDIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_edit_name_done)],
+            CUST_EDIT_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_edit_phone_done)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(cust_edit_conv)
+
+    # router لكل callbacks الخاصة بالعميل (تفاصيل/حذف/مشاركة/قائمة)
+    app.add_handler(CallbackQueryHandler(cust_callback_router, pattern="^cust_"))
 
     logger.info("البوت يعمل...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
