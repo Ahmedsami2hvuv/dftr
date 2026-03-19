@@ -2,7 +2,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import SessionLocal
-from models import User
+from app_models import User
 from config import ADMIN_ID
 
 
