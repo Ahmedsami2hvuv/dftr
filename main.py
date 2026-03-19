@@ -32,24 +32,13 @@ from handlers.start import cmd_start, main_menu
 from handlers.auth import (
     auth_register,
     auth_login,
-    auth_forgot,
     reg_name,
     reg_phone,
-    reg_password,
     login_phone,
-    login_password,
-    forgot_phone,
-    forgot_enter_code_click,
-    forgot_code,
     cancel_auth,
     REG_NAME,
     REG_PHONE,
-    REG_PASSWORD,
     LOGIN_PHONE,
-    LOGIN_PASSWORD,
-    FORGOT_PHONE,
-    FORGOT_WAIT,
-    FORGOT_CODE,
 )
 from handlers.ledger_handler import (
     menu_ledger,
@@ -74,27 +63,6 @@ from handlers.debts import (
     DEBT_AMOUNT,
     DEBT_DESC,
 )
-from handlers.customers import (
-    menu_customers,
-    cust_add_start,
-    cust_name,
-    cust_phone,
-    cust_took,
-    cust_gave,
-    cust_amount,
-    cust_note,
-    cust_edit_name_start,
-    cust_edit_phone_start,
-    cust_edit_name_done,
-    cust_edit_phone_done,
-    cust_callback_router,
-    CUST_NAME,
-    CUST_PHONE,
-    CUST_AMOUNT,
-    CUST_NOTE,
-    CUST_EDIT_NAME,
-    CUST_EDIT_PHONE,
-)
 from handlers.profile import menu_profile
 from handlers.admin import admin_panel, admin_users_list
 
@@ -112,43 +80,28 @@ def main():
 
     app.add_handler(CommandHandler("start", cmd_start))
 
-    # محادثة التسجيل: اسم → رقم → كلمة مرور
+    # محادثة التسجيل — per_message=False حتى يُقبل رسالة الاسم/الرقم بعد الضغط على الزر
     reg_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(auth_register, pattern="^auth_register$")],
         states={
             REG_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_name)],
             REG_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_phone)],
-            REG_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_password)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
         per_message=False,
     )
     app.add_handler(reg_conv)
 
-    # محادثة تسجيل الدخول: رقم → كلمة مرور
+    # محادثة تسجيل الدخول
     login_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(auth_login, pattern="^auth_login$")],
         states={
             LOGIN_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_phone)],
-            LOGIN_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_password)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
         per_message=False,
     )
     app.add_handler(login_conv)
-
-    # محادثة نسيت كلمة المرور: رقم → زر "بعد استلام الرمز" → إدخال الرمز
-    forgot_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(auth_forgot, pattern="^auth_forgot$")],
-        states={
-            FORGOT_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_phone)],
-            FORGOT_WAIT: [CallbackQueryHandler(forgot_enter_code_click, pattern="^forgot_enter_code$")],
-            FORGOT_CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_code)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel_auth)],
-        per_message=False,
-    )
-    app.add_handler(forgot_conv)
 
     # محادثة إضافة قيد دفتر
     ledger_add_conv = ConversationHandler(
@@ -196,46 +149,6 @@ def main():
     app.add_handler(CallbackQueryHandler(menu_profile, pattern="^menu_profile$"))
     app.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
     app.add_handler(CallbackQueryHandler(admin_users_list, pattern="^admin_users$"))
-
-    # دفتر الديون (عملاء)
-    app.add_handler(CallbackQueryHandler(menu_customers, pattern="^menu_customers$"))
-    cust_add_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(cust_add_start, pattern="^cust_add$")],
-        states={
-            CUST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_name)],
-            CUST_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_phone)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel_auth)],
-        per_message=False,
-    )
-    app.add_handler(cust_add_conv)
-    cust_txn_conv = ConversationHandler(
-        entry_points=[
-            CallbackQueryHandler(cust_took, pattern="^cust_took_\\d+$"),
-            CallbackQueryHandler(cust_gave, pattern="^cust_gave_\\d+$"),
-        ],
-        states={
-            CUST_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_amount)],
-            CUST_NOTE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_note)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel_auth)],
-        per_message=False,
-    )
-    app.add_handler(cust_txn_conv)
-    cust_edit_conv = ConversationHandler(
-        entry_points=[
-            CallbackQueryHandler(cust_edit_name_start, pattern="^cust_editname_\\d+$"),
-            CallbackQueryHandler(cust_edit_phone_start, pattern="^cust_editphone_\\d+$"),
-        ],
-        states={
-            CUST_EDIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_edit_name_done)],
-            CUST_EDIT_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_edit_phone_done)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel_auth)],
-        per_message=False,
-    )
-    app.add_handler(cust_edit_conv)
-    app.add_handler(CallbackQueryHandler(cust_callback_router, pattern="^cust_"))
 
     logger.info("البوت يعمل...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

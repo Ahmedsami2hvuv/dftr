@@ -17,7 +17,11 @@ class Customer(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="customers")
-    transactions = relationship("CustomerTransaction", back_populates="customer", order_by="CustomerTransaction.created_at.desc()")
+    transactions = relationship(
+        "CustomerTransaction",
+        back_populates="customer",
+        order_by="CustomerTransaction.created_at.desc()",
+    )
     share_links = relationship("ShareLink", back_populates="customer")
 
 
@@ -67,11 +71,11 @@ class Debt(Base):
     __tablename__ = "debts"
 
     id = Column(Integer, primary_key=True, index=True)
-    from_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # صاحب السجل
-    to_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)   # مستخدم آخر أو null لشخص خارجي
-    to_name = Column(String(255), nullable=True)   # اسم الدائن/المدين إذا خارجي
+    from_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    to_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    to_name = Column(String(255), nullable=True)
     amount = Column(Numeric(15, 2), nullable=False)
-    is_they_owe_me = Column(Integer, default=1)   # 1 = هم مدينون لي، 0 = أنا مدين
+    is_they_owe_me = Column(Integer, default=1)  # 1 = هم مدينون لي، 0 = أنا مدين
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
