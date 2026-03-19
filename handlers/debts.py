@@ -78,7 +78,14 @@ async def debt_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("أدخل رقماً صحيحاً.")
         return DEBT_AMOUNT
     context.user_data["debt_amount"] = amount
-    await update.message.reply_text("اختياري: وصف (لتخطي اكتب: تخطى أو /skip):")
+    keyboard = [
+        [InlineKeyboardButton("⏭️ سكيب الوصف", callback_data="debt_skip_desc_btn")],
+    ]
+    await update.message.reply_text(
+        "اختياري: وصف.\n"
+        "إذا تريد تخطي الوصف اضغط زر (سكيب الوصف).",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
     return DEBT_DESC
 
 
@@ -105,6 +112,37 @@ async def debt_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.commit()
         direction = "مدينون لك" if debt.is_they_owe_me else "أنت مدين"
         await update.message.reply_text(
+            f"تم تسجيل الدين ✅\n{debt.to_name}: {debt.amount} — {direction}"
+        )
+    finally:
+        db.close()
+    for k in ("debt_to_name", "debt_amount", "debt_they_owe_me"):
+        context.user_data.pop(k, None)
+    return ConversationHandler.END
+
+
+async def debt_skip_desc_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """سكيب الوصف عبر زر بدل كتابة /skip"""
+    query = update.callback_query
+    await query.answer()
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        if not user:
+            await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            return ConversationHandler.END
+        debt = Debt(
+            from_user_id=user.id,
+            to_user_id=None,
+            to_name=context.user_data.get("debt_to_name"),
+            amount=context.user_data.get("debt_amount"),
+            is_they_owe_me=context.user_data.get("debt_they_owe_me", 1),
+            description=None,
+        )
+        db.add(debt)
+        db.commit()
+        direction = "مدينون لك" if debt.is_they_owe_me else "أنت مدين"
+        await query.edit_message_text(
             f"تم تسجيل الدين ✅\n{debt.to_name}: {debt.amount} — {direction}"
         )
     finally:

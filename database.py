@@ -41,3 +41,12 @@ def init_db():
                 conn.commit()
             except Exception:
                 pass
+
+        # عمود صورة للمعاملات
+        try:
+            conn.execute(
+                text("ALTER TABLE customer_transactions ADD COLUMN IF NOT EXISTS photo_file_id VARCHAR(255)")
+            )
+            conn.commit()
+        except Exception:
+            pass

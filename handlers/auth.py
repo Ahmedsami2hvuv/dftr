@@ -218,8 +218,62 @@ async def forgot_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def forgot_enter_code_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("أرسل الرمز المرسل لك عبر الواتساب:")
+    keyboard = [
+        [
+            InlineKeyboardButton("↩ رجوع", callback_data="forgot_back_phone"),
+            InlineKeyboardButton("📋 نسخ الرمز", callback_data="forgot_copy_code"),
+        ]
+    ]
+    await query.edit_message_text(
+        "أرسل الرمز المرسل لك عبر الواتساب:\n\n"
+        "يمكنك نسخ الرمز من الزر أو الرجوع لإدخال رقم الهاتف مرة أخرى.",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
     return FORGOT_CODE
+
+
+async def forgot_back_phone_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    # إرجاع المستخدم لإدخال رقم الهاتف من جديد
+    context.user_data.pop("forgot_phone", None)
+    await query.edit_message_text("أرسل رقم هاتفك المسجل في الحساب:")
+    return FORGOT_PHONE
+
+
+async def forgot_copy_code_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    phone = context.user_data.get("forgot_phone")
+    if not phone:
+        await query.edit_message_text("انتهت الجلسة. ابدأ من «نسيت كلمة المرور» مرة أخرى.")
+        return FORGOT_PHONE
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.phone == phone).first()
+        if not user or not user.reset_code:
+            await query.edit_message_text("لم يتم العثور على رمز. استخدم «نسيت كلمة المرور» مرة أخرى.")
+            return ConversationHandler.END
+        if user.reset_code_expires and user.reset_code_expires < datetime.utcnow():
+            await query.edit_message_text("انتهت صلاحية الرمز. استخدم «نسيت كلمة المرور» مرة أخرى.")
+            return ConversationHandler.END
+        code = user.reset_code
+        # عرض الرمز داخل تليجرام (ليتم نسخه ولصقه)
+        await context.bot.send_message(
+            chat_id=update.effective_user.id,
+            text=f"رمزك هو: {code}\n\nانسخه والصقه في رسالة الرمز.",
+        )
+        # ارجع لنفس رسالة إدخال الرمز
+        keyboard = [
+            [
+                InlineKeyboardButton("↩ رجوع", callback_data="forgot_back_phone"),
+                InlineKeyboardButton("📋 نسخ الرمز", callback_data="forgot_copy_code"),
+            ]
+        ]
+        await query.edit_message_text("أرسل الرمز المرسل لك عبر الواتساب:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return FORGOT_CODE
+    finally:
+        db.close()
 
 
 async def forgot_code(update: Update, context: ContextTypes.DEFAULT_TYPE):

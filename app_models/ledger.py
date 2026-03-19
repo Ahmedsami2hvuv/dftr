@@ -34,6 +34,7 @@ class CustomerTransaction(Base):
     amount = Column(Numeric(15, 2), nullable=False)
     kind = Column(String(10), nullable=False)  # "gave" أعطيت أو "took" أخذت
     note = Column(Text, nullable=True)
+    photo_file_id = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     customer = relationship("Customer", back_populates="transactions")

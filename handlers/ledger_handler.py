@@ -63,7 +63,14 @@ async def ledger_add_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("أدخل رقماً صحيحاً للمبلغ.")
         return ADD_AMOUNT
     context.user_data["ledger_amount"] = amount
-    await update.message.reply_text("اختياري: أرسل وصفاً للقيد (لتخطي الوصف اكتب: تخطى أو /skip):")
+    keyboard = [
+        [InlineKeyboardButton("⏭️ سكيب الوصف", callback_data="ledger_skip_desc_btn")],
+    ]
+    await update.message.reply_text(
+        "اختياري: أرسل وصفاً للقيد.\n"
+        "إذا تريد تخطي الوصف اضغط زر (سكيب الوصف).",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
     return ADD_DESC
 
 
@@ -133,6 +140,34 @@ async def ledger_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     finally:
         db.close()
+
+
+async def ledger_skip_desc_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """سكيب الوصف عبر زر بدل كتابة /skip"""
+    query = update.callback_query
+    await query.answer()
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        if not user:
+            await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            return ConversationHandler.END
+        entry = LedgerEntry(
+            user_id=user.id,
+            kind=context.user_data.get("ledger_kind", "income"),
+            amount=context.user_data.get("ledger_amount", 0),
+            description=None,
+        )
+        db.add(entry)
+        db.commit()
+        kind_ar = "دخل" if entry.kind == "income" else "مصروف"
+        await query.edit_message_text(f"تم تسجيل {kind_ar} بمبلغ {entry.amount} ✅")
+    finally:
+        db.close()
+    context.user_data.pop("ledger_kind", None)
+    context.user_data.pop("ledger_amount", None)
+    context.user_data.pop("ledger_skip", None)
+    return ConversationHandler.END
 
 
 async def ledger_skip_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):

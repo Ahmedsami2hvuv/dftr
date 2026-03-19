@@ -32,13 +32,26 @@ from handlers.start import cmd_start, main_menu
 from handlers.auth import (
     auth_register,
     auth_login,
+    auth_forgot,
     reg_name,
     reg_phone,
+    reg_password,
     login_phone,
+    login_password,
+    forgot_phone,
+    forgot_enter_code_click,
+    forgot_code,
+    forgot_back_phone_click,
+    forgot_copy_code_click,
     cancel_auth,
     REG_NAME,
     REG_PHONE,
+    REG_PASSWORD,
     LOGIN_PHONE,
+    LOGIN_PASSWORD,
+    FORGOT_PHONE,
+    FORGOT_WAIT,
+    FORGOT_CODE,
 )
 from handlers.ledger_handler import (
     menu_ledger,
@@ -46,7 +59,7 @@ from handlers.ledger_handler import (
     ledger_add_expense,
     ledger_add_amount,
     ledger_add_desc,
-    ledger_skip_desc,
+    ledger_skip_desc_click,
     ledger_list,
     ADD_AMOUNT,
     ADD_DESC,
@@ -58,6 +71,7 @@ from handlers.debts import (
     debt_who,
     debt_amount,
     debt_desc,
+    debt_skip_desc_click,
     debt_list,
     DEBT_WHO,
     DEBT_AMOUNT,
@@ -70,15 +84,32 @@ from handlers.customers import (
     cust_add_start,
     cust_name,
     cust_phone,
+    cust_phone_skip_click,
     cust_took,
     cust_gave,
     cust_amount,
     cust_note,
+    cust_note_skip_click,
     cust_edit_name_start,
     cust_edit_phone_start,
     cust_edit_name_done,
     cust_edit_phone_done,
     cust_callback_router,
+    cust_tx_detail,
+    cust_tx_delete_click,
+    cust_tx_toggle_kind_click,
+    cust_tx_edit_amount_start,
+    cust_tx_edit_amount_done,
+    cust_tx_edit_note_start,
+    cust_tx_edit_note_done,
+    cust_tx_edit_date_start,
+    cust_tx_edit_date_done,
+    cust_tx_edit_photo_start,
+    cust_tx_edit_photo_done,
+    TX_EDIT_AMOUNT,
+    TX_EDIT_NOTE,
+    TX_EDIT_DATE,
+    TX_EDIT_PHOTO,
     CUST_NAME,
     CUST_PHONE,
     CUST_AMOUNT,
@@ -107,6 +138,7 @@ def main():
         states={
             REG_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_name)],
             REG_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_phone)],
+            REG_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_password)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
         per_message=False,
@@ -118,11 +150,29 @@ def main():
         entry_points=[CallbackQueryHandler(auth_login, pattern="^auth_login$")],
         states={
             LOGIN_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_phone)],
+            LOGIN_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_password)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
         per_message=False,
     )
     app.add_handler(login_conv)
+
+    # محادثة نسيت كلمة المرور: رقم الهاتف -> زر استلام الرمز -> إدخال الرمز
+    forgot_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(auth_forgot, pattern="^auth_forgot$")],
+        states={
+            FORGOT_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_phone)],
+            FORGOT_WAIT: [CallbackQueryHandler(forgot_enter_code_click, pattern="^forgot_enter_code$")],
+            FORGOT_CODE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_code),
+                CallbackQueryHandler(forgot_back_phone_click, pattern="^forgot_back_phone$"),
+                CallbackQueryHandler(forgot_copy_code_click, pattern="^forgot_copy_code$"),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(forgot_conv)
 
     # محادثة إضافة قيد دفتر
     ledger_add_conv = ConversationHandler(
@@ -134,7 +184,7 @@ def main():
             ADD_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_add_amount)],
             ADD_DESC: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_add_desc),
-                CommandHandler("skip", ledger_skip_desc),
+                CallbackQueryHandler(ledger_skip_desc_click, pattern="^ledger_skip_desc_btn$"),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
@@ -153,7 +203,7 @@ def main():
             DEBT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, debt_amount)],
             DEBT_DESC: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, debt_desc),
-                CommandHandler("skip", debt_desc),
+                CallbackQueryHandler(debt_skip_desc_click, pattern="^debt_skip_desc_btn$"),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
@@ -178,7 +228,10 @@ def main():
         entry_points=[CallbackQueryHandler(cust_add_start, pattern="^cust_add$")],
         states={
             CUST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_name)],
-            CUST_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_phone)],
+            CUST_PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_phone),
+                CallbackQueryHandler(cust_phone_skip_click, pattern="^cust_phone_skip_btn$"),
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
         per_message=False,
@@ -192,7 +245,10 @@ def main():
         ],
         states={
             CUST_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_amount)],
-            CUST_NOTE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_note)],
+            CUST_NOTE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_note),
+                CallbackQueryHandler(cust_note_skip_click, pattern="^cust_note_skip_btn$"),
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
         per_message=False,
@@ -212,6 +268,25 @@ def main():
         per_message=False,
     )
     app.add_handler(cust_edit_conv)
+
+    # محادثة تعديل معاملة العميل (مبلغ/ملاحظة/تاريخ/صورة)
+    cust_tx_edit_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(cust_tx_edit_amount_start, pattern="^cust_tx_edit_amount_\\d+$"),
+            CallbackQueryHandler(cust_tx_edit_note_start, pattern="^cust_tx_edit_note_\\d+$"),
+            CallbackQueryHandler(cust_tx_edit_date_start, pattern="^cust_tx_edit_date_\\d+$"),
+            CallbackQueryHandler(cust_tx_edit_photo_start, pattern="^cust_tx_edit_photo_\\d+$"),
+        ],
+        states={
+            TX_EDIT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_amount_done)],
+            TX_EDIT_NOTE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_note_done)],
+            TX_EDIT_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_date_done)],
+            TX_EDIT_PHOTO: [MessageHandler(filters.PHOTO, cust_tx_edit_photo_done)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(cust_tx_edit_conv)
 
     # router لكل callbacks الخاصة بالعميل (تفاصيل/حذف/مشاركة/قائمة)
     app.add_handler(CallbackQueryHandler(cust_callback_router, pattern="^cust_"))
