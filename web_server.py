@@ -6,12 +6,15 @@
 
 from __future__ import annotations
 
+import json
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
+from urllib.request import urlopen
 
 from database import SessionLocal
 from app_models import ShareLink, CustomerTransaction, Customer
+from config import BOT_TOKEN
 from config import BOT_USERNAME
 
 
@@ -89,6 +92,13 @@ def _render_page(token: str, offset: int) -> str:
             dt = t.created_at.strftime("%Y-%m-%d %H:%M")
             note = (t.note or "").strip()
             note_html = f"<div class='note'>ملاحظة: {note}</div>" if note else ""
+            photo_html = ""
+            if getattr(t, "photo_file_id", None):
+                fid = quote(str(t.photo_file_id), safe="")
+                photo_html = (
+                    f"<div class='photo-wrap'><img class='photo' "
+                    f"src='/creditbook/photo/{fid}' alt='صورة المعاملة'/></div>"
+                )
             remain = running_after_by_tx.get(t.id, bal)
             tx_rows.append(
                 f"""
@@ -96,6 +106,7 @@ def _render_page(token: str, offset: int) -> str:
                   <div class='top'>{dt}</div>
                   <div class='main'>{_kind_icon(t.kind)} {_kind_label(t.kind)} - {_amount_to_str(t.amount)} د.ع.</div>
                   <div class='remain'>الرصيد الحالي: {_amount_to_str(remain)} د.ع.</div>
+                  {photo_html}
                   {note_html}
                 </div>
                 """
@@ -148,6 +159,8 @@ def _render_page(token: str, offset: int) -> str:
               .main {{ margin-top: 6px; font-size: 15px; }}
               .remain {{ margin-top: 6px; color: #0d47a1; font-size: 13px; }}
               .note {{ margin-top: 6px; color: #444; font-size: 13px; }}
+              .photo-wrap {{ margin-top: 8px; }}
+              .photo {{ width: 100%; max-height: 260px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; }}
               .btn {{ display: inline-block; padding: 10px 14px; background: #1976d2; color: #fff; text-decoration: none; border-radius: 10px; margin-top: 10px; }}
               .wa {{ background: #1b5e20; margin-left: 8px; }}
               .bot {{ background: #1565c0; }}
@@ -177,6 +190,24 @@ def _kind_label(kind: str) -> str:
     return "أخذت" if kind == "took" else "أعطيت"
 
 
+def _resolve_telegram_file_url(file_id: str) -> str | None:
+    """يحصل الرابط المباشر للصورة من Telegram getFile."""
+    if not BOT_TOKEN or not file_id:
+        return None
+    try:
+        api = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={quote(file_id, safe='')}"
+        with urlopen(api, timeout=8) as r:  # nosec B310
+            payload = json.loads(r.read().decode("utf-8"))
+        if not payload.get("ok"):
+            return None
+        file_path = payload.get("result", {}).get("file_path")
+        if not file_path:
+            return None
+        return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+    except Exception:
+        return None
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         parsed = urlparse(self.path)
@@ -190,6 +221,21 @@ class Handler(BaseHTTPRequestHandler):
                 offset = 0
 
         m = re.match(r"^/creditbook/balance/(?P<token>[A-Za-z0-9_-]+)$", path)
+        photo_match = re.match(r"^/creditbook/photo/(?P<fid>.+)$", path)
+        if photo_match:
+            file_id = unquote(photo_match.group("fid"))
+            file_url = _resolve_telegram_file_url(file_id)
+            if not file_url:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write("الصورة غير متاحة".encode("utf-8"))
+                return
+            self.send_response(302)
+            self.send_header("Location", file_url)
+            self.end_headers()
+            return
+
         if not m:
             self.send_response(404)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
