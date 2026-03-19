@@ -40,17 +40,31 @@ from handlers.auth import (
     REG_PHONE,
     LOGIN_PHONE,
 )
-from handlers.ledger_handler import (
-    menu_ledger,
-    ledger_add_income,
-    ledger_add_expense,
-    ledger_add_amount,
-    ledger_add_desc,
-    ledger_skip_desc,
-    ledger_list,
-    ADD_AMOUNT,
-    ADD_DESC,
-)
+try:
+    from handlers.ledger_handler import (
+        menu_ledger,
+        ledger_add_income,
+        ledger_add_expense,
+        ledger_add_amount,
+        ledger_add_desc,
+        ledger_skip_desc,
+        ledger_list,
+        ADD_AMOUNT,
+        ADD_DESC,
+    )
+except ModuleNotFoundError:
+    # توافق مع النسخ القديمة إذا كان الملف اسمه ledger.py
+    from handlers.ledger import (  # type: ignore
+        menu_ledger,
+        ledger_add_income,
+        ledger_add_expense,
+        ledger_add_amount,
+        ledger_add_desc,
+        ledger_skip_desc,
+        ledger_list,
+        ADD_AMOUNT,
+        ADD_DESC,
+    )
 from handlers.debts import (
     menu_debts,
     debt_add_they_owe,
