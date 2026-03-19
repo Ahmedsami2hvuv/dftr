@@ -137,31 +137,37 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = context.user_data.get("login_phone")
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
-        if not user:
-            await update.message.reply_text("لا يوجد حساب بهذا الرقم. أنشئ حساباً جديداً.")
-            context.user_data.pop("login_phone", None)
-            return ConversationHandler.END
-        if user.password_hash and not check_password(password, user.password_hash):
-            await update.message.reply_text("كلمة المرور غير صحيحة.")
-            return LOGIN_PASSWORD
-        if not user.password_hash:
-            user.password_hash = hash_password(password)
+        try:
+            user = db.query(User).filter(User.phone == phone).first()
+            if not user:
+                await update.message.reply_text("لا يوجد حساب بهذا الرقم. أنشئ حساباً جديداً.")
+                context.user_data.pop("login_phone", None)
+                return ConversationHandler.END
+            if user.password_hash and not check_password(password, user.password_hash):
+                await update.message.reply_text("كلمة المرور غير صحيحة.")
+                return LOGIN_PASSWORD
+            if not user.password_hash:
+                user.password_hash = hash_password(password)
+                db.commit()
+            if user.telegram_id and user.telegram_id != update.effective_user.id:
+                await update.message.reply_text(
+                    "هذا الحساب مربوط بحساب تليجرام آخر. تواصل مع الإدارة إن كان خطأ."
+                )
+                context.user_data.pop("login_phone", None)
+                return ConversationHandler.END
+            user.telegram_id = update.effective_user.id
+            user.username = update.effective_user.username
             db.commit()
-        if user.telegram_id and user.telegram_id != update.effective_user.id:
+            keyboard = [[InlineKeyboardButton("القائمة الرئيسية", callback_data="main_menu")]]
             await update.message.reply_text(
-                "هذا الحساب مربوط بحساب تليجرام آخر. تواصل مع الإدارة إن كان خطأ."
+                f"تم تسجيل الدخول بنجاح ✅ مرحباً {user.full_name or user.username or 'بك'}.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
             )
-            context.user_data.pop("login_phone", None)
+        except Exception:
+            await update.message.reply_text(
+                "حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى أو استخدم /start."
+            )
             return ConversationHandler.END
-        user.telegram_id = update.effective_user.id
-        user.username = update.effective_user.username
-        db.commit()
-        keyboard = [[InlineKeyboardButton("القائمة الرئيسية", callback_data="main_menu")]]
-        await update.message.reply_text(
-            f"تم تسجيل الدخول بنجاح ✅ مرحباً {user.full_name or user.username or 'بك'}.",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
     finally:
         db.close()
     context.user_data.pop("login_phone", None)
