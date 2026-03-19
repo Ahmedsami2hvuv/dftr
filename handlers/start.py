@@ -75,7 +75,6 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
         [InlineKeyboardButton("📒 الدخل والمصروف", callback_data="menu_ledger")],
         [InlineKeyboardButton("👤 حسابي", callback_data="menu_profile")],
-        [InlineKeyboardButton("🚪 تسجيل خروج", callback_data="auth_logout")],
     ]
     if update.effective_user.id == ADMIN_ID:
         keyboard.append([InlineKeyboardButton("🔐 لوحة الأدمن", callback_data="admin_panel")])

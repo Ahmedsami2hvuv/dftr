@@ -338,23 +338,24 @@ async def cancel_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تسجيل خروج حقيقي: إزالة ربط telegram_id حتى يرجع يطلب تسجيل الدخول."""
     query = update.callback_query
-    if query:
-        await query.answer()
-        msg = query.message
-    else:
-        msg = update.message
+    if not query:
+        return ConversationHandler.END
+    await query.answer()
 
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.telegram_id == update.effective_user.id).first()
+        keyboard = [
+            [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+            [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+            [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+        ]
+
         if not user:
-            # أصلاً غير مسجل
-            keyboard = [
-                [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
-                [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
-                [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
-            ]
-            await msg.reply_text("أنت غير مسجل حالياً. اختر خيار تسجيل الدخول.", reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(
+                "أنت غير مسجل حالياً. اختر خيار تسجيل الدخول.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
             return ConversationHandler.END
 
         user.telegram_id = None
@@ -362,12 +363,7 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user.username = None
         db.commit()
 
-        keyboard = [
-            [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
-            [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
-            [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
-        ]
-        await msg.reply_text(
+        await query.edit_message_text(
             "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى.",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
