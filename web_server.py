@@ -91,7 +91,7 @@ def _render_page(token: str, offset: int) -> str:
         for t in txs:
             dt = t.created_at.strftime("%Y-%m-%d %H:%M")
             note = (t.note or "").strip()
-            note_html = f"<div class='note'>ملاحظة: {note}</div>" if note else ""
+            note_html = f"<div class='note'>ملاحظة: {note}</div>" if note else "<div class='note'>ملاحظة: —</div>"
             photo_html = ""
             if getattr(t, "photo_file_id", None):
                 fid = quote(str(t.photo_file_id), safe="")
@@ -101,14 +101,19 @@ def _render_page(token: str, offset: int) -> str:
                 )
             remain = running_after_by_tx.get(t.id, bal)
             remain_class = "bal-red" if remain > 0 else ("bal-green" if remain < 0 else "")
+            tx_kind_class = "bal-red" if t.kind == "took" else "bal-green"
             tx_rows.append(
                 f"""
                 <div class='tx'>
                   <div class='top'>{dt}</div>
-                  <div class='main'>{_kind_icon(t.kind)} {_kind_label(t.kind)} - {_amount_to_str(t.amount)} د.ع.</div>
-                  <div class='remain {remain_class}'>الرصيد الحالي: {_amount_to_str(remain)} د.ع.</div>
-                  {photo_html}
-                  {note_html}
+                  <div class='tx-content'>
+                    <div class='tx-text'>
+                      <div class='remain {remain_class}'>الرصيد الحالي: {_amount_to_str(remain)} د.ع.</div>
+                      <div class='main {tx_kind_class}'>{_kind_icon(t.kind)} {_kind_label(t.kind)} - {_amount_to_str(t.amount)} د.ع.</div>
+                      {note_html}
+                    </div>
+                    {photo_html}
+                  </div>
                 </div>
                 """
             )
@@ -160,13 +165,15 @@ def _render_page(token: str, offset: int) -> str:
               .bal-green {{ color: #2e7d32; }}
               .tx {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 12px; margin: 10px 0; }}
               .top {{ color: #666; font-size: 12px; }}
-              .main {{ margin-top: 6px; font-size: 15px; }}
+              .tx-content {{ margin-top: 6px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }}
+              .tx-text {{ flex: 1; min-width: 0; }}
+              .main {{ margin-top: 6px; font-size: 15px; font-weight: 700; }}
               .remain {{ margin-top: 6px; font-size: 13px; }}
               .remain.bal-red {{ color: #d32f2f; }}
               .remain.bal-green {{ color: #2e7d32; }}
               .note {{ margin-top: 6px; color: #444; font-size: 13px; }}
-              .photo-wrap {{ margin-top: 8px; }}
-              .photo {{ width: 68px; height: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; cursor: pointer; }}
+              .photo-wrap {{ flex: 0 0 auto; margin-top: 2px; }}
+              .photo {{ width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; cursor: pointer; }}
               .btn {{ display: inline-block; padding: 10px 14px; background: #1976d2; color: #fff; text-decoration: none; border-radius: 10px; margin-top: 10px; }}
               .wa {{ background: #1b5e20; margin-left: 8px; }}
               .bot {{ background: #1565c0; }}
