@@ -1,0 +1,4 @@
+python-telegram-bot==21.7
+sqlalchemy==2.0.36
+bcrypt==4.2.0
+python-dotenv==1.0.1
