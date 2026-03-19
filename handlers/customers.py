@@ -265,26 +265,19 @@ async def _render_tx_detail(db, tx: CustomerTransaction):
         + ("الصورة: موجودة ✅" if has_photo else "الصورة: غير مضافة")
     )
 
+    # 6 ازرار (ثلاثة بسطرين): مبلغ/ملاحظة/تاريخ ثم صورة/نوع/حذف
     keyboard = [
         [
-            InlineKeyboardButton("✏️ تعديل المبلغ", callback_data=f"cust_tx_edit_amount_{tx.id}"),
-            InlineKeyboardButton("✏️ تعديل الملاحظة", callback_data=f"cust_tx_edit_note_{tx.id}"),
+            InlineKeyboardButton("✏️المبلغ", callback_data=f"cust_tx_edit_amount_{tx.id}"),
+            InlineKeyboardButton("✏️الملاحظة", callback_data=f"cust_tx_edit_note_{tx.id}"),
+            InlineKeyboardButton("✏️التاريخ", callback_data=f"cust_tx_edit_date_{tx.id}"),
         ],
         [
-            InlineKeyboardButton("✏️ تعديل التاريخ", callback_data=f"cust_tx_edit_date_{tx.id}"),
+            InlineKeyboardButton("🖼الصورة", callback_data=f"cust_tx_edit_photo_{tx.id}"),
+            InlineKeyboardButton("النوع", callback_data=f"cust_tx_toggle_kind_{tx.id}"),
+            InlineKeyboardButton("حذف", callback_data=f"cust_tx_delete_req_{tx.id}"),
         ],
-        [
-            InlineKeyboardButton("🖼 إضافة/تعديل صورة", callback_data=f"cust_tx_edit_photo_{tx.id}"),
-        ],
-        [
-            InlineKeyboardButton("🔁 تبديل النوع", callback_data=f"cust_tx_toggle_kind_{tx.id}"),
-        ],
-        [
-            InlineKeyboardButton("🗑 حذف المعاملة", callback_data=f"cust_tx_delete_req_{tx.id}"),
-        ],
-        [
-            InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cust.id}"),
-        ],
+        [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cust.id}")],
     ]
     return text, keyboard
 
