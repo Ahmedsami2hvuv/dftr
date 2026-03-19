@@ -332,7 +332,7 @@ async def cust_cat_del_req_click(update: Update, context: ContextTypes.DEFAULT_T
         ],
     ]
     await query.edit_message_text(
-        "هل أنت متأكد من حذف هذا الصنف؟",
+        "⚠️ هل أنت متأكد من حذف هذا الصنف؟\nلا يمكن التراجع.",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -797,20 +797,20 @@ async def cust_tx_delete_req_click(update: Update, context: ContextTypes.DEFAULT
         ],
     ]
     await query.edit_message_text(
-        "هل أنت متأكد من حذف هذه المعاملة؟",
+        "⚠️ هل أنت متأكد من حذف هذه المعاملة؟\nلا يمكن التراجع.",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
 async def cust_tx_delete_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تنفيذ الحذف فقط بعد زر «تأكيد الحذف» (cust_tx_delete_do_)."""
     query = update.callback_query
     await query.answer()
     data = query.data or ""
-    if data.startswith("cust_tx_delete_do_"):
-        tx_id = int(data.replace("cust_tx_delete_do_", ""))
-    else:
-        # دعم قديم إن وجد
-        tx_id = int(data.replace("cust_tx_delete_", ""))
+    if not data.startswith("cust_tx_delete_do_"):
+        await query.edit_message_text("استخدم زر تأكيد الحذف من الشاشة السابقة.")
+        return
+    tx_id = int(data.replace("cust_tx_delete_do_", ""))
     db = SessionLocal()
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
@@ -1372,7 +1372,7 @@ async def cust_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("تغيير الاسم", callback_data=f"cust_editname_{cid}")],
             [InlineKeyboardButton("تغيير الرقم", callback_data=f"cust_editphone_{cid}")],
-            [InlineKeyboardButton("🗑 حذف العميل", callback_data=f"cust_del_{cid}")],
+            [InlineKeyboardButton("🗑 حذف العميل", callback_data=f"cust_del_req_{cid}")],
             [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
         ]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1446,10 +1446,43 @@ async def cust_edit_phone_done(update: Update, context: ContextTypes.DEFAULT_TYP
     return ConversationHandler.END
 
 
-async def cust_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cust_delete_req_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """شاشة تأكيد قبل حذف العميل."""
     query = update.callback_query
     await query.answer()
-    cid = int(query.data.replace("cust_del_", ""))
+    cid = int(query.data.replace("cust_del_req_", ""))
+    db = SessionLocal()
+    try:
+        cust = db.query(Customer).filter(Customer.id == cid).first()
+        if not cust:
+            await query.edit_message_text("العميل غير موجود.")
+            return
+        user = get_current_user(db, update.effective_user.id)
+        if not user or cust.user_id != user.id:
+            await query.edit_message_text("غير مسموح.")
+            return
+        tx_count = db.query(CustomerTransaction).filter(CustomerTransaction.customer_id == cid).count()
+        name = cust.name
+    finally:
+        db.close()
+    keyboard = [
+        [InlineKeyboardButton("✅ تأكيد الحذف", callback_data=f"cust_del_do_{cid}")],
+        [InlineKeyboardButton("↩ تراجع", callback_data=f"cust_edit_{cid}")],
+    ]
+    extra = f"\n\nعدد المعاملات المرتبطة: {tx_count}" if tx_count else ""
+    await query.edit_message_text(
+        f"⚠️ حذف العميل «{name}»{extra}\n\n"
+        "سيتم حذف جميع معاملاته وروابط المشاركة نهائياً.\n\n"
+        "هل أنت متأكد؟",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def cust_delete_do_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تنفيذ حذف العميل بعد التأكيد."""
+    query = update.callback_query
+    await query.answer()
+    cid = int(query.data.replace("cust_del_do_", ""))
     db = SessionLocal()
     try:
         cust = db.query(Customer).filter(Customer.id == cid).first()
@@ -1622,7 +1655,7 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
     if data.startswith("cust_tx_delete_req_"):
         await cust_tx_delete_req_click(update, context)
         return
-    if data.startswith("cust_tx_delete_do_") or data.startswith("cust_tx_delete_"):
+    if data.startswith("cust_tx_delete_do_"):
         await cust_tx_delete_click(update, context)
         return
     if data.startswith("cust_tx_toggle_kind_"):
@@ -1639,9 +1672,12 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
         # سيتم التعامل معها عبر ConversationHandler داخل main.py
         return
 
-    # حذف العميل قبل cust_edit_ حتى لا يختلط أي بادئة لاحقاً
-    if data.startswith("cust_del_"):
-        await cust_delete(update, context)
+    # حذف العميل: تأكيد ثم تنفيذ (قبل cust_edit_ حتى لا يختلط أي بادئة لاحقاً)
+    if data.startswith("cust_del_do_"):
+        await cust_delete_do_click(update, context)
+        return
+    if data.startswith("cust_del_req_"):
+        await cust_delete_req_click(update, context)
         return
     if data.startswith("cust_edit_"):
         await cust_edit_menu(update, context)

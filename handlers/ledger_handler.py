@@ -219,7 +219,7 @@ async def ledger_cat_del_req_click(update: Update, context: ContextTypes.DEFAULT
         [InlineKeyboardButton("↩ تراجع", callback_data="ledger_categories_menu")],
     ]
     await query.edit_message_text(
-        "تأكيد الحذف؟",
+        "⚠️ هل أنت متأكد من حذف صنف الدفتر هذا؟\nلا يمكن التراجع.",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
