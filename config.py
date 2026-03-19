@@ -28,6 +28,10 @@ if not _raw_base:
 if not _raw_base:
     _raw_base = f"http://localhost:{WEB_PORT}"
 
+# إذا المستخدم كتب الدومين بدون بروتوكول، نضيف https تلقائياً
+if _raw_base and not _raw_base.startswith(("http://", "https://")):
+    _raw_base = "https://" + _raw_base.lstrip("/")
+
 WEB_BASE_URL = _raw_base.rstrip("/")
 
 if not BOT_TOKEN:
