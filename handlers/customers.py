@@ -374,7 +374,8 @@ async def _build_customer_view(db, cust: Customer, offset: int):
         keyboard.append([InlineKeyboardButton("لا توجد معاملات بعد", callback_data="noop")])
     else:
         for t in txs:
-            dt = t.created_at.strftime("%Y-%m-%d")
+            # ترتيب: يوم/شهر/سنه
+            dt = t.created_at.strftime("%d/%m/%Y")
             note = (t.note or "").strip()
             note_short = (note[:10] + "…") if len(note) > 10 else note
             icon = _tx_kind_ar(t.kind)
@@ -437,7 +438,7 @@ def _format_tx_amount(amount) -> str:
 async def _render_tx_detail(db, tx: CustomerTransaction):
     cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
     icon = _tx_kind_ar(tx.kind)
-    dt = tx.created_at.strftime("%Y-%m-%d %H:%M")
+    dt = tx.created_at.strftime("%d/%m/%Y %H:%M")
     note = (tx.note or "").strip()
     has_photo = bool(getattr(tx, "photo_file_id", None))
 
@@ -483,17 +484,15 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
             await query.edit_message_text("غير مسموح.")
             return
         text, keyboard = await _render_tx_detail(db, tx)
+        # ملاحظة: أزرار التعديل كانت "مرات تتشتغل ومرات لا" بسبب رسالة الصورة.
+        # نخلي الأزرار دائماً على رسالة `edit_message_text` نفسها.
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         if getattr(tx, "photo_file_id", None):
             await context.bot.send_photo(
                 chat_id=update.effective_user.id,
                 photo=tx.photo_file_id,
                 caption=text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
             )
-            # نخلي رسالة الواجهة القديمة بدون كيبورد
-            await query.edit_message_text("تم عرض تفاصيل المعاملة (مع الصورة) ✅")
-        else:
-            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     finally:
         db.close()
 
