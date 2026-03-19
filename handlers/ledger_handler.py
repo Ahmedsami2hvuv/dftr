@@ -6,7 +6,11 @@ from telegram.ext import ContextTypes, ConversationHandler
 from database import SessionLocal
 from app_models import User, LedgerEntry
 
-(LEDGER_MENU, ADD_KIND, ADD_AMOUNT, ADD_DESC) = range(4)
+(LEDGER_MENU, ADD_KIND, ADD_CATEGORY, ADD_AMOUNT, ADD_DESC) = range(5)
+
+CAT_FIXED_SALARY = "fixed_salary"
+CAT_ADDITIONAL_INCOME = "additional_income"
+CAT_EXPENSES = "expenses"
 
 
 def get_current_user(db, telegram_id: int):
@@ -22,35 +26,60 @@ async def menu_ledger(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user:
             await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
             return
-        keyboard = [
-            [InlineKeyboardButton("➕ إضافة دخل", callback_data="ledger_add_income")],
-            [InlineKeyboardButton("➖ إضافة مصروف", callback_data="ledger_add_expense")],
-            [InlineKeyboardButton("📋 عرض السجل", callback_data="ledger_list")],
-            [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
-        ]
-        await query.edit_message_text(
-            "دفتر الحسابات 📊\n\nاختر:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
+
+        # حساب إجمالي كل خانة
+        fixed = sum(
+            (e.amount for e in user.ledger_entries if (e.category or "") == CAT_FIXED_SALARY and e.kind == "income")
         )
+        additional = sum(
+            (e.amount for e in user.ledger_entries if (e.category or "") == CAT_ADDITIONAL_INCOME and e.kind == "income")
+        )
+        expenses = sum(
+            (e.amount for e in user.ledger_entries if (e.category or "") == CAT_EXPENSES and e.kind == "expense")
+        )
+        net = fixed + additional - expenses
+
+        keyboard = [
+            [InlineKeyboardButton("➕ إضافة راتبك الثابت", callback_data="ledger_add_fixed_salary")],
+            [InlineKeyboardButton("➕ إضافة مدخولات إضافية", callback_data="ledger_add_additional_income")],
+            [InlineKeyboardButton("➕ إضافة التزامات/مصروفات", callback_data="ledger_add_expenses")],
+            [InlineKeyboardButton("◀ دفتر الديون", callback_data="menu_customers")],
+        ]
+
+        text = (
+            "الدخل والمصروف 📒\n\n"
+            f"راتبك الثابت: {fixed} د.ع.\n"
+            f"مدخولات إضافية: {additional} د.ع.\n"
+            f"التزامات/مصروفات: {expenses} د.ع.\n\n"
+            f"الصافي: {net} د.ع."
+        )
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     finally:
         db.close()
 
 
-async def ledger_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE, kind: str):
+async def ledger_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE, kind: str, category: str):
     query = update.callback_query
     await query.answer()
     context.user_data["ledger_kind"] = kind
+    context.user_data["ledger_category"] = category
     kind_ar = "دخل" if kind == "income" else "مصروف"
-    await query.edit_message_text(f"إضافة {kind_ar} 💵\n\nأرسل المبلغ (رقم فقط، مثال: 50000):")
+    await query.edit_message_text(
+        f"إضافة {kind_ar} 💵\n\nأرسل المبلغ (رقم فقط، مثال: 50000):"
+    )
     return ADD_AMOUNT
 
 
-async def ledger_add_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return await ledger_add_start(update, context, "income")
+async def ledger_add_fixed_salary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await ledger_add_start(update, context, "income", CAT_FIXED_SALARY)
 
 
-async def ledger_add_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return await ledger_add_start(update, context, "expense")
+async def ledger_add_additional_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await ledger_add_start(update, context, "income", CAT_ADDITIONAL_INCOME)
+
+
+async def ledger_add_expenses(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await ledger_add_start(update, context, "expense", CAT_EXPENSES)
 
 
 async def ledger_add_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -89,6 +118,7 @@ async def ledger_add_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id=user.id,
             kind=context.user_data.get("ledger_kind", "income"),
             amount=context.user_data.get("ledger_amount", 0),
+            category=context.user_data.get("ledger_category"),
             description=desc or None,
         )
         db.add(entry)
@@ -156,6 +186,7 @@ async def ledger_skip_desc_click(update: Update, context: ContextTypes.DEFAULT_T
             user_id=user.id,
             kind=context.user_data.get("ledger_kind", "income"),
             amount=context.user_data.get("ledger_amount", 0),
+            category=context.user_data.get("ledger_category"),
             description=None,
         )
         db.add(entry)
@@ -166,6 +197,7 @@ async def ledger_skip_desc_click(update: Update, context: ContextTypes.DEFAULT_T
         db.close()
     context.user_data.pop("ledger_kind", None)
     context.user_data.pop("ledger_amount", None)
+    context.user_data.pop("ledger_category", None)
     context.user_data.pop("ledger_skip", None)
     return ConversationHandler.END
 

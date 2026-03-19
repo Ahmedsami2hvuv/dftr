@@ -56,8 +56,9 @@ from handlers.auth import (
 )
 from handlers.ledger_handler import (
     menu_ledger,
-    ledger_add_income,
-    ledger_add_expense,
+    ledger_add_fixed_salary,
+    ledger_add_additional_income,
+    ledger_add_expenses,
     ledger_add_amount,
     ledger_add_desc,
     ledger_skip_desc_click,
@@ -199,8 +200,9 @@ def main():
     # محادثة إضافة قيد دفتر
     ledger_add_conv = ConversationHandler(
         entry_points=[
-            CallbackQueryHandler(ledger_add_income, pattern="^ledger_add_income$"),
-            CallbackQueryHandler(ledger_add_expense, pattern="^ledger_add_expense$"),
+            CallbackQueryHandler(ledger_add_fixed_salary, pattern="^ledger_add_fixed_salary$"),
+            CallbackQueryHandler(ledger_add_additional_income, pattern="^ledger_add_additional_income$"),
+            CallbackQueryHandler(ledger_add_expenses, pattern="^ledger_add_expenses$"),
         ],
         states={
             ADD_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_add_amount)],

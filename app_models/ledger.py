@@ -61,6 +61,7 @@ class LedgerEntry(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     kind = Column(String(20), nullable=False)  # "income" أو "expense"
     amount = Column(Numeric(15, 2), nullable=False)
+    category = Column(String(50), nullable=True)  # fixed_salary / additional_income / expenses
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

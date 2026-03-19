@@ -47,7 +47,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "استخدم القائمة أدناه لإدارة دفترك."
             )
             keyboard = [
-                [InlineKeyboardButton("📊 دفتر الحسابات", callback_data="menu_ledger")],
                 [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
                 [InlineKeyboardButton("👤 حسابي", callback_data="menu_profile")],
             ]
@@ -72,7 +71,6 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     keyboard = [
-        [InlineKeyboardButton("📊 دفتر الحسابات", callback_data="menu_ledger")],
         [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
         [InlineKeyboardButton("👤 حسابي", callback_data="menu_profile")],
     ]

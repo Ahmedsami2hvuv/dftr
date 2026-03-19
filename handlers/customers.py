@@ -47,7 +47,10 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
             return
         customers = db.query(Customer).filter(Customer.user_id == user.id).order_by(Customer.created_at.desc()).all()
-        keyboard = [[InlineKeyboardButton("➕ إضافة عميل", callback_data="cust_add")]]
+        keyboard = [
+            [InlineKeyboardButton("📒 الدخل والمصروف", callback_data="menu_ledger")],
+            [InlineKeyboardButton("➕ إضافة عميل", callback_data="cust_add")],
+        ]
         for c in customers:
             bal, _, _ = _balance(c)
             # بالواجهة: اسم العميل فقط بدون رقم

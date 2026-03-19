@@ -50,3 +50,12 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+
+        # عمود التصنيف لدفتر الحسابات
+        try:
+            conn.execute(
+                text("ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS category VARCHAR(50)")
+            )
+            conn.commit()
+        except Exception:
+            pass
