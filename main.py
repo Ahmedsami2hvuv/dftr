@@ -58,6 +58,7 @@ from handlers.debts import (
     debt_who,
     debt_amount,
     debt_desc,
+    debt_list,
     DEBT_WHO,
     DEBT_AMOUNT,
     DEBT_DESC,
