@@ -80,7 +80,7 @@ def main():
 
     app.add_handler(CommandHandler("start", cmd_start))
 
-    # محادثة التسجيل
+    # محادثة التسجيل (per_message=True لتتبع أزرار الـ callback بشكل صحيح)
     reg_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(auth_register, pattern="^auth_register$")],
         states={
@@ -88,6 +88,7 @@ def main():
             REG_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_phone)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=True,
     )
     app.add_handler(reg_conv)
 
@@ -98,6 +99,7 @@ def main():
             LOGIN_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_phone)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=True,
     )
     app.add_handler(login_conv)
 
@@ -112,10 +114,10 @@ def main():
             ADD_DESC: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_add_desc),
                 CommandHandler("skip", ledger_skip_desc),
-                CommandHandler("تخطى", ledger_skip_desc),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=True,
     )
     app.add_handler(ledger_add_conv)
 
@@ -131,10 +133,10 @@ def main():
             DEBT_DESC: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, debt_desc),
                 CommandHandler("skip", debt_desc),
-                CommandHandler("تخطى", debt_desc),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=True,
     )
     app.add_handler(debt_add_conv)
 
