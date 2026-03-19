@@ -132,6 +132,42 @@ def _parse_amount_and_optional_note(text: str):
     return a, note if note else None
 
 
+# مفاتيح حالة إدخال معاملة العميل (للتنظيف عند الإنهاء)
+_CUST_TXN_KEYS = (
+    "cust_txn_kind",
+    "cust_txn_cid",
+    "cust_txn_amount",
+    "cust_txn_note_text",
+    "cust_txn_photo_file_id",
+    "cust_txn_prompt_msg_id",
+    "cust_txn_prompt_chat_id",
+)
+
+
+async def _edit_txn_prompt_or_reply(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    text: str,
+    keyboard: list,
+):
+    """يعدّل رسالة التعليمات السابقة (إن وُجدت) وإلا يرسل رداً جديداً."""
+    markup = InlineKeyboardMarkup(keyboard)
+    chat_id = context.user_data.get("cust_txn_prompt_chat_id")
+    msg_id = context.user_data.get("cust_txn_prompt_msg_id")
+    if chat_id is not None and msg_id is not None:
+        try:
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=msg_id,
+                text=text,
+                reply_markup=markup,
+            )
+            return
+        except Exception:
+            pass
+    await update.message.reply_text(text, reply_markup=markup)
+
+
 def _is_public_http_url(url: str) -> bool:
     """يتحقق أن الرابط HTTP/HTTPS وقابل للاستخدام من خارج السيرفر."""
     if not url:
@@ -1021,6 +1057,8 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
+    context.user_data["cust_txn_prompt_msg_id"] = query.message.message_id
+    context.user_data["cust_txn_prompt_chat_id"] = query.message.chat_id
     return CUST_AMOUNT
 
 
@@ -1044,6 +1082,8 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
+    context.user_data["cust_txn_prompt_msg_id"] = query.message.message_id
+    context.user_data["cust_txn_prompt_chat_id"] = query.message.chat_id
     return CUST_AMOUNT
 
 
@@ -1057,7 +1097,7 @@ async def cust_txn_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text("غير قادر على الرجوع.")
         return ConversationHandler.END
 
-    for k in ("cust_txn_kind", "cust_txn_cid", "cust_txn_amount", "cust_txn_note_text", "cust_txn_photo_file_id"):
+    for k in _CUST_TXN_KEYS:
         context.user_data.pop(k, None)
 
     await customer_detail(update, context, cid, offset=0)
@@ -1068,7 +1108,7 @@ async def cust_txn_cancel_click(update: Update, context: ContextTypes.DEFAULT_TY
     """إلغاء العملية والعودة لقائمة العملاء."""
     query = update.callback_query
     await query.answer()
-    for k in ("cust_txn_kind", "cust_txn_cid", "cust_txn_amount", "cust_txn_note_text", "cust_txn_photo_file_id"):
+    for k in _CUST_TXN_KEYS:
         context.user_data.pop(k, None)
     await menu_customers(update, context)
     return ConversationHandler.END
@@ -1092,6 +1132,8 @@ async def cust_txn_back_amount_click(update: Update, context: ContextTypes.DEFAU
         "أرسل المبلغ (رقم أو 38 الفيروز أو سطرين… أو صورة بالتعليق).",
         keyboard,
     )
+    context.user_data["cust_txn_prompt_msg_id"] = query.message.message_id
+    context.user_data["cust_txn_prompt_chat_id"] = query.message.chat_id
     return CUST_AMOUNT
 
 
@@ -1111,22 +1153,33 @@ async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         context.user_data.pop("cust_txn_note_text", None)
     keyboard = [
-        [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
+        [
+            InlineKeyboardButton(
+                "✅ حفظ بدون صورة" if note_opt else "⏭️ تخطي الملاحظة",
+                callback_data="cust_note_skip_btn",
+            )
+        ],
         [
             InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
             InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
         ],
     ]
-    hint = ""
     if note_opt:
-        hint = f"تم تسجيل الملاحظة من رسالتك. يمكنك تعديلها برسالة جديدة أو إضافة صورة أو سكيب.\n\n"
-    await update.message.reply_text(
-        hint
-        + "أرسل ملاحظة إضافية أو صورة إن أردت.\n"
-        "إذا أرسلت صورة بدون تعليق يمكنك كتابة الملاحظة بعدها.\n"
-        "زر (سكيب) يحفظ بدون ملاحظة إن لم تكتبها من قبل، أو يؤكد الملاحظة المسجّلة.",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+        kind_label = "أخذت 🔴" if context.user_data.get("cust_txn_kind") == "took" else "أعطيت 🟢"
+        text = (
+            f"{kind_label}\n\n"
+            "لقد استلمت المبلغ والملاحظة ✅\n\n"
+            "هل تريد إضافة صورة؟\n\n"
+            "أرسل صورة الآن، أو اضغط «حفظ بدون صورة»."
+        )
+        await _edit_txn_prompt_or_reply(update, context, text, keyboard)
+    else:
+        await update.message.reply_text(
+            "تم استلام المبلغ ✅\n\n"
+            "أرسل ملاحظة أو صورة.\n"
+            "يمكنك استخدام «تخطي الملاحظة» إن لم تكن هناك ملاحظة.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
     return CUST_NOTE
 
 
@@ -1154,21 +1207,33 @@ async def cust_amount_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         context.user_data.pop("cust_txn_note_text", None)
     keyboard = [
-        [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
+        [
+            InlineKeyboardButton(
+                "✅ حفظ كما هو" if note_opt else "⏭️ تخطي الملاحظة",
+                callback_data="cust_note_skip_btn",
+            )
+        ],
         [
             InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
             InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
         ],
     ]
-    hint = "تم حفظ المبلغ والصورة ✅\n\n"
+    kind_label = "أخذت 🔴" if context.user_data.get("cust_txn_kind") == "took" else "أعطيت 🟢"
     if note_opt:
-        hint += "الملاحظة مأخوذة من تعليق الصورة. يمكنك تعديلها برسالة أو سكيب.\n\n"
+        text = (
+            f"{kind_label}\n\n"
+            "لقد استلمت المبلغ والملاحظة والصورة ✅\n\n"
+            "هل تريد تعديل الملاحظة بإرسال نص؟\n"
+            "أو اضغط «حفظ كما هو»."
+        )
+        await _edit_txn_prompt_or_reply(update, context, text, keyboard)
     else:
-        hint += "أرسل ملاحظة نصاً أو صورة ثانية، أو سكيب.\n\n"
-    await update.message.reply_text(
-        hint + "يمكنك أيضاً إرسال نص لتعديل الملاحظة أو تأكيدها.",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+        await update.message.reply_text(
+            f"{kind_label}\n\n"
+            "تم حفظ المبلغ والصورة ✅\n\n"
+            "أرسل ملاحظة نصاً، أو «تخطي الملاحظة».",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
     return CUST_NOTE
 
 
@@ -1210,13 +1275,7 @@ async def cust_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     finally:
         db.close()
-    for k in (
-        "cust_txn_kind",
-        "cust_txn_cid",
-        "cust_txn_amount",
-        "cust_txn_note_text",
-        "cust_txn_photo_file_id",
-    ):
+    for k in _CUST_TXN_KEYS:
         context.user_data.pop(k, None)
     return ConversationHandler.END
 
@@ -1290,13 +1349,7 @@ async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYP
         )
     finally:
         db.close()
-    for k in (
-        "cust_txn_kind",
-        "cust_txn_cid",
-        "cust_txn_amount",
-        "cust_txn_note_text",
-        "cust_txn_photo_file_id",
-    ):
+    for k in _CUST_TXN_KEYS:
         context.user_data.pop(k, None)
     return ConversationHandler.END
 
