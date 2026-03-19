@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """دفتر الديون: عملاء، أخذت/أعطيت، مشاركة"""
+import re
 import secrets
 from urllib.parse import quote
 from urllib.parse import urlparse
@@ -38,6 +39,97 @@ def _balance(customer):
     gave = sum(t.amount for t in customer.transactions if t.kind == "gave")
     took = sum(t.amount for t in customer.transactions if t.kind == "took")
     return float(gave - took), float(gave), float(took)
+
+
+def _normalize_amount_digits(s: str) -> str:
+    """تحويل الأرقام العربية/الفارسية إلى إنجليزية لتحليل المبلغ."""
+    s = s.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+    s = s.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789"))
+    return s
+
+
+def _parse_decimal_amount_token(s: str):
+    """تحليل رقم واحد فقط (سطر كامل = المبلغ فقط)."""
+    s = _normalize_amount_digits(s.strip())
+    s = s.replace(",", "").replace("،", "").replace(" ", "")
+    if not s:
+        return None
+    try:
+        d = Decimal(s)
+        return d if d > 0 else None
+    except Exception:
+        return None
+
+
+def _is_pure_amount_line(s: str) -> bool:
+    """السطر يحتوي رقماً فقط (بدون نص ملاحظة)."""
+    s = _normalize_amount_digits(s.strip())
+    s = s.replace(",", "").replace("،", "").replace(" ", "")
+    if not s or not re.match(r"^[\d.]+$", s):
+        return False
+    try:
+        return Decimal(s) > 0
+    except Exception:
+        return False
+
+
+def _parse_single_line_amount_note(line: str):
+    """
+    أمثلة: 38 | 38 الفيروز | 38,500 باقي
+    يعيد (Decimal, ملاحظة أو None)
+    """
+    line = (line or "").strip()
+    if not line:
+        return None, None
+    line = _normalize_amount_digits(line)
+    m = re.match(r"^([\d,\.]+)\s*(.*)$", line.strip())
+    if not m:
+        return None, None
+    num_str = m.group(1).replace(",", "").replace("،", "").strip()
+    try:
+        amt = Decimal(num_str)
+    except Exception:
+        return None, None
+    if amt <= 0:
+        return None, None
+    rest = (m.group(2) or "").strip()
+    return amt, rest if rest else None
+
+
+def _parse_amount_and_optional_note(text: str):
+    """
+    تنسيقات مرنة:
+    - «38 الفيروز» في سطر واحد
+    - سطران: المبلغ ثم الملاحظة
+    - «38» فقط (بدون ملاحظة من النص)
+    """
+    text = (text or "").strip()
+    if not text:
+        return None, None
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return None, None
+    if len(lines) == 1:
+        return _parse_single_line_amount_note(lines[0])
+    first = lines[0]
+    if _is_pure_amount_line(first):
+        a = _parse_decimal_amount_token(first)
+        if a is not None:
+            note = "\n".join(lines[1:]).strip()
+            return a, note if note else None
+    a, rest_first = _parse_single_line_amount_note(first)
+    if a is None:
+        return None, None
+    tail = lines[1:]
+    if rest_first and tail:
+        note = (rest_first + "\n" + "\n".join(tail)).strip()
+    elif rest_first:
+        note = rest_first
+    elif tail:
+        note = "\n".join(tail).strip()
+    else:
+        note = None
+    return a, note if note else None
 
 
 def _is_public_http_url(url: str) -> bool:
@@ -921,7 +1013,12 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel")],
     ]
     await query.edit_message_text(
-        "أخذت 🔴\n\nأرسل المبلغ (رقم):",
+        "أخذت 🔴\n\n"
+        "أرسل المبلغ بأي شكل يناسبك:\n"
+        "• رقم فقط: 38\n"
+        "• سطر واحد: 38 الفيروز\n"
+        "• سطران: السطر الأول المبلغ والثاني الملاحظة\n"
+        "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return CUST_AMOUNT
@@ -939,7 +1036,12 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel")],
     ]
     await query.edit_message_text(
-        "أعطيت 🟢\n\nأرسل المبلغ (رقم):",
+        "أعطيت 🟢\n\n"
+        "أرسل المبلغ بأي شكل يناسبك:\n"
+        "• رقم فقط: 38\n"
+        "• سطر واحد: 38 الفيروز\n"
+        "• سطران: السطر الأول المبلغ والثاني الملاحظة\n"
+        "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return CUST_AMOUNT
@@ -986,23 +1088,28 @@ async def cust_txn_back_amount_click(update: Update, context: ContextTypes.DEFAU
     ]
     await _safe_edit_callback_text(
         query,
-        "رجوع لتعديل السعر.\n\nأرسل المبلغ الجديد (رقم فقط):",
+        "رجوع لتعديل السعر.\n\n"
+        "أرسل المبلغ (رقم أو 38 الفيروز أو سطرين… أو صورة بالتعليق).",
         keyboard,
     )
     return CUST_AMOUNT
 
 
 async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        amount = Decimal((update.message.text or "").replace(",", "").strip())
-        if amount <= 0:
-            await update.message.reply_text("أدخل مبلغاً أكبر من صفر.")
-            return CUST_AMOUNT
-    except Exception:
-        await update.message.reply_text("أدخل رقماً صحيحاً.")
+    raw = (update.message.text or "").strip()
+    amount, note_opt = _parse_amount_and_optional_note(raw)
+    if amount is None:
+        await update.message.reply_text(
+            "لم أستخرج مبلغاً صحيحاً.\n"
+            "جرّب: 38  أو  38 الفيروز  أو سطرين (المبلغ ثم الملاحظة)\n"
+            "أو أرسل صورة والمبلغ في تعليق الصورة."
+        )
         return CUST_AMOUNT
     context.user_data["cust_txn_amount"] = amount
-    cid = context.user_data.get("cust_txn_cid")
+    if note_opt:
+        context.user_data["cust_txn_note_text"] = note_opt
+    else:
+        context.user_data.pop("cust_txn_note_text", None)
     keyboard = [
         [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
         [
@@ -1010,18 +1117,69 @@ async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
         ],
     ]
+    hint = ""
+    if note_opt:
+        hint = f"تم تسجيل الملاحظة من رسالتك. يمكنك تعديلها برسالة جديدة أو إضافة صورة أو سكيب.\n\n"
     await update.message.reply_text(
-        "أرسل ملاحظة، و(إذا تريد) صورة.\n"
-        "إذا أرسلت صورة بدون ملاحظة كمل وارسل الملاحظة نصاً.\n"
-        "يمكنك أيضاً استخدام زر (سكيب الملاحظة).",
+        hint
+        + "أرسل ملاحظة إضافية أو صورة إن أردت.\n"
+        "إذا أرسلت صورة بدون تعليق يمكنك كتابة الملاحظة بعدها.\n"
+        "زر (سكيب) يحفظ بدون ملاحظة إن لم تكتبها من قبل، أو يؤكد الملاحظة المسجّلة.",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return CUST_NOTE
+
+
+async def cust_amount_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """صورة من خطوة المبلغ: المبلغ (والملاحظة) في تعليق الصورة."""
+    if not update.message.photo:
+        return CUST_AMOUNT
+    caption = (update.message.caption or "").strip()
+    if not caption:
+        await update.message.reply_text(
+            "أرسل الصورة مع تعليق يحتوي المبلغ.\n"
+            "أمثلة للتعليق: 38  أو  38 الفيروز  أو سطرين (المبلغ ثم الملاحظة)."
+        )
+        return CUST_AMOUNT
+    amount, note_opt = _parse_amount_and_optional_note(caption)
+    if amount is None:
+        await update.message.reply_text(
+            "لم أستخرج مبلغاً من تعليق الصورة. جرّب: 38  أو  38 الفيروز"
+        )
+        return CUST_AMOUNT
+    context.user_data["cust_txn_amount"] = amount
+    context.user_data["cust_txn_photo_file_id"] = update.message.photo[-1].file_id
+    if note_opt:
+        context.user_data["cust_txn_note_text"] = note_opt
+    else:
+        context.user_data.pop("cust_txn_note_text", None)
+    keyboard = [
+        [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
+        [
+            InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
+            InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
+        ],
+    ]
+    hint = "تم حفظ المبلغ والصورة ✅\n\n"
+    if note_opt:
+        hint += "الملاحظة مأخوذة من تعليق الصورة. يمكنك تعديلها برسالة أو سكيب.\n\n"
+    else:
+        hint += "أرسل ملاحظة نصاً أو صورة ثانية، أو سكيب.\n\n"
+    await update.message.reply_text(
+        hint + "يمكنك أيضاً إرسال نص لتعديل الملاحظة أو تأكيدها.",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return CUST_NOTE
 
 
 async def cust_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # إذا كانت الملاحظة أُرسلت عبر caption للصور
-    note = context.user_data.get("cust_txn_note_text") or (update.message.text or "").strip()
+    # نص الرسالة الحالية يطغى على الملاحظة المسجّلة مسبقاً (مثلاً من خطوة المبلغ)
+    text_in = ((update.message.text or "").strip()) if update.message and update.message.text else ""
+    prefilled = context.user_data.get("cust_txn_note_text")
+    if text_in:
+        note = text_in
+    else:
+        note = prefilled or ""
     db = SessionLocal()
     try:
         cid = context.user_data.get("cust_txn_cid")
@@ -1078,6 +1236,10 @@ async def cust_note_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # نفذ الحفظ باستخدام cust_note مع قراءة الملاحظة من context
         return await cust_note(update, context)
 
+    # ملاحظة مسجّلة مسبقاً + صورة بدون تعليق → احفظ معاً
+    if context.user_data.get("cust_txn_note_text"):
+        return await cust_note(update, context)
+
     cid = context.user_data.get("cust_txn_cid")
     keyboard = [
         [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
@@ -1111,11 +1273,12 @@ async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYP
         if not user or cust.user_id != user.id:
             await query.edit_message_text("غير مسموح.")
             return ConversationHandler.END
+        note = context.user_data.get("cust_txn_note_text")
         t = CustomerTransaction(
             customer_id=cid,
             amount=amount,
             kind=kind,
-            note=None,
+            note=note or None,
             photo_file_id=photo_file_id,
         )
         db.add(t)
@@ -1238,17 +1401,36 @@ async def cust_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         cust = db.query(Customer).filter(Customer.id == cid).first()
         if not cust:
-            await query.edit_message_text("العميل غير موجود.")
+            await _safe_edit_callback_text(
+                query,
+                "العميل غير موجود.",
+                [[InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")]],
+            )
             return
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await _safe_edit_callback_text(query, "غير مسموح.", None)
             return
         name = cust.name
+        # PostgreSQL يرفض حذف العميل طالما توجد معاملات أو روابط مشاركة — نحذفها أولاً
+        db.query(CustomerTransaction).filter(CustomerTransaction.customer_id == cid).delete(
+            synchronize_session=False
+        )
+        db.query(ShareLink).filter(ShareLink.customer_id == cid).delete(synchronize_session=False)
         db.delete(cust)
         db.commit()
         keyboard = [[InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")]]
-        await query.edit_message_text(f"تم حذف العميل: {name} ✅", reply_markup=InlineKeyboardMarkup(keyboard))
+        await _safe_edit_callback_text(query, f"تم حذف العميل: {name} ✅", keyboard)
+    except Exception as e:
+        db.rollback()
+        await _safe_edit_callback_text(
+            query,
+            f"تعذّر حذف العميل.\n{str(e)[:200]}",
+            [
+                [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
+                [InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")],
+            ],
+        )
     finally:
         db.close()
 
@@ -1404,11 +1586,12 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
         # سيتم التعامل معها عبر ConversationHandler داخل main.py
         return
 
-    if data.startswith("cust_edit_"):
-        await cust_edit_menu(update, context)
-        return
+    # حذف العميل قبل cust_edit_ حتى لا يختلط أي بادئة لاحقاً
     if data.startswith("cust_del_"):
         await cust_delete(update, context)
+        return
+    if data.startswith("cust_edit_"):
+        await cust_edit_menu(update, context)
         return
     if data.startswith("cust_share_"):
         await cust_share(update, context)

@@ -135,6 +135,7 @@ from handlers.customers import (
     cust_took,
     cust_gave,
     cust_amount,
+    cust_amount_photo,
     cust_note,
     cust_note_photo,
     cust_note_skip_click,
@@ -450,6 +451,7 @@ def main():
         states={
             CUST_AMOUNT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, cust_amount),
+                MessageHandler(filters.PHOTO, cust_amount_photo),
                 CallbackQueryHandler(cust_txn_back_click, pattern="^cust_txn_back_\\d+$"),
                 CallbackQueryHandler(cust_txn_cancel_click, pattern="^cust_txn_cancel$"),
                 CallbackQueryHandler(cust_callback_router, pattern="^cust_"),
