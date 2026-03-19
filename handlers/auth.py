@@ -338,7 +338,11 @@ async def cancel_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تسجيل خروج حقيقي: إزالة ربط telegram_id حتى يرجع يطلب تسجيل الدخول."""
     query = update.callback_query
-    chat_id = update.effective_user.id if update.effective_user else None
+    chat_id = None
+    if query and query.from_user:
+        chat_id = query.from_user.id
+    elif update.effective_user:
+        chat_id = update.effective_user.id
     if query:
         try:
             await query.answer("جاري تسجيل الخروج...")
@@ -349,36 +353,27 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if not chat_id:
             return ConversationHandler.END
-        user = db.query(User).filter(User.telegram_id == chat_id).first()
         keyboard = [
             [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
             [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
             [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
         ]
 
-        if not user:
-            # إرسال رسالة جديدة دائمًا (أكثر ثباتاً من تعديل الرسالة القديمة)
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="أنت غير مسجل حالياً. اختر خيار تسجيل الدخول.",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-            )
-            if query:
-                try:
-                    await query.edit_message_reply_markup(reply_markup=None)
-                except Exception:
-                    pass
-            return ConversationHandler.END
-
-        user.telegram_id = None
-        # لا نريد حذف الهاتف/الاسم؛ نريد فقط إعادة تسجيل الدخول لاحقاً
-        user.username = None
-        db.commit()
+        # تنظيف كل الحسابات المرتبطة بهذا Telegram ID (احتياطي ضد أي حالة بيانات قديمة)
+        linked_users = db.query(User).filter(User.telegram_id == chat_id).all()
+        if linked_users:
+            for user in linked_users:
+                user.telegram_id = None
+                user.username = None
+            db.commit()
+            out_text = "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى."
+        else:
+            out_text = "أنت غير مسجل حالياً. اختر خيار تسجيل الدخول."
 
         # رسالة جديدة مضمونة + تعطيل أزرار الرسالة السابقة إن أمكن
         await context.bot.send_message(
             chat_id=chat_id,
-            text="تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى.",
+            text=out_text,
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
         if query:
@@ -386,6 +381,7 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=None)
             except Exception:
                 pass
+
         # امسح أي حالة محادثة حالية للمستخدم
         for k in (
             "reg_name",
@@ -395,6 +391,16 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "forgot_phone",
         ):
             context.user_data.pop(k, None)
+    except Exception:
+        # fallback أخير حتى لا يبقى الزر بلا نتيجة للمستخدم
+        if chat_id:
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="حدث خطأ أثناء تسجيل الخروج. أرسل /start ثم جرّب مرة ثانية.",
+                )
+            except Exception:
+                pass
     finally:
         db.close()
 
