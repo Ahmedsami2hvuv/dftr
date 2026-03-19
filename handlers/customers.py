@@ -329,8 +329,15 @@ async def _safe_edit_callback_text(callback_query, text: str, keyboard):
     try:
         await callback_query.edit_message_text(text, reply_markup=reply_markup)
     except Exception:
-        # لرسائل الصور: نعدّل الكابشن بدل النص
-        await callback_query.edit_message_caption(text, reply_markup=reply_markup)
+        try:
+            # لرسائل الصور: نعدّل الكابشن بدل النص
+            await callback_query.edit_message_caption(text, reply_markup=reply_markup)
+        except Exception:
+            # fallback: أرسل رسالة جديدة حتى ما يتعطل الزر
+            await callback_query.message.reply_text(
+                text,
+                reply_markup=reply_markup,
+            )
 
 
 async def _build_customer_view(db, cust: Customer, offset: int):
@@ -852,6 +859,26 @@ async def cust_txn_cancel_click(update: Update, context: ContextTypes.DEFAULT_TY
     return ConversationHandler.END
 
 
+async def cust_txn_back_amount_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رجوع لتعديل السعر من خطوة الملاحظة/الصورة."""
+    query = update.callback_query
+    await query.answer()
+    cid = context.user_data.get("cust_txn_cid")
+    if not cid:
+        await menu_customers(update, context)
+        return ConversationHandler.END
+    keyboard = [
+        [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
+        [InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel")],
+    ]
+    await _safe_edit_callback_text(
+        query,
+        "رجوع لتعديل السعر.\n\nأرسل المبلغ الجديد (رقم فقط):",
+        keyboard,
+    )
+    return CUST_AMOUNT
+
+
 async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         amount = Decimal((update.message.text or "").replace(",", "").strip())
@@ -866,7 +893,7 @@ async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
         [
-            InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}"),
+            InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
             InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
         ],
     ]
@@ -942,7 +969,7 @@ async def cust_note_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
         [
-            InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}"),
+            InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
             InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
         ],
     ]
