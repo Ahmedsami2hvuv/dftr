@@ -88,7 +88,14 @@ from handlers.debts import (
     DEBT_DESC,
 )
 from handlers.profile import menu_profile
-from handlers.admin import admin_panel, admin_users_list
+from handlers.admin import (
+    admin_panel,
+    admin_users_list,
+    admin_user_detail,
+    admin_broadcast_start,
+    admin_broadcast_send,
+    ADMIN_BROADCAST_TEXT,
+)
 from web_server import start_web_server
 from handlers.customers import (
     menu_customers,
@@ -269,6 +276,19 @@ def main():
     )
     app.add_handler(debt_add_conv)
 
+    # محادثة بث الأدمن
+    admin_broadcast_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(admin_broadcast_start, pattern="^admin_broadcast$")],
+        states={
+            ADMIN_BROADCAST_TEXT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_broadcast_send),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(admin_broadcast_conv)
+
     # أزرار القوائم
     app.add_handler(CallbackQueryHandler(main_menu, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(menu_ledger, pattern="^menu_ledger$"))
@@ -285,6 +305,7 @@ def main():
     app.add_handler(CallbackQueryHandler(menu_profile, pattern="^menu_profile$"))
     app.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
     app.add_handler(CallbackQueryHandler(admin_users_list, pattern="^admin_users$"))
+    app.add_handler(CallbackQueryHandler(admin_user_detail, pattern="^admin_user_\\d+$"))
 
     # دفتر الديون (عملاء)
     app.add_handler(CallbackQueryHandler(menu_customers, pattern="^menu_customers$"))
