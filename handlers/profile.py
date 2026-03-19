@@ -30,6 +30,7 @@ async def menu_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]
         if update.effective_user.id == ADMIN_ID:
             keyboard.insert(0, [InlineKeyboardButton("🔐 لوحة الأدمن", callback_data="admin_panel")])
+        keyboard.append([InlineKeyboardButton("🚪 تسجيل خروج", callback_data="auth_logout")])
         await query.edit_message_text(
             text,
             reply_markup=InlineKeyboardMarkup(keyboard),

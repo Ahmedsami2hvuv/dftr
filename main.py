@@ -34,6 +34,7 @@ from handlers.auth import (
     auth_register,
     auth_login,
     auth_forgot,
+    auth_logout,
     reg_name,
     reg_phone,
     reg_password,
@@ -283,6 +284,9 @@ def main():
 
     # دفتر الديون (عملاء)
     app.add_handler(CallbackQueryHandler(menu_customers, pattern="^menu_customers$"))
+
+    # تسجيل خروج
+    app.add_handler(CallbackQueryHandler(auth_logout, pattern="^auth_logout$"))
 
     cust_add_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(cust_add_start, pattern="^cust_add$")],

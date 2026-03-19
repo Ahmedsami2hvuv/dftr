@@ -333,3 +333,54 @@ async def cancel_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop(k, None)
     await update.message.reply_text("تم الإلغاء.")
     return ConversationHandler.END
+
+
+async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تسجيل خروج حقيقي: إزالة ربط telegram_id حتى يرجع يطلب تسجيل الدخول."""
+    query = update.callback_query
+    if query:
+        await query.answer()
+        msg = query.message
+    else:
+        msg = update.message
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.telegram_id == update.effective_user.id).first()
+        if not user:
+            # أصلاً غير مسجل
+            keyboard = [
+                [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+                [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+                [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+            ]
+            await msg.reply_text("أنت غير مسجل حالياً. اختر خيار تسجيل الدخول.", reply_markup=InlineKeyboardMarkup(keyboard))
+            return ConversationHandler.END
+
+        user.telegram_id = None
+        # لا نريد حذف الهاتف/الاسم؛ نريد فقط إعادة تسجيل الدخول لاحقاً
+        user.username = None
+        db.commit()
+
+        keyboard = [
+            [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+            [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+            [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+        ]
+        await msg.reply_text(
+            "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        # امسح أي حالة محادثة حالية للمستخدم
+        for k in (
+            "reg_name",
+            "reg_phone",
+            "auth_action",
+            "login_phone",
+            "forgot_phone",
+        ):
+            context.user_data.pop(k, None)
+    finally:
+        db.close()
+
+    return ConversationHandler.END
