@@ -108,3 +108,19 @@ class Debt(Base):
 
     from_user = relationship("User", foreign_keys=[from_user_id], back_populates="debts_given")
     to_user = relationship("User", foreign_keys=[to_user_id], back_populates="debts_received")
+
+
+class FeedbackMessage(Base):
+    """رسائل مشاكل/اقتراحات من المستخدمين إلى الإدارة"""
+    __tablename__ = "feedback_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_telegram_id = Column(BigInteger, nullable=True, index=True)
+    user_name = Column(String(255), nullable=True)
+    user_phone = Column(String(32), nullable=True)
+    source = Column(String(32), nullable=True)  # profile / broadcast_comment / broadcast_suggest
+    content_type = Column(String(32), nullable=False)  # text/photo/video/voice/document/sticker/...
+    text = Column(Text, nullable=True)
+    file_id = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

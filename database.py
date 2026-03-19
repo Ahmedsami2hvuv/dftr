@@ -36,6 +36,7 @@ def init_db():
         ShareLink,
         CustomerCategory,
         LedgerCategory,
+        FeedbackMessage,
     )  # noqa: F401
     Base.metadata.create_all(bind=engine)
     # إضافة أعمدة جديدة لجدول users إن وُجد بدونها (ترحيل بسيط)

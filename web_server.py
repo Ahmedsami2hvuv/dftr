@@ -96,8 +96,8 @@ def _render_page(token: str, offset: int) -> str:
             if getattr(t, "photo_file_id", None):
                 fid = quote(str(t.photo_file_id), safe="")
                 photo_html = (
-                    f"<div class='photo-wrap'><img class='photo' "
-                    f"src='/creditbook/photo/{fid}' alt='صورة المعاملة'/></div>"
+                    f"<div class='photo-wrap'><a href='/creditbook/photo/{fid}' target='_blank' rel='noopener'>"
+                    f"<img class='photo' src='/creditbook/photo/{fid}' alt='صورة المعاملة'/></a></div>"
                 )
             remain = running_after_by_tx.get(t.id, bal)
             tx_rows.append(
@@ -137,7 +137,7 @@ def _render_page(token: str, offset: int) -> str:
 
         bot_btn = ""
         if BOT_USERNAME:
-            bot_btn = f"<a class='btn bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>افتح حسابك في البوت</a>"
+            bot_btn = f"<a class='btn bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>سجّل حسابك بسهولة في البوت</a>"
 
         title = f"عميل: {cust.name}"
         return f"""
@@ -165,6 +165,7 @@ def _render_page(token: str, offset: int) -> str:
               .wa {{ background: #1b5e20; margin-left: 8px; }}
               .bot {{ background: #1565c0; }}
               .meta {{ color: #444; margin-bottom: 6px; }}
+              .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }}
             </style>
           </head>
           <body>
@@ -173,8 +174,7 @@ def _render_page(token: str, offset: int) -> str:
               <div class='meta'>صاحب الحساب: {owner_name}{(" - " + owner_phone) if owner_phone else ""}</div>
               <div class='meta'>العميل: {cust.name}{(" - " + cust.phone) if cust.phone else ""}</div>
               <div class='balance {balance_class}'>{balance_text} د.ع.</div>
-              {wa_btn}
-              {bot_btn}
+              <div class='actions'>{wa_btn}{bot_btn}</div>
               {''.join(tx_rows) if tx_rows else '<p>لا توجد معاملات.</p>'}
               {more_btn}
             </div>

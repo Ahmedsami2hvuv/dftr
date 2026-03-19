@@ -8,6 +8,7 @@ from .ledger import (
     ShareLink,
     CustomerCategory,
     LedgerCategory,
+    FeedbackMessage,
 )
 
 __all__ = [
@@ -19,4 +20,5 @@ __all__ = [
     "ShareLink",
     "CustomerCategory",
     "LedgerCategory",
+    "FeedbackMessage",
 ]

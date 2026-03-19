@@ -92,9 +92,25 @@ from handlers.admin import (
     admin_panel,
     admin_users_list,
     admin_user_detail,
+    admin_feedbacks_list,
+    admin_feedback_detail,
     admin_broadcast_start,
+    admin_broadcast_receive_content,
+    admin_broadcast_toggle_buttons,
+    admin_broadcast_cancel,
     admin_broadcast_send,
-    ADMIN_BROADCAST_TEXT,
+    bc_start_click,
+    bc_update_click,
+    ADMIN_BROADCAST_CONTENT,
+    ADMIN_BROADCAST_BUTTONS,
+)
+from handlers.feedback import (
+    feedback_from_profile,
+    feedback_from_broadcast_comment,
+    feedback_from_broadcast_suggest,
+    feedback_receive,
+    feedback_cancel_click,
+    FEEDBACK_WAIT,
 )
 from web_server import start_web_server
 from handlers.customers import (
@@ -280,14 +296,42 @@ def main():
     admin_broadcast_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(admin_broadcast_start, pattern="^admin_broadcast$")],
         states={
-            ADMIN_BROADCAST_TEXT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_broadcast_send),
+            ADMIN_BROADCAST_CONTENT: [
+                MessageHandler(~filters.COMMAND, admin_broadcast_receive_content),
+                CallbackQueryHandler(admin_broadcast_cancel, pattern="^admin_broadcast_cancel$"),
+            ],
+            ADMIN_BROADCAST_BUTTONS: [
+                CallbackQueryHandler(admin_broadcast_toggle_buttons, pattern="^admin_bc_toggle_"),
+                CallbackQueryHandler(admin_broadcast_send, pattern="^admin_bc_send$"),
+                CallbackQueryHandler(admin_broadcast_cancel, pattern="^admin_broadcast_cancel$"),
             ],
         },
-        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        fallbacks=[],
+        allow_reentry=True,
+        per_chat=True,
         per_message=False,
     )
     app.add_handler(admin_broadcast_conv)
+
+    # محادثة إرسال مشكلة/اقتراح للمستخدمين
+    feedback_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(feedback_from_profile, pattern="^send_feedback$"),
+            CallbackQueryHandler(feedback_from_broadcast_comment, pattern="^bc_comment$"),
+            CallbackQueryHandler(feedback_from_broadcast_suggest, pattern="^bc_suggest$"),
+        ],
+        states={
+            FEEDBACK_WAIT: [
+                MessageHandler(~filters.COMMAND, feedback_receive),
+                CallbackQueryHandler(feedback_cancel_click, pattern="^feedback_cancel$"),
+            ]
+        },
+        fallbacks=[],
+        allow_reentry=True,
+        per_chat=True,
+        per_message=False,
+    )
+    app.add_handler(feedback_conv)
 
     # أزرار القوائم
     app.add_handler(CallbackQueryHandler(main_menu, pattern="^main_menu$"))
@@ -306,6 +350,10 @@ def main():
     app.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
     app.add_handler(CallbackQueryHandler(admin_users_list, pattern="^admin_users$"))
     app.add_handler(CallbackQueryHandler(admin_user_detail, pattern="^admin_user_\\d+$"))
+    app.add_handler(CallbackQueryHandler(admin_feedbacks_list, pattern="^admin_feedbacks$"))
+    app.add_handler(CallbackQueryHandler(admin_feedback_detail, pattern="^admin_feedback_\\d+$"))
+    app.add_handler(CallbackQueryHandler(bc_start_click, pattern="^bc_start$"))
+    app.add_handler(CallbackQueryHandler(bc_update_click, pattern="^bc_update$"))
 
     # دفتر الديون (عملاء)
     app.add_handler(CallbackQueryHandler(menu_customers, pattern="^menu_customers$"))

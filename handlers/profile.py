@@ -27,7 +27,10 @@ async def menu_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"الهاتف: {user.phone or '—'}\n"
         )
         text += f"تاريخ التسجيل: {user.created_at.strftime('%Y-%m-%d')}"
-        keyboard = [[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]
+        keyboard = [
+            [InlineKeyboardButton("💡 إرسال مشكلة أو اقتراح", callback_data="send_feedback")],
+            [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
+        ]
         if update.effective_user.id == ADMIN_ID:
             keyboard.insert(0, [InlineKeyboardButton("🔐 لوحة الأدمن", callback_data="admin_panel")])
         keyboard.append([InlineKeyboardButton("🚪 تسجيل خروج", callback_data="auth_logout")])
