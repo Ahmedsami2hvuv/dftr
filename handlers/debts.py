@@ -4,7 +4,7 @@ from decimal import Decimal
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from database import SessionLocal
-from models import User, Debt
+from app_models import User, Debt
 
 (DEBT_MENU, DEBT_WHO, DEBT_AMOUNT, DEBT_DIR, DEBT_DESC) = range(5)
 
