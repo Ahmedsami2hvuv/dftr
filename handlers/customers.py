@@ -452,6 +452,7 @@ def _format_tx_amount(amount) -> str:
 async def _render_tx_detail(db, tx: CustomerTransaction):
     cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
     icon = _tx_kind_ar(tx.kind)
+    kind_text = "أخذت" if tx.kind == "took" else "أعطيت"
     dt = tx.created_at.strftime("%d/%m/%Y %H:%M")
     note = (tx.note or "").strip()
     has_photo = bool(getattr(tx, "photo_file_id", None))
@@ -459,7 +460,7 @@ async def _render_tx_detail(db, tx: CustomerTransaction):
     text = (
         "🧾 تفاصيل المعاملة\n\n"
         f"العميل: {cust.name}\n"
-        f"اللون: {icon}\n"
+        f"النوع: {icon} {kind_text}\n"
         f"السعر/المبلغ: {tx.amount} د.ع.\n"
         f"الملاحظة: {note if note else '—'}\n"
         f"التاريخ: {dt}\n"
