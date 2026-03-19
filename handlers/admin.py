@@ -1,15 +1,29 @@
 # -*- coding: utf-8 -*-
 """لوحة الأدمن"""
+import io
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
 from database import SessionLocal
-from app_models import User, LedgerEntry, Debt, Customer, CustomerTransaction, FeedbackMessage
+from app_models import (
+    BRAND_LOGO_SETTING_KEY,
+    User,
+    LedgerEntry,
+    Debt,
+    Customer,
+    CustomerTransaction,
+    FeedbackMessage,
+    SiteSetting,
+)
 from config import ADMIN_ID, BOT_USERNAME
 
 ADMIN_BROADCAST_CONTENT = 900
 ADMIN_BROADCAST_BUTTONS = 901
 ADMIN_FEEDBACK_SEARCH = 902
+ADMIN_BRAND_LOGO = 904
+
+MAX_BRAND_LOGO_BYTES = 2_500_000
 
 
 def is_admin(user_id: int) -> bool:
@@ -93,6 +107,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("👥 قائمة المستخدمين", callback_data="admin_users")],
             [InlineKeyboardButton("📢 بث / إذاعة", callback_data="admin_broadcast")],
+            [InlineKeyboardButton("🖼️ تغيير شعار الموقع", callback_data="admin_brand_logo")],
             [InlineKeyboardButton("📥 المشاكل والاقتراحات", callback_data="admin_feedbacks")],
             [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
         ]
@@ -507,3 +522,108 @@ async def bc_update_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if BOT_USERNAME:
         kb = [[InlineKeyboardButton("🔄 تحديث", url=f"https://t.me/{BOT_USERNAME}?start=update")]]
         await query.message.reply_text("تم تحديث البوت. اضغط زر التحديث:", reply_markup=InlineKeyboardMarkup(kb))
+
+
+# --- شعار صفحة المشاركة (يُخزَّن في PostgreSQL على Railway) ---
+
+
+async def admin_brand_logo_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id):
+        return ConversationHandler.END
+    await query.edit_message_text(
+        "🖼️ تغيير شعار الموقع\n\n"
+        "تُحفظ الصورة في قاعدة البيانات وتظهر بجانب «دفتر الديون» في صفحة روابط المشاركة فوراً.\n\n"
+        f"أرسل صورة (أو ملف صورة). الحد الأقصى ≈ {MAX_BRAND_LOGO_BYTES // 1_000_000} ميجا.",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("❌ إلغاء", callback_data="admin_brand_logo_cancel")]]
+        ),
+    )
+    return ADMIN_BRAND_LOGO
+
+
+async def admin_brand_logo_remind(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return ConversationHandler.END
+    await update.message.reply_text(
+        "أرسل صورة (مرفق صورة أو ملف بصيغة صورة)، أو اضغط «إلغاء» في الرسالة السابقة."
+    )
+    return ADMIN_BRAND_LOGO
+
+
+async def admin_brand_logo_cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return ConversationHandler.END
+    await update.message.reply_text(
+        "تم الإلغاء.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀ لوحة الأدمن", callback_data="admin_panel")]]),
+    )
+    return ConversationHandler.END
+
+
+async def admin_brand_logo_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return ConversationHandler.END
+    msg = update.message
+    file_id = None
+    size_hint = 0
+    if msg.photo:
+        p = msg.photo[-1]
+        file_id = p.file_id
+        size_hint = p.file_size or 0
+    elif msg.document and msg.document.mime_type and msg.document.mime_type.startswith("image/"):
+        file_id = msg.document.file_id
+        size_hint = msg.document.file_size or 0
+
+    if not file_id:
+        await msg.reply_text("أرسل صورة فقط (كصورة أو كملف بصيغة image/…).")
+        return ADMIN_BRAND_LOGO
+
+    if size_hint and size_hint > MAX_BRAND_LOGO_BYTES:
+        await msg.reply_text("الملف كبير جداً. أرسل صورة أصغر.")
+        return ADMIN_BRAND_LOGO
+
+    try:
+        tg_file = await context.bot.get_file(file_id)
+        buf = io.BytesIO()
+        await tg_file.download_to_memory(buf)
+        raw = buf.getvalue()
+    except Exception:
+        await msg.reply_text("تعذّر تنزيل الملف من تليجرام. حاول مرة أخرى.")
+        return ADMIN_BRAND_LOGO
+
+    if len(raw) > MAX_BRAND_LOGO_BYTES:
+        await msg.reply_text("الصورة كبيرة بعد التنزيل. أرسل غيرها.")
+        return ADMIN_BRAND_LOGO
+
+    db = SessionLocal()
+    try:
+        row = db.query(SiteSetting).filter(SiteSetting.key == BRAND_LOGO_SETTING_KEY).first()
+        if not row:
+            row = SiteSetting(key=BRAND_LOGO_SETTING_KEY, blob_value=raw)
+            db.add(row)
+        else:
+            row.blob_value = raw
+        db.commit()
+    finally:
+        db.close()
+
+    keyboard = [[InlineKeyboardButton("◀ لوحة الأدمن", callback_data="admin_panel")]]
+    await msg.reply_text(
+        "✅ تم حفظ الشعار. يظهر على الرابط العام فوراً (جرّب تحديث الصفحة).",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return ConversationHandler.END
+
+
+async def admin_brand_logo_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id):
+        return ConversationHandler.END
+    await query.edit_message_text(
+        "تم الإلغاء.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀ لوحة الأدمن", callback_data="admin_panel")]]),
+    )
+    return ConversationHandler.END

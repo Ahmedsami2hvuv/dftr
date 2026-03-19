@@ -35,5 +35,10 @@ if _raw_base and not _raw_base.startswith(("http://", "https://")):
 
 WEB_BASE_URL = _raw_base.rstrip("/")
 
+# شعار صفحة «مشاركة الديون» على الويب: صورة PNG بصيغة Base64 (الصق القيمة كاملة في Railway)
+# يمكن لصق النص كما هو من ملف .b64 أو بصيغة data:image/png;base64,.... — بدون رفع ملف للريبو
+# إن تُرك فارغاً يُستخدم ملف static/ إن وُجد، وإلا أيقونة SVG افتراضية
+BOT_LOGO_BASE64 = (os.environ.get("BOT_LOGO_BASE64") or os.environ.get("WEB_BRAND_LOGO_B64") or "").strip()
+
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN مطلوب. أضفه في Railway أو في ملف .env")

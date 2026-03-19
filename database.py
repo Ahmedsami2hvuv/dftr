@@ -37,6 +37,7 @@ def init_db():
         CustomerCategory,
         LedgerCategory,
         FeedbackMessage,
+        SiteSetting,
     )  # noqa: F401
     Base.metadata.create_all(bind=engine)
     # إضافة أعمدة جديدة لجدول users إن وُجد بدونها (ترحيل بسيط)

@@ -10,7 +10,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from database import SessionLocal
 from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerCategory
-from utils.phone import normalize_phone, wa_number
+from utils.phone import is_plausible_iraq_mobile, normalize_phone, wa_number
 from config import WEB_BASE_URL
 
 (
@@ -365,10 +365,15 @@ async def cust_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cust_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    raw = (update.message.text or "").strip()
+    if update.message.contact:
+        raw = update.message.contact.phone_number or ""
+    else:
+        raw = (update.message.text or "").strip()
     phone = normalize_phone(raw)
-    if len(phone) < 10:
-        await update.message.reply_text("رقم غير صحيح. ارسل رقم صحيح أو اضغط سكيب.")
+    if not is_plausible_iraq_mobile(phone):
+        await update.message.reply_text(
+            "رقم غير صحيح. جرّب: 077… أو 7××× أو +964… أو اضغط سكيب."
+        )
         return CUST_PHONE
     db = SessionLocal()
     try:
@@ -1201,9 +1206,12 @@ async def cust_edit_name_done(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def cust_edit_phone_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    raw = (update.message.text or "").strip()
+    if update.message.contact:
+        raw = update.message.contact.phone_number or ""
+    else:
+        raw = (update.message.text or "").strip()
     phone = None if raw.lower() in ("حذف", "delete", "") else normalize_phone(raw)
-    if phone is not None and len(phone) < 10:
+    if phone is not None and not is_plausible_iraq_mobile(phone):
         await update.message.reply_text("رقم غير صحيح. أرسل الرقم أو اكتب: حذف")
         return CUST_EDIT_PHONE
     cid = context.user_data.get("cust_edit_id")

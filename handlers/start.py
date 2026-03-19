@@ -40,7 +40,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == update.effective_user.id).first()
+        tid = int(update.effective_user.id)
+        user = db.query(User).filter(User.telegram_id == tid).first()
         if user:
             text = (
                 f"مرحباً مجدداً، {user.full_name or user.username or 'صديقي'} 👋\n\n"
@@ -54,6 +55,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if update.effective_user.id == ADMIN_ID:
                 keyboard.append([InlineKeyboardButton("🔐 لوحة الأدمن", callback_data="admin_panel")])
         else:
+            # غير مربوط بالحساب: صفّر أي حالة محادثة عالقة (مثلاً بعد تسجيل خروج)
+            context.user_data.clear()
             keyboard = [
                 [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
                 [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],

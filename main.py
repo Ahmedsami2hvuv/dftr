@@ -103,11 +103,17 @@ from handlers.admin import (
     admin_broadcast_toggle_buttons,
     admin_broadcast_cancel,
     admin_broadcast_send,
+    admin_brand_logo_start,
+    admin_brand_logo_receive,
+    admin_brand_logo_remind,
+    admin_brand_logo_cancel,
+    admin_brand_logo_cancel_cmd,
     bc_start_click,
     bc_update_click,
     ADMIN_BROADCAST_CONTENT,
     ADMIN_BROADCAST_BUTTONS,
     ADMIN_FEEDBACK_SEARCH,
+    ADMIN_BRAND_LOGO,
 )
 from handlers.feedback import (
     feedback_from_profile,
@@ -197,7 +203,8 @@ def main():
     except Exception as e:
         logger.warning("تعذر تشغيل الموقع: %s", e)
 
-    app.add_handler(CommandHandler("start", cmd_start))
+    # أولوية أعلى لـ /start حتى لا تلتقطه محادثة أخرى وتُظهر قائمة قديمة
+    app.add_handler(CommandHandler("start", cmd_start), group=-1)
 
     # محادثة التسجيل — per_message=False حتى يُقبل رسالة الاسم/الرقم بعد الضغط على الزر
     reg_conv = ConversationHandler(
@@ -322,6 +329,25 @@ def main():
     )
     app.add_handler(admin_broadcast_conv)
 
+    admin_brand_logo_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(admin_brand_logo_start, pattern="^admin_brand_logo$")],
+        states={
+            ADMIN_BRAND_LOGO: [
+                CallbackQueryHandler(admin_brand_logo_cancel, pattern="^admin_brand_logo_cancel$"),
+                MessageHandler(
+                    (filters.PHOTO | filters.Document.IMAGE) & ~filters.COMMAND,
+                    admin_brand_logo_receive,
+                ),
+                MessageHandler(~filters.COMMAND, admin_brand_logo_remind),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", admin_brand_logo_cancel_cmd)],
+        allow_reentry=True,
+        per_chat=True,
+        per_message=False,
+    )
+    app.add_handler(admin_brand_logo_conv)
+
     # محادثة بحث صندوق المشاكل/الاقتراحات (أدمن)
     admin_feedback_search_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(admin_feedback_search_start, pattern="^admin_feedback_search$")],
@@ -395,6 +421,7 @@ def main():
             CUST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_name)],
             CUST_PHONE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, cust_phone),
+                MessageHandler(filters.CONTACT, cust_phone),
                 CallbackQueryHandler(cust_phone_skip_click, pattern="^cust_phone_skip_btn$"),
             ],
         },
@@ -453,7 +480,10 @@ def main():
         ],
         states={
             CUST_EDIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_edit_name_done)],
-            CUST_EDIT_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_edit_phone_done)],
+            CUST_EDIT_PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_edit_phone_done),
+                MessageHandler(filters.CONTACT, cust_edit_phone_done),
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
         per_message=False,

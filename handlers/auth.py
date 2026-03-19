@@ -7,11 +7,17 @@ from urllib.parse import quote
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
+from sqlalchemy import text
 from database import SessionLocal
 from app_models import User
 from config import ADMIN_ID
 from utils.password import hash_password, check_password
-from utils.phone import normalize_phone as _normalize_phone, wa_number as _wa_number
+from utils.phone import (
+    is_plausible_iraq_mobile as _is_plausible_phone,
+    normalize_phone as _normalize_phone,
+    same_phone as _same_phone,
+    wa_number as _wa_number,
+)
 
 (
     REG_NAME,
@@ -27,6 +33,17 @@ from utils.phone import normalize_phone as _normalize_phone, wa_number as _wa_nu
 
 def get_user_by_telegram(db, telegram_id: int):
     return db.query(User).filter(User.telegram_id == telegram_id).first()
+
+
+def _find_user_by_phone(db, phone_normalized: str):
+    """يطابق الرقم المخزّن حتى لو كان محفوظاً بصيغة قديمة (بدون +964، مسافات، …)."""
+    u = db.query(User).filter(User.phone == phone_normalized).first()
+    if u:
+        return u
+    for u in db.query(User).filter(User.phone.isnot(None)):
+        if _same_phone(u.phone, phone_normalized):
+            return u
+    return None
 
 
 
@@ -60,12 +77,12 @@ async def reg_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         phone_raw = update.message.text or ""
     phone = _normalize_phone(phone_raw)
-    if not phone or len(phone) < 10:
-        await update.message.reply_text("يرجى إرسال رقم هاتف صحيح.")
+    if not phone or not _is_plausible_phone(phone):
+        await update.message.reply_text("يرجى إرسال رقم هاتف صحيح (مثلاً 077… أو 7××× أو +964…).")
         return REG_PHONE
     db = SessionLocal()
     try:
-        if db.query(User).filter(User.phone == phone).first():
+        if _find_user_by_phone(db, phone):
             await update.message.reply_text(
                 "هذا الرقم مسجل مسبقاً. استخدم «تسجيل الدخول» أو رقم آخر."
             )
@@ -124,8 +141,8 @@ async def login_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         phone_raw = update.message.text or ""
     phone = _normalize_phone(phone_raw)
-    if not phone:
-        await update.message.reply_text("يرجى إرسال رقمك المسجل.")
+    if not phone or not _is_plausible_phone(phone):
+        await update.message.reply_text("يرجى إرسال رقم هاتف صحيح كما سجّلته.")
         return LOGIN_PHONE
     context.user_data["login_phone"] = phone
     await update.message.reply_text("أرسل كلمة المرور:")
@@ -138,11 +155,13 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = SessionLocal()
     try:
         try:
-            user = db.query(User).filter(User.phone == phone).first()
+            user = _find_user_by_phone(db, phone)
             if not user:
                 await update.message.reply_text("لا يوجد حساب بهذا الرقم. أنشئ حساباً جديداً.")
                 context.user_data.pop("login_phone", None)
                 return ConversationHandler.END
+            if user.phone != phone:
+                user.phone = phone
             if user.password_hash and not check_password(password, user.password_hash):
                 await update.message.reply_text("كلمة المرور غير صحيحة.")
                 return LOGIN_PASSWORD
@@ -192,12 +211,12 @@ async def forgot_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         phone_raw = update.message.text or ""
     phone = _normalize_phone(phone_raw)
-    if not phone:
-        await update.message.reply_text("يرجى إرسال رقم الهاتف.")
+    if not phone or not _is_plausible_phone(phone):
+        await update.message.reply_text("يرجى إرسال رقم هاتف صحيح كما في الحساب.")
         return FORGOT_PHONE
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = _find_user_by_phone(db, phone)
         if not user:
             await update.message.reply_text("لا يوجد حساب مسجل بهذا الرقم.")
             return FORGOT_PHONE
@@ -268,7 +287,7 @@ async def forgot_copy_code_click(update: Update, context: ContextTypes.DEFAULT_T
         return FORGOT_PHONE
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = _find_user_by_phone(db, phone)
         if not user or not user.reset_code:
             await query.edit_message_text("لم يتم العثور على رمز. استخدم «نسيت كلمة المرور» مرة أخرى.")
             return ConversationHandler.END
@@ -302,7 +321,7 @@ async def forgot_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.phone == phone).first()
+        user = _find_user_by_phone(db, phone)
         if not user:
             await update.message.reply_text("لا يوجد حساب بهذا الرقم.")
             context.user_data.pop("forgot_phone", None)
@@ -344,11 +363,10 @@ async def cancel_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تسجيل خروج حقيقي: إزالة ربط telegram_id حتى يرجع يطلب تسجيل الدخول."""
     query = update.callback_query
-    chat_id = None
-    if query and query.from_user:
-        chat_id = query.from_user.id
-    elif update.effective_user:
-        chat_id = update.effective_user.id
+    if not update.effective_user:
+        return ConversationHandler.END
+    # دائماً معرف التليجرام كـ int — نفس المنطق المستخدم في /start
+    uid = int(update.effective_user.id)
     if query:
         try:
             await query.answer("جاري تسجيل الخروج...")
@@ -357,25 +375,36 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     db = SessionLocal()
     try:
-        if not chat_id:
-            return ConversationHandler.END
         keyboard = [
             [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
             [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
             [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
         ]
 
-        # تحديث مباشر أكثر ثباتاً لتفريغ الربط الحالي
+        # تحديث عبر SQL مباشر لتفادي أي اختلاف نوع/كاش مع ORM
+        affected = 0
         try:
-            affected = (
-                db.query(User)
-                .filter(User.telegram_id == chat_id)
-                .update({User.telegram_id: None, User.username: None}, synchronize_session=False)
+            result = db.execute(
+                text(
+                    "UPDATE users SET telegram_id = NULL, username = NULL "
+                    "WHERE telegram_id = :tid"
+                ),
+                {"tid": uid},
             )
             db.commit()
+            affected = getattr(result, "rowcount", 0) or 0
         except Exception:
             db.rollback()
-            affected = 0
+            try:
+                affected = (
+                    db.query(User)
+                    .filter(User.telegram_id == uid)
+                    .update({User.telegram_id: None, User.username: None}, synchronize_session=False)
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
+                affected = 0
 
         out_text = (
             "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى."
@@ -392,13 +421,13 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
         else:
             await context.bot.send_message(
-                chat_id=chat_id,
+                chat_id=uid,
                 text=out_text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
             )
 
-        for k in ("reg_name", "reg_phone", "auth_action", "login_phone", "forgot_phone"):
-            context.user_data.pop(k, None)
+        # إفراغ جلسة المحادثات حتى لا يبقى المستخدم في حالة Conversation ويُعاد فتح القائمة من كاش قديم
+        context.user_data.clear()
     finally:
         db.close()
 

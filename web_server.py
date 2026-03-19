@@ -6,19 +6,92 @@
 
 from __future__ import annotations
 
+import base64
+import html
 import json
 import re
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import urlopen
 
 from database import SessionLocal
-from app_models import ShareLink, CustomerTransaction, Customer
+from app_models import BRAND_LOGO_SETTING_KEY, Customer, CustomerTransaction, ShareLink, SiteSetting
+from config import BOT_LOGO_BASE64
 from config import BOT_TOKEN
 from config import BOT_USERNAME
+from utils.phone import wa_number as _wa_number
 
+# شعار البوت (احتياطي إذا لم يُضبط BOT_LOGO_BASE64 في Railway)
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+_LOGO_PATH = _STATIC_DIR / "bot_logo.png"
+_LOGO_B64_PATH = _STATIC_DIR / "bot_logo.b64.txt"
 
 TX_PAGE_SIZE = 15
+
+
+def _html_escape(s: str) -> str:
+    return html.escape(s or "", quote=True)
+
+
+def _clean_env_logo_b64(raw: str) -> str:
+    """يستخرج سلسلة base64 نظيفة من المتغير أو من data:image/png;base64,..."""
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    if "base64," in s:
+        s = s.split("base64,", 1)[1].strip()
+    # إزالة مسافات/أسطر زائدة إن لصق المستخدم نصاً مقسّماً
+    return "".join(s.split())
+
+
+def _guess_image_mime(data: bytes) -> str:
+    if not data:
+        return "image/png"
+    if len(data) >= 3 and data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if len(data) >= 8 and data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if len(data) >= 6 and data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/png"
+
+
+def _brand_visual_for_page() -> tuple[str, str]:
+    """رابط الشعار — يُحمَّل من قاعدة البيانات أو المتغير أو الملف عبر هذا المسار."""
+    u = "/creditbook/logo.png"
+    return u, u
+
+
+def _get_brand_logo_bytes_ctype() -> tuple[bytes, str]:
+    """للاستجابة GET /creditbook/logo — أولاً من لوحة الأدمن (PostgreSQL)، ثم المتغير، ثم الملفات."""
+    db = SessionLocal()
+    try:
+        row = db.query(SiteSetting).filter(SiteSetting.key == BRAND_LOGO_SETTING_KEY).first()
+        if row and row.blob_value:
+            data = bytes(row.blob_value)
+            return data, _guess_image_mime(data)
+    finally:
+        db.close()
+    b64 = _clean_env_logo_b64(BOT_LOGO_BASE64)
+    if b64:
+        try:
+            return base64.standard_b64decode(b64), "image/png"
+        except Exception:
+            pass
+    if _LOGO_B64_PATH.is_file():
+        return base64.standard_b64decode(_LOGO_B64_PATH.read_text(encoding="ascii").strip()), "image/png"
+    if _LOGO_PATH.is_file():
+        return _LOGO_PATH.read_bytes(), "image/png"
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>"
+        "<rect width='64' height='64' rx='14' fill='#0d9488'/>"
+        "<rect x='12' y='16' width='40' height='34' rx='4' fill='#f0fdfa' stroke='#0f766e' stroke-width='2'/>"
+        "</svg>"
+    )
+    return svg.encode("utf-8"), "image/svg+xml; charset=utf-8"
 
 
 def _amount_to_str(x) -> str:
@@ -141,7 +214,7 @@ def _render_page(token: str, offset: int) -> str:
 
         wa_btn = ""
         if owner_phone:
-            wa_phone = owner_phone.replace("+", "").replace(" ", "").replace("-", "")
+            wa_phone = _wa_number(owner_phone)
             wa_btn = (
                 f"<a class='btn wa' href='https://api.whatsapp.com/send?phone={wa_phone}' "
                 f"target='_blank' rel='noopener'>راسل {owner_name}</a>"
@@ -151,18 +224,53 @@ def _render_page(token: str, offset: int) -> str:
         if BOT_USERNAME:
             bot_btn = f"<a class='btn bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>افتحلك دفتر</a>"
 
-        title = f"عميل: {cust.name}"
+        title = "دفتر الديون"
+        brand_img_src, favicon_href = _brand_visual_for_page()
+        owner_meta = (
+            f"<span class='k'>صاحب الحساب:</span> {_html_escape(owner_name)}"
+            + (f" — {_html_escape(owner_phone)}" if owner_phone else "")
+        )
+        phone_disp = _html_escape((cust.phone or "").strip())
+        cust_meta = (
+            f"<span class='k'>العميل:</span> {_html_escape(cust.name)}"
+            + (f" — {phone_disp}" if phone_disp else "")
+        )
         return f"""
         <!doctype html>
         <html lang='ar' dir='rtl'>
           <head>
             <meta charset='utf-8'/>
             <meta name='viewport' content='width=device-width, initial-scale=1'/>
+            <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
             <title>{title}</title>
             <style>
               body {{ font-family: Arial, sans-serif; background: #f7f7f7; padding: 16px; }}
               .card {{ background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }}
-              h2 {{ margin-top: 0; }}
+              .brand {{
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: flex-start;
+                gap: 12px;
+                flex-wrap: nowrap;
+                margin-bottom: 14px;
+              }}
+              .brand h2 {{
+                margin: 0;
+                font-size: 1.85rem;
+                font-weight: 800;
+                color: #0f172a;
+                line-height: 1.15;
+                letter-spacing: -0.02em;
+              }}
+              .brand-logo {{
+                width: 56px;
+                height: 56px;
+                border-radius: 14px;
+                object-fit: cover;
+                flex-shrink: 0;
+                box-shadow: 0 3px 10px rgba(0,0,0,.12);
+              }}
               .balance {{ font-size: 18px; margin: 8px 0 16px 0; }}
               .bal-red {{ color: #d32f2f; }}
               .bal-green {{ color: #2e7d32; }}
@@ -196,15 +304,21 @@ def _render_page(token: str, offset: int) -> str:
               }}
               .wa {{ background: linear-gradient(135deg, #22c55e, #15803d); margin-left: 8px; }}
               .bot {{ background: linear-gradient(135deg, #3b82f6, #1d4ed8); }}
-              .meta {{ color: #444; margin-bottom: 6px; }}
+              .meta {{ margin-bottom: 6px; line-height: 1.45; }}
+              .meta .k {{ color: #64748b; font-weight: 600; margin-inline-end: 6px; }}
+              .owner-line {{ font-size: 14px; color: #475569; }}
+              .customer-line {{ font-size: 13px; color: #64748b; font-weight: 500; }}
               .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }}
             </style>
           </head>
           <body>
             <div class='card'>
-              <h2>{cust.name}</h2>
-              <div class='meta'>{owner_name}{(" - " + owner_phone) if owner_phone else ""}</div>
-              <div class='meta'>{cust.name}{(" - " + cust.phone) if cust.phone else ""}</div>
+              <div class='brand'>
+                <img class='brand-logo' src="{_html_escape(brand_img_src)}" width='56' height='56' alt='دفتر الديون'/>
+                <h2>دفتر الديون</h2>
+              </div>
+              <div class='meta owner-line'>{owner_meta}</div>
+              <div class='meta customer-line'>{cust_meta}</div>
               <div class='balance {balance_class}'>{balance_text} د.ع.</div>
               <div class='actions'>{wa_btn}{bot_btn}</div>
               {''.join(tx_rows) if tx_rows else '<p>لا توجد معاملات.</p>'}
@@ -243,7 +357,9 @@ def _resolve_telegram_file_url(file_id: str) -> str | None:
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         parsed = urlparse(self.path)
-        path = parsed.path
+        path = parsed.path or "/"
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
         qs = parse_qs(parsed.query)
         offset = 0
         if "offset" in qs:
@@ -251,6 +367,21 @@ class Handler(BaseHTTPRequestHandler):
                 offset = int(qs["offset"][0])
             except Exception:
                 offset = 0
+
+        if path in ("/creditbook/logo", "/creditbook/logo.png"):
+            try:
+                data, ctype = _get_brand_logo_bytes_ctype()
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+            except Exception:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"Logo not found")
+            return
 
         m = re.match(r"^/creditbook/balance/(?P<token>[A-Za-z0-9_-]+)$", path)
         photo_match = re.match(r"^/creditbook/photo/(?P<fid>.+)$", path)
@@ -312,6 +443,8 @@ class Handler(BaseHTTPRequestHandler):
         html = _render_page(token, offset)
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
         self.end_headers()
         self.wfile.write(html.encode("utf-8"))
 
