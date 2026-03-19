@@ -63,13 +63,14 @@ async def ledger_add_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("أدخل رقماً صحيحاً للمبلغ.")
         return ADD_AMOUNT
     context.user_data["ledger_amount"] = amount
-    await update.message.reply_text("اختياري: أرسل وصفاً للقيد (أو /تخطى أو /skip):")
+    await update.message.reply_text("اختياري: أرسل وصفاً للقيد (لتخطي الوصف اكتب: تخطى أو /skip):")
     return ADD_DESC
 
 
 async def ledger_add_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     desc = update.message.text.strip() if update.message.text else ""
-    if context.user_data.pop("ledger_skip", False) or (update.message.text and update.message.text.strip() == "/تخطى"):
+    raw = (update.message.text or "").strip()
+    if context.user_data.pop("ledger_skip", False) or raw in ("تخطى", "skip", "/skip"):
         desc = ""
     db = SessionLocal()
     try:
