@@ -55,7 +55,11 @@ async def reg_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def reg_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    phone = _normalize_phone(update.message.text or "")
+    if update.message.contact:
+        phone_raw = update.message.contact.phone_number or ""
+    else:
+        phone_raw = update.message.text or ""
+    phone = _normalize_phone(phone_raw)
     if not phone or len(phone) < 10:
         await update.message.reply_text("يرجى إرسال رقم هاتف صحيح.")
         return REG_PHONE
@@ -115,7 +119,11 @@ async def auth_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def login_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    phone = _normalize_phone(update.message.text or "")
+    if update.message.contact:
+        phone_raw = update.message.contact.phone_number or ""
+    else:
+        phone_raw = update.message.text or ""
+    phone = _normalize_phone(phone_raw)
     if not phone:
         await update.message.reply_text("يرجى إرسال رقمك المسجل.")
         return LOGIN_PHONE
@@ -173,7 +181,11 @@ async def auth_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def forgot_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    phone = _normalize_phone(update.message.text or "")
+    if update.message.contact:
+        phone_raw = update.message.contact.phone_number or ""
+    else:
+        phone_raw = update.message.text or ""
+    phone = _normalize_phone(phone_raw)
     if not phone:
         await update.message.reply_text("يرجى إرسال رقم الهاتف.")
         return FORGOT_PHONE

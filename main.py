@@ -138,7 +138,10 @@ def main():
         entry_points=[CallbackQueryHandler(auth_register, pattern="^auth_register$")],
         states={
             REG_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_name)],
-            REG_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_phone)],
+            REG_PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, reg_phone),
+                MessageHandler(filters.CONTACT, reg_phone),
+            ],
             REG_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_password)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
@@ -150,7 +153,10 @@ def main():
     login_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(auth_login, pattern="^auth_login$")],
         states={
-            LOGIN_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_phone)],
+            LOGIN_PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, login_phone),
+                MessageHandler(filters.CONTACT, login_phone),
+            ],
             LOGIN_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_password)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
@@ -162,7 +168,10 @@ def main():
     forgot_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(auth_forgot, pattern="^auth_forgot$")],
         states={
-            FORGOT_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_phone)],
+            FORGOT_PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_phone),
+                MessageHandler(filters.CONTACT, forgot_phone),
+            ],
             FORGOT_WAIT: [CallbackQueryHandler(forgot_enter_code_click, pattern="^forgot_enter_code$")],
             FORGOT_CODE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_code),
