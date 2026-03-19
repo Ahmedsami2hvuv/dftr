@@ -177,9 +177,25 @@ def _render_page(token: str, offset: int) -> str:
               .note {{ margin-top: 6px; color: #444; font-size: 13px; }}
               .photo-wrap {{ flex: 0 0 auto; margin-top: 2px; }}
               .photo {{ width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; cursor: pointer; }}
-              .btn {{ display: inline-block; padding: 10px 14px; background: #1976d2; color: #fff; text-decoration: none; border-radius: 10px; margin-top: 10px; }}
-              .wa {{ background: #1b5e20; margin-left: 8px; }}
-              .bot {{ background: #1565c0; }}
+              .btn {{
+                display: inline-block;
+                padding: 10px 16px;
+                color: #fff;
+                text-decoration: none;
+                border-radius: 999px;
+                margin-top: 10px;
+                font-weight: 700;
+                font-size: 14px;
+                box-shadow: 0 6px 14px rgba(0,0,0,.14);
+                transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+              }}
+              .btn:hover {{
+                transform: translateY(-1px);
+                box-shadow: 0 9px 18px rgba(0,0,0,.18);
+                opacity: .95;
+              }}
+              .wa {{ background: linear-gradient(135deg, #22c55e, #15803d); margin-left: 8px; }}
+              .bot {{ background: linear-gradient(135deg, #3b82f6, #1d4ed8); }}
               .meta {{ color: #444; margin-bottom: 6px; }}
               .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }}
             </style>
