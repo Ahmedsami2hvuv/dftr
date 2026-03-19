@@ -139,33 +139,7 @@ _CUST_TXN_KEYS = (
     "cust_txn_amount",
     "cust_txn_note_text",
     "cust_txn_photo_file_id",
-    "cust_txn_prompt_msg_id",
-    "cust_txn_prompt_chat_id",
 )
-
-
-async def _edit_txn_prompt_or_reply(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    text: str,
-    keyboard: list,
-):
-    """يعدّل رسالة التعليمات السابقة (إن وُجدت) وإلا يرسل رداً جديداً."""
-    markup = InlineKeyboardMarkup(keyboard)
-    chat_id = context.user_data.get("cust_txn_prompt_chat_id")
-    msg_id = context.user_data.get("cust_txn_prompt_msg_id")
-    if chat_id is not None and msg_id is not None:
-        try:
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=msg_id,
-                text=text,
-                reply_markup=markup,
-            )
-            return
-        except Exception:
-            pass
-    await update.message.reply_text(text, reply_markup=markup)
 
 
 def _is_public_http_url(url: str) -> bool:
@@ -1057,8 +1031,6 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
-    context.user_data["cust_txn_prompt_msg_id"] = query.message.message_id
-    context.user_data["cust_txn_prompt_chat_id"] = query.message.chat_id
     return CUST_AMOUNT
 
 
@@ -1082,8 +1054,6 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
-    context.user_data["cust_txn_prompt_msg_id"] = query.message.message_id
-    context.user_data["cust_txn_prompt_chat_id"] = query.message.chat_id
     return CUST_AMOUNT
 
 
@@ -1132,8 +1102,6 @@ async def cust_txn_back_amount_click(update: Update, context: ContextTypes.DEFAU
         "أرسل المبلغ (رقم أو 38 الفيروز أو سطرين… أو صورة بالتعليق).",
         keyboard,
     )
-    context.user_data["cust_txn_prompt_msg_id"] = query.message.message_id
-    context.user_data["cust_txn_prompt_chat_id"] = query.message.chat_id
     return CUST_AMOUNT
 
 
@@ -1172,7 +1140,11 @@ async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "هل تريد إضافة صورة؟\n\n"
             "أرسل صورة الآن، أو اضغط «حفظ بدون صورة»."
         )
-        await _edit_txn_prompt_or_reply(update, context, text, keyboard)
+        # رد جديد بعد رسالة المستخدم (لا نعدّل رسالة التعليمات السابقة)
+        await update.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
     else:
         await update.message.reply_text(
             "تم استلام المبلغ ✅\n\n"
@@ -1226,7 +1198,10 @@ async def cust_amount_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "هل تريد تعديل الملاحظة بإرسال نص؟\n"
             "أو اضغط «حفظ كما هو»."
         )
-        await _edit_txn_prompt_or_reply(update, context, text, keyboard)
+        await update.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
     else:
         await update.message.reply_text(
             f"{kind_label}\n\n"
