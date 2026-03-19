@@ -56,15 +56,22 @@ from handlers.auth import (
 )
 from handlers.ledger_handler import (
     menu_ledger,
-    ledger_add_fixed_salary,
-    ledger_add_additional_income,
-    ledger_add_expenses,
+    ledger_pick_category_click,
     ledger_add_amount,
     ledger_add_desc,
     ledger_skip_desc_click,
     ledger_list,
+    ledger_categories_menu,
+    ledger_cat_add_start,
+    ledger_cat_name_done,
+    ledger_cat_kind_took_click,
+    ledger_cat_kind_gave_click,
+    ledger_cat_del_req_click,
+    ledger_cat_del_do_click,
     ADD_AMOUNT,
     ADD_DESC,
+    CAT_ADD_NAME,
+    CAT_ADD_KIND,
 )
 from handlers.debts import (
     menu_debts,
@@ -209,9 +216,7 @@ def main():
     # محادثة إضافة قيد دفتر
     ledger_add_conv = ConversationHandler(
         entry_points=[
-            CallbackQueryHandler(ledger_add_fixed_salary, pattern="^ledger_add_fixed_salary$"),
-            CallbackQueryHandler(ledger_add_additional_income, pattern="^ledger_add_additional_income$"),
-            CallbackQueryHandler(ledger_add_expenses, pattern="^ledger_add_expenses$"),
+            CallbackQueryHandler(ledger_pick_category_click, pattern="^ledger_pick_cat_\\d+$"),
         ],
         states={
             ADD_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_add_amount)],
@@ -224,6 +229,21 @@ def main():
         per_message=True,
     )
     app.add_handler(ledger_add_conv)
+
+    # محادثة إضافة صنف في الدخل والمصروف (أصناف الصنف)
+    ledger_cat_add_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(ledger_cat_add_start, pattern="^ledger_cat_add$")],
+        states={
+            CAT_ADD_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_cat_name_done)],
+            CAT_ADD_KIND: [
+                CallbackQueryHandler(ledger_cat_kind_took_click, pattern="^ledger_cat_kind_took$"),
+                CallbackQueryHandler(ledger_cat_kind_gave_click, pattern="^ledger_cat_kind_gave$"),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(ledger_cat_add_conv)
 
     # محادثة إضافة دين
     debt_add_conv = ConversationHandler(
@@ -248,6 +268,13 @@ def main():
     app.add_handler(CallbackQueryHandler(main_menu, pattern="^main_menu$"))
     app.add_handler(CallbackQueryHandler(menu_ledger, pattern="^menu_ledger$"))
     app.add_handler(CallbackQueryHandler(ledger_list, pattern="^ledger_list$"))
+    app.add_handler(CallbackQueryHandler(ledger_categories_menu, pattern="^ledger_categories_menu$"))
+    app.add_handler(
+        CallbackQueryHandler(ledger_cat_del_req_click, pattern="^ledger_cat_del_req_\\d+$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ledger_cat_del_do_click, pattern="^ledger_cat_del_do_\\d+$")
+    )
     app.add_handler(CallbackQueryHandler(menu_debts, pattern="^menu_debts$"))
     app.add_handler(CallbackQueryHandler(debt_list, pattern="^debt_list$"))
     app.add_handler(CallbackQueryHandler(menu_profile, pattern="^menu_profile$"))

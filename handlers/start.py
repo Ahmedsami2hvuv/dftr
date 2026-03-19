@@ -48,6 +48,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             keyboard = [
                 [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
+                [InlineKeyboardButton("📒 الدخل والمصروف", callback_data="menu_ledger")],
                 [InlineKeyboardButton("👤 حسابي", callback_data="menu_profile")],
             ]
             if update.effective_user.id == ADMIN_ID:
@@ -72,6 +73,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     keyboard = [
         [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
+        [InlineKeyboardButton("📒 الدخل والمصروف", callback_data="menu_ledger")],
         [InlineKeyboardButton("👤 حسابي", callback_data="menu_profile")],
     ]
     if update.effective_user.id == ADMIN_ID:

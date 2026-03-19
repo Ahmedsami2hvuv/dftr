@@ -19,6 +19,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     ledger_entries = relationship("LedgerEntry", back_populates="user")
+    ledger_categories = relationship("LedgerCategory", back_populates="user")
     debts_given = relationship("Debt", foreign_keys="Debt.from_user_id", back_populates="from_user")
     debts_received = relationship("Debt", foreign_keys="Debt.to_user_id", back_populates="to_user")
     customers = relationship("Customer", back_populates="user")

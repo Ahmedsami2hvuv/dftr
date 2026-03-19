@@ -64,6 +64,20 @@ class CustomerCategory(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class LedgerCategory(Base):
+    """اصناف المعاملات ضمن دفتر الحسابات (تؤرخ نوع أخذت/أعطيت)"""
+    __tablename__ = "ledger_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    # "took" => 🔴 أخذت, "gave" => 🟢 أعطيت
+    kind = Column(String(10), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="ledger_categories")
+
+
 class LedgerEntry(Base):
     """قيد في دفتر الحسابات (دخل أو مصروف)"""
     __tablename__ = "ledger_entries"
