@@ -134,11 +134,14 @@ def _render_page(token: str, offset: int) -> str:
         wa_btn = ""
         if owner_phone:
             wa_phone = owner_phone.replace("+", "").replace(" ", "").replace("-", "")
-            wa_btn = f"<a class='btn wa' href='https://api.whatsapp.com/send?phone={wa_phone}' target='_blank' rel='noopener'>راسل صاحب الحساب عبر واتساب</a>"
+            wa_btn = (
+                f"<a class='btn wa' href='https://api.whatsapp.com/send?phone={wa_phone}' "
+                f"target='_blank' rel='noopener'>راسل {owner_name}</a>"
+            )
 
         bot_btn = ""
         if BOT_USERNAME:
-            bot_btn = f"<a class='btn bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>سجّل حسابك بسهولة في البوت</a>"
+            bot_btn = f"<a class='btn bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>افتحلك دفتر</a>"
 
         title = f"عميل: {cust.name}"
         return f"""
@@ -172,8 +175,8 @@ def _render_page(token: str, offset: int) -> str:
           <body>
             <div class='card'>
               <h2>{cust.name}</h2>
-              <div class='meta'>صاحب الحساب: {owner_name}{(" - " + owner_phone) if owner_phone else ""}</div>
-              <div class='meta'>العميل: {cust.name}{(" - " + cust.phone) if cust.phone else ""}</div>
+              <div class='meta'>{owner_name}{(" - " + owner_phone) if owner_phone else ""}</div>
+              <div class='meta'>{cust.name}{(" - " + cust.phone) if cust.phone else ""}</div>
               <div class='balance {balance_class}'>{balance_text} د.ع.</div>
               <div class='actions'>{wa_btn}{bot_btn}</div>
               {''.join(tx_rows) if tx_rows else '<p>لا توجد معاملات.</p>'}
