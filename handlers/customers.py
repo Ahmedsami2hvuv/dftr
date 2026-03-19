@@ -2,6 +2,7 @@
 """دفتر الديون: عملاء، أخذت/أعطيت، مشاركة"""
 import secrets
 from urllib.parse import quote
+from urllib.parse import urlparse
 from decimal import Decimal
 from datetime import datetime, timedelta
 
@@ -36,6 +37,26 @@ def _balance(customer):
     gave = sum(t.amount for t in customer.transactions if t.kind == "gave")
     took = sum(t.amount for t in customer.transactions if t.kind == "took")
     return float(gave - took), float(gave), float(took)
+
+
+def _is_public_http_url(url: str) -> bool:
+    """يتحقق أن الرابط HTTP/HTTPS وقابل للاستخدام من خارج السيرفر."""
+    if not url:
+        return False
+    try:
+        p = urlparse(url.strip())
+    except Exception:
+        return False
+    if p.scheme not in ("http", "https"):
+        return False
+    host = (p.hostname or "").lower()
+    if not host:
+        return False
+    # localhost / شبكات داخلية لا تعمل للمستخدمين الخارجيين
+    private_hosts = {"localhost", "127.0.0.1", "0.0.0.0"}
+    if host in private_hosts:
+        return False
+    return True
 
 
 async def menu_customer_categories(update: Update, context: ContextTypes.DEFAULT_TYPE, back_customer_id: int):
@@ -1163,7 +1184,7 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 1) إذا WEB_BASE_URL مضبوط -> رابط موقع
         # 2) fallback -> deep link داخل البوت (حتى لا يتعطل زر المشاركة)
         base = (WEB_BASE_URL or "").strip().rstrip("/")
-        if base.startswith("http://") or base.startswith("https://"):
+        if _is_public_http_url(base):
             view_url = f"{base}/creditbook/balance/{token}?lang=ar"
         else:
             me = await context.bot.get_me()
@@ -1189,7 +1210,8 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
         wa_num = cust.phone and wa_number(cust.phone)
         try:
             if wa_num:
-                wa_url = f"https://wa.me/{wa_num}?text={quote(wa_text)}"
+                # api.whatsapp.com غالباً أكثر ثباتاً في فتح واتساب من wa.me
+                wa_url = f"https://api.whatsapp.com/send?phone={wa_num}&text={quote(wa_text)}"
                 # تحويل مباشر إلى واتساب عند ضغط زر "مشاركة"
                 try:
                     await query.answer(url=wa_url)
