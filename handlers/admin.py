@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """لوحة الأدمن"""
 import io
+import logging
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
@@ -24,6 +25,8 @@ ADMIN_FEEDBACK_SEARCH = 902
 ADMIN_BRAND_LOGO = 904
 
 MAX_BRAND_LOGO_BYTES = 2_500_000
+
+logger = logging.getLogger(__name__)
 
 
 def is_admin(user_id: int) -> bool:
@@ -543,15 +546,6 @@ async def admin_brand_logo_start(update: Update, context: ContextTypes.DEFAULT_T
     return ADMIN_BRAND_LOGO
 
 
-async def admin_brand_logo_remind(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.effective_user.id):
-        return ConversationHandler.END
-    await update.message.reply_text(
-        "أرسل صورة (مرفق صورة أو ملف بصيغة صورة)، أو اضغط «إلغاء» في الرسالة السابقة."
-    )
-    return ADMIN_BRAND_LOGO
-
-
 async def admin_brand_logo_cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return ConversationHandler.END
@@ -562,7 +556,8 @@ async def admin_brand_logo_cancel_cmd(update: Update, context: ContextTypes.DEFA
     return ConversationHandler.END
 
 
-async def admin_brand_logo_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_brand_logo_on_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قبول صورة كصورة أو كملف صورة — بدون الاعتماد على Document.IMAGE (توافق أوسع)."""
     if not is_admin(update.effective_user.id):
         return ConversationHandler.END
     msg = update.message
@@ -575,9 +570,11 @@ async def admin_brand_logo_receive(update: Update, context: ContextTypes.DEFAULT
     elif msg.document and msg.document.mime_type and msg.document.mime_type.startswith("image/"):
         file_id = msg.document.file_id
         size_hint = msg.document.file_size or 0
-
-    if not file_id:
-        await msg.reply_text("أرسل صورة فقط (كصورة أو كملف بصيغة image/…).")
+    else:
+        await msg.reply_text(
+            "أرسل صورة كصورة (مرفق صورة من المعرض)، أو ملف JPG/PNG/WebP.\n"
+            "تجنّب إرسال ملفات غير صور."
+        )
         return ADMIN_BRAND_LOGO
 
     if size_hint and size_hint > MAX_BRAND_LOGO_BYTES:
@@ -586,15 +583,21 @@ async def admin_brand_logo_receive(update: Update, context: ContextTypes.DEFAULT
 
     try:
         tg_file = await context.bot.get_file(file_id)
-        buf = io.BytesIO()
-        await tg_file.download_to_memory(buf)
-        raw = buf.getvalue()
-    except Exception:
-        await msg.reply_text("تعذّر تنزيل الملف من تليجرام. حاول مرة أخرى.")
+        raw = None
+        try:
+            data = await tg_file.download_as_bytearray()
+            raw = bytes(data)
+        except Exception:
+            buf = io.BytesIO()
+            await tg_file.download_to_memory(buf)
+            raw = buf.getvalue()
+    except Exception as e:
+        logger.exception("تنزيل شعار من تليجرام فشل")
+        await msg.reply_text(f"تعذّر تنزيل الملف من تليجرام.\nتفاصيل: {e!s}")
         return ADMIN_BRAND_LOGO
 
-    if len(raw) > MAX_BRAND_LOGO_BYTES:
-        await msg.reply_text("الصورة كبيرة بعد التنزيل. أرسل غيرها.")
+    if not raw or len(raw) > MAX_BRAND_LOGO_BYTES:
+        await msg.reply_text("الصورة كبيرة بعد التنزيل أو فارغة. أرسل غيرها.")
         return ADMIN_BRAND_LOGO
 
     db = SessionLocal()
@@ -606,12 +609,22 @@ async def admin_brand_logo_receive(update: Update, context: ContextTypes.DEFAULT
         else:
             row.blob_value = raw
         db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.exception("حفظ الشعار في قاعدة البيانات فشل")
+        await msg.reply_text(
+            f"❌ تعذّر الحفظ في قاعدة البيانات.\n"
+            f"تأكد أن الجدول site_settings وُجد (أعد تشغيل البوت بعد التحديث).\n\n"
+            f"الخطأ: {e!s}"
+        )
+        return ConversationHandler.END
     finally:
         db.close()
 
     keyboard = [[InlineKeyboardButton("◀ لوحة الأدمن", callback_data="admin_panel")]]
     await msg.reply_text(
-        "✅ تم حفظ الشعار. يظهر على الرابط العام فوراً (جرّب تحديث الصفحة).",
+        "✅ تم حفظ الشعار في قاعدة البيانات.\n"
+        "افتح رابط المشاركة وحدّث الصفحة (أو Ctrl+F5) لرؤية الشعار الجديد.",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return ConversationHandler.END

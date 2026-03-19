@@ -104,8 +104,7 @@ from handlers.admin import (
     admin_broadcast_cancel,
     admin_broadcast_send,
     admin_brand_logo_start,
-    admin_brand_logo_receive,
-    admin_brand_logo_remind,
+    admin_brand_logo_on_message,
     admin_brand_logo_cancel,
     admin_brand_logo_cancel_cmd,
     bc_start_click,
@@ -334,11 +333,7 @@ def main():
         states={
             ADMIN_BRAND_LOGO: [
                 CallbackQueryHandler(admin_brand_logo_cancel, pattern="^admin_brand_logo_cancel$"),
-                MessageHandler(
-                    (filters.PHOTO | filters.Document.IMAGE) & ~filters.COMMAND,
-                    admin_brand_logo_receive,
-                ),
-                MessageHandler(~filters.COMMAND, admin_brand_logo_remind),
+                MessageHandler(~filters.COMMAND, admin_brand_logo_on_message),
             ],
         },
         fallbacks=[CommandHandler("cancel", admin_brand_logo_cancel_cmd)],
@@ -346,7 +341,8 @@ def main():
         per_chat=True,
         per_message=False,
     )
-    app.add_handler(admin_brand_logo_conv)
+    # أولوية عالية حتى لا تخطف محادثات أخرى (مثل دفتر العملاء) صورة الشعار
+    app.add_handler(admin_brand_logo_conv, group=-1)
 
     # محادثة بحث صندوق المشاكل/الاقتراحات (أدمن)
     admin_feedback_search_conv = ConversationHandler(

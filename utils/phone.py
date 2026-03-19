@@ -109,3 +109,34 @@ def phone_local_display(phone: str) -> str:
     if len(rest) == 10:
         return f"+964 {rest[:3]} {rest[3:6]} {rest[6:]}"
     return n
+
+
+def format_phone_iq_local_display(phone: str) -> str:
+    """
+    للعرض على الموقع: بدون +964 — صيغة محلية 07XXXXXXXXX (11 رقم).
+    يصلح أرقاماً طويلة/مكررة في قاعدة البيانات بأخذ 10 أرقام وطنية بعد 964.
+    """
+    if not (phone or "").strip():
+        return ""
+    d = _digits_only(normalize_phone(phone))
+    if not d:
+        return (phone or "").strip()
+
+    if d.startswith("964"):
+        rest = d[3:]
+        rest = rest.lstrip("0") or rest
+        while rest.startswith("964"):
+            rest = rest[3:].lstrip("0")
+        if len(rest) > 10:
+            rest = rest[:10]
+        if len(rest) == 10 and rest[0] == "7":
+            return "0" + rest
+        if len(rest) == 9 and rest[0] == "7":
+            return "0" + rest
+
+    if d.startswith("0") and len(d) == 11 and d[1] == "7":
+        return d
+    if len(d) == 10 and d[0] == "7":
+        return "0" + d
+
+    return (phone or "").strip()

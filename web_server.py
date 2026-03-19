@@ -20,7 +20,7 @@ from app_models import BRAND_LOGO_SETTING_KEY, Customer, CustomerTransaction, Sh
 from config import BOT_LOGO_BASE64
 from config import BOT_TOKEN
 from config import BOT_USERNAME
-from utils.phone import wa_number as _wa_number
+from utils.phone import format_phone_iq_local_display, wa_number as _wa_number
 
 # شعار البوت (احتياطي إذا لم يُضبط BOT_LOGO_BASE64 في Railway)
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -226,14 +226,14 @@ def _render_page(token: str, offset: int) -> str:
 
         title = "دفتر الديون"
         brand_img_src, favicon_href = _brand_visual_for_page()
-        owner_meta = (
-            f"<span class='k'>صاحب الحساب:</span> {_html_escape(owner_name)}"
-            + (f" — {_html_escape(owner_phone)}" if owner_phone else "")
+        # بدون تسميات «صاحب الحساب / العميل» — الاسم والرقم فقط، رقم محلي 11 رقم يبدأ بـ 0
+        owner_disp_phone = format_phone_iq_local_display(owner_phone) if owner_phone else ""
+        owner_meta = _html_escape(owner_name) + (
+            f" — {_html_escape(owner_disp_phone)}" if owner_disp_phone else ""
         )
-        phone_disp = _html_escape((cust.phone or "").strip())
-        cust_meta = (
-            f"<span class='k'>العميل:</span> {_html_escape(cust.name)}"
-            + (f" — {phone_disp}" if phone_disp else "")
+        cust_disp_phone = format_phone_iq_local_display((cust.phone or "").strip()) if cust.phone else ""
+        cust_meta = _html_escape(cust.name) + (
+            f" — {_html_escape(cust_disp_phone)}" if cust_disp_phone else ""
         )
         return f"""
         <!doctype html>
@@ -305,9 +305,8 @@ def _render_page(token: str, offset: int) -> str:
               .wa {{ background: linear-gradient(135deg, #22c55e, #15803d); margin-left: 8px; }}
               .bot {{ background: linear-gradient(135deg, #3b82f6, #1d4ed8); }}
               .meta {{ margin-bottom: 6px; line-height: 1.45; }}
-              .meta .k {{ color: #64748b; font-weight: 600; margin-inline-end: 6px; }}
-              .owner-line {{ font-size: 14px; color: #475569; }}
-              .customer-line {{ font-size: 13px; color: #64748b; font-weight: 500; }}
+              .owner-line {{ font-size: 14px; color: #475569; font-weight: 600; }}
+              .customer-line {{ font-size: 14px; color: #475569; }}
               .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }}
             </style>
           </head>
@@ -373,7 +372,8 @@ class Handler(BaseHTTPRequestHandler):
                 data, ctype = _get_brand_logo_bytes_ctype()
                 self.send_response(200)
                 self.send_header("Content-Type", ctype)
-                self.send_header("Cache-Control", "public, max-age=86400")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.send_header("Pragma", "no-cache")
                 self.end_headers()
                 self.wfile.write(data)
             except Exception:
