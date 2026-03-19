@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """اتصال قاعدة البيانات PostgreSQL (Railway)"""
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from config import DATABASE_URL
 
@@ -26,6 +26,18 @@ def get_db():
 
 
 def init_db():
-    """إنشاء الجداول عند أول تشغيل"""
-    from app_models import User, LedgerEntry, Debt  # noqa: F401
+    """إنشاء الجداول عند أول تشغيل + إضافة أعمدة للمستخدمين القدامى"""
+    from app_models import User, LedgerEntry, Debt, Customer, CustomerTransaction, ShareLink  # noqa: F401
     Base.metadata.create_all(bind=engine)
+    # إضافة أعمدة جديدة لجدول users إن وُجد بدونها (ترحيل بسيط)
+    with engine.connect() as conn:
+        for col, typ in [
+            ("password_hash", "VARCHAR(128)"),
+            ("reset_code", "VARCHAR(10)"),
+            ("reset_code_expires", "TIMESTAMP"),
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {typ}"))
+                conn.commit()
+            except Exception:
+                pass
