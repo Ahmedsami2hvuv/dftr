@@ -30,9 +30,9 @@ def _amount_to_str(x) -> str:
 
 def _kind_icon(kind: str) -> str:
     # في صفحة المشاركة نعرض من منظور العميل (عكس منظور صاحب الحساب)
-    # gave (صاحب الحساب أعطى) => العميل أخذ => 🔴
-    # took (صاحب الحساب أخذ) => العميل أعطى => 🟢
-    return "🔴" if kind == "gave" else "🟢"
+    # gave => العميل أخذ => سهم للأسفل
+    # took => العميل أعطى => سهم للأعلى
+    return "⬇️" if kind == "gave" else "⬆️"
 
 
 def _render_page(token: str, offset: int) -> str:
