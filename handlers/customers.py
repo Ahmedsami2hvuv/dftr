@@ -336,12 +336,7 @@ async def _safe_edit_callback_text(callback_query, text: str, keyboard):
 async def _build_customer_view(db, cust: Customer, offset: int):
     bal, gave, took = _balance(cust)
     cur = "د.ع."
-    if bal > 0:
-        balance_text = f"الرصيد الحالي: {bal:.2f} {cur} (العميل مدين لك)"
-    elif bal < 0:
-        balance_text = f"الرصيد الحالي: {abs(bal):.2f} {cur} (أنت مدين للعميل)"
-    else:
-        balance_text = "الرصيد الحالي: 0 (لا دين)"
+    balance_text = f"الرصيد الحالي: {bal:.2f} {cur}"
 
     total = (
         db.query(CustomerTransaction)
@@ -357,12 +352,29 @@ async def _build_customer_view(db, cust: Customer, offset: int):
         .all()
     )
 
+    # الرصيد الجاري لكل معاملة (بالترتيب الزمني: الأقدم -> الأحدث)
+    all_txs_asc = (
+        db.query(CustomerTransaction)
+        .filter(CustomerTransaction.customer_id == cust.id)
+        .order_by(CustomerTransaction.created_at.asc(), CustomerTransaction.id.asc())
+        .all()
+    )
+    running = 0.0
+    running_after_by_tx = {}
+    for rt in all_txs_asc:
+        amt = float(rt.amount or 0)
+        if rt.kind == "gave":
+            running += amt
+        else:  # took
+            running -= amt
+        running_after_by_tx[rt.id] = running
+
     text = (
         f"📒 {cust.name}\n"
         + (f"📞 {cust.phone}\n" if cust.phone else "")
         + f"\n{balance_text}\n"
-        + f"🟢 أعطيت (مدين لك): {gave:.2f} {cur}\n"
-        + f"🔴 أخذت (دفع): {took:.2f} {cur}\n\n"
+        + f"🟢 أعطيت: {gave:.2f} {cur}\n"
+        + f"🔴 أخذت: {took:.2f} {cur}\n\n"
         + "آخر المعاملات:"
     )
 
@@ -380,9 +392,11 @@ async def _build_customer_view(db, cust: Customer, offset: int):
             note_short = (note[:10] + "…") if len(note) > 10 else note
             icon = _tx_kind_ar(t.kind)
             amount_str = f"{float(t.amount):.2f}"
-            note_part = note_short if note_short else "بدون ملاحظة"
-            # اللون ثم السعر ثم الملاحظة ثم التاريخ
-            label = f"{icon} {amount_str} - {note_part} - {dt}"
+            remain = running_after_by_tx.get(t.id, bal)
+            remain_str = f"{remain:.2f}"
+            note_part = note_short if note_short else "—"
+            # اللون ثم السعر ثم الرصيد ثم الملاحظة ثم التاريخ
+            label = f"{icon} {amount_str} | رصيد {remain_str} | {note_part} | {dt}"
             keyboard.append([InlineKeyboardButton(label[:64], callback_data=f"cust_tx_{t.id}")])
 
     # زر أخذت/أعطيت في آخر المعاملات
