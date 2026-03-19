@@ -80,7 +80,7 @@ def main():
 
     app.add_handler(CommandHandler("start", cmd_start))
 
-    # محادثة التسجيل (per_message=True لتتبع أزرار الـ callback بشكل صحيح)
+    # محادثة التسجيل — per_message=False حتى يُقبل رسالة الاسم/الرقم بعد الضغط على الزر
     reg_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(auth_register, pattern="^auth_register$")],
         states={
@@ -88,7 +88,7 @@ def main():
             REG_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_phone)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
-        per_message=True,
+        per_message=False,
     )
     app.add_handler(reg_conv)
 
@@ -99,7 +99,7 @@ def main():
             LOGIN_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, login_phone)],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
-        per_message=True,
+        per_message=False,
     )
     app.add_handler(login_conv)
 
