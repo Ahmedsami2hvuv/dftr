@@ -3,7 +3,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import SessionLocal
-from models import User, LedgerEntry, Debt
+from app_models import User, LedgerEntry, Debt
 from config import ADMIN_ID
 
 
