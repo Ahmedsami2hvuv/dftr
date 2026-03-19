@@ -1243,8 +1243,19 @@ async def cust_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مشاركة: رسالة واتساب + رابط لرؤية المعاملات"""
     query = update.callback_query
-    # لا نعمل answer هنا مباشرة، حتى نقدر نستخدم answer(url=...) للتحويل الفوري.
-    cid = int(query.data.replace("cust_share_", ""))
+    try:
+        await query.answer()
+    except Exception:
+        pass
+    try:
+        cid = int(query.data.replace("cust_share_", ""))
+    except Exception:
+        await _safe_edit_callback_text(
+            query,
+            "تعذر فتح المشاركة. حاول مرة أخرى.",
+            [[InlineKeyboardButton("◀ رجوع", callback_data="menu_customers")]],
+        )
+        return
     db = SessionLocal()
     try:
         cust = db.query(Customer).filter(Customer.id == cid).first()
@@ -1299,15 +1310,6 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
             wa_url = f"https://api.whatsapp.com/send?phone={wa_num}&text={quote(wa_text)}"
         else:
             wa_url = f"https://api.whatsapp.com/send?text={quote(wa_text)}"
-
-        # تحويل مباشر إلى واتساب عند ضغط زر "مشاركة" (قد لا يعمل في بعض نسخ تليجرام، لذلك نحتفظ بزر URL دائمًا)
-        try:
-            await query.answer(url=wa_url)
-        except Exception:
-            try:
-                await query.answer()
-            except Exception:
-                pass
 
         keyboard = [
             [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
