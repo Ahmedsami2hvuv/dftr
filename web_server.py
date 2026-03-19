@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 
 from database import SessionLocal
 from app_models import ShareLink, CustomerTransaction, Customer
+from config import BOT_USERNAME
 
 
 TX_PAGE_SIZE = 15
@@ -63,6 +64,23 @@ def _render_page(token: str, offset: int) -> str:
             .all()
         )
 
+        # الرصيد الجاري لكل معاملة (بعد تنفيذ هذه المعاملة)
+        all_txs_asc = (
+            db.query(CustomerTransaction)
+            .filter(CustomerTransaction.customer_id == cust.id)
+            .order_by(CustomerTransaction.created_at.asc(), CustomerTransaction.id.asc())
+            .all()
+        )
+        running = 0.0
+        running_after_by_tx = {}
+        for rt in all_txs_asc:
+            amt = float(rt.amount or 0)
+            if rt.kind == "gave":
+                running += amt
+            else:
+                running -= amt
+            running_after_by_tx[rt.id] = running
+
         has_more = offset + TX_PAGE_SIZE < total
         more_offset = offset + TX_PAGE_SIZE
 
@@ -71,11 +89,13 @@ def _render_page(token: str, offset: int) -> str:
             dt = t.created_at.strftime("%Y-%m-%d %H:%M")
             note = (t.note or "").strip()
             note_html = f"<div class='note'>ملاحظة: {note}</div>" if note else ""
+            remain = running_after_by_tx.get(t.id, bal)
             tx_rows.append(
                 f"""
                 <div class='tx'>
                   <div class='top'>{dt}</div>
                   <div class='main'>{_kind_icon(t.kind)} {_kind_label(t.kind)} - {_amount_to_str(t.amount)} د.ع.</div>
+                  <div class='remain'>الرصيد الحالي: {_amount_to_str(remain)} د.ع.</div>
                   {note_html}
                 </div>
                 """
@@ -86,13 +106,27 @@ def _render_page(token: str, offset: int) -> str:
             # offset button keep same token
             more_btn = f"<a class='btn' href='/creditbook/balance/{token}?lang=ar&offset={more_offset}'>➕ عرض الباقيات</a>"
 
-        balance_text = "الرصيد: "
+        balance_text = "الرصيد النهائي: "
         if bal > 0:
             balance_text += f"{bal:.2f}"
         elif bal < 0:
             balance_text += f"{abs(bal):.2f}"
         else:
             balance_text += "0"
+        balance_class = "bal-red" if bal > 0 else ("bal-green" if bal < 0 else "")
+
+        owner = cust.user
+        owner_name = (owner.full_name or owner.username or "صاحب الحساب") if owner else "صاحب الحساب"
+        owner_phone = (owner.phone or "").strip() if owner else ""
+
+        wa_btn = ""
+        if owner_phone:
+            wa_phone = owner_phone.replace("+", "").replace(" ", "").replace("-", "")
+            wa_btn = f"<a class='btn wa' href='https://api.whatsapp.com/send?phone={wa_phone}' target='_blank' rel='noopener'>راسل صاحب الحساب عبر واتساب</a>"
+
+        bot_btn = ""
+        if BOT_USERNAME:
+            bot_btn = f"<a class='btn bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>افتح حسابك في البوت</a>"
 
         title = f"عميل: {cust.name}"
         return f"""
@@ -107,17 +141,27 @@ def _render_page(token: str, offset: int) -> str:
               .card {{ background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }}
               h2 {{ margin-top: 0; }}
               .balance {{ font-size: 18px; margin: 8px 0 16px 0; }}
+              .bal-red {{ color: #d32f2f; }}
+              .bal-green {{ color: #2e7d32; }}
               .tx {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 12px; margin: 10px 0; }}
               .top {{ color: #666; font-size: 12px; }}
               .main {{ margin-top: 6px; font-size: 15px; }}
+              .remain {{ margin-top: 6px; color: #0d47a1; font-size: 13px; }}
               .note {{ margin-top: 6px; color: #444; font-size: 13px; }}
               .btn {{ display: inline-block; padding: 10px 14px; background: #1976d2; color: #fff; text-decoration: none; border-radius: 10px; margin-top: 10px; }}
+              .wa {{ background: #1b5e20; margin-left: 8px; }}
+              .bot {{ background: #1565c0; }}
+              .meta {{ color: #444; margin-bottom: 6px; }}
             </style>
           </head>
           <body>
             <div class='card'>
               <h2>{cust.name}</h2>
-              <div class='balance'>{balance_text}</div>
+              <div class='meta'>صاحب الحساب: {owner_name}{(" - " + owner_phone) if owner_phone else ""}</div>
+              <div class='meta'>العميل: {cust.name}{(" - " + cust.phone) if cust.phone else ""}</div>
+              <div class='balance {balance_class}'>{balance_text} د.ع.</div>
+              {wa_btn}
+              {bot_btn}
               {''.join(tx_rows) if tx_rows else '<p>لا توجد معاملات.</p>'}
               {more_btn}
             </div>

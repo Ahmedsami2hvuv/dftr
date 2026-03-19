@@ -9,6 +9,7 @@ BOT_TOKEN = get_env("BOT_TOKEN")
 ADMIN_ID = int(get_env("ADMIN_ID") or "0")
 ADMIN_USERNAME = get_env("ADMIN_USERNAME", "Reozaki_94")
 ADMIN_PHONE = get_env("ADMIN_PHONE", "+9647733921468")
+BOT_USERNAME = get_env("BOT_USERNAME", "Dftr1_bot")
 DATABASE_URL = get_env("DATABASE_URL")
 WEB_PORT = int(get_env("WEB_PORT") or "8000")
 
