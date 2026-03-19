@@ -1225,47 +1225,41 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else f"الرصيد صفر\n\n{view_url}"
         )
         wa_num = cust.phone and wa_number(cust.phone)
+        # زر واتساب يظهر دائمًا:
+        # - مع رقم العميل: يفتح المحادثة معه
+        # - بدون رقم: يفتح واتساب مع النص فقط (المستخدم يختار جهة الإرسال)
+        if wa_num:
+            wa_url = f"https://api.whatsapp.com/send?phone={wa_num}&text={quote(wa_text)}"
+        else:
+            wa_url = f"https://api.whatsapp.com/send?text={quote(wa_text)}"
+
+        # تحويل مباشر إلى واتساب عند ضغط زر "مشاركة" (قد لا يعمل في بعض نسخ تليجرام، لذلك نحتفظ بزر URL دائمًا)
         try:
-            if wa_num:
-                # api.whatsapp.com غالباً أكثر ثباتاً في فتح واتساب من wa.me
-                wa_url = f"https://api.whatsapp.com/send?phone={wa_num}&text={quote(wa_text)}"
-                # تحويل مباشر إلى واتساب عند ضغط زر "مشاركة"
-                try:
-                    await query.answer(url=wa_url)
-                except Exception:
-                    await query.answer()
-                keyboard = [
-                    [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
-                    [InlineKeyboardButton("فتح واتساب وإرسال الرسالة", url=wa_url)],
-                    [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
-                ]
-            else:
-                await query.answer()
-                keyboard = [
-                    [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
-                    [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
-                ]
-            await _safe_edit_callback_text(
-                query,
-                (
-                    "مشاركة 📤\n\nاستخدم الأزرار أدناه:\n\n"
-                    + share_text
-                    + ("\n\n⚠️ ملاحظة: لم يتم العثور على دومين ويب عام، لذلك الرابط احتياطي داخل تليجرام." if not using_web else "")
-                ),
-                keyboard,
-            )
+            await query.answer(url=wa_url)
         except Exception:
-            # fallback أخير: بدون URL buttons حتى لا يتعطل الزر نهائياً
             try:
                 await query.answer()
             except Exception:
                 pass
-            keyboard = [[InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")]]
-            await _safe_edit_callback_text(
-                query,
-                "مشاركة 📤\n\nانسخ الرابط يدويًا:\n\n" + share_text,
-                keyboard,
-            )
+
+        keyboard = [
+            [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
+            [InlineKeyboardButton("فتح واتساب وإرسال الرسالة", url=wa_url)],
+            [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
+        ]
+        await _safe_edit_callback_text(
+            query,
+            (
+                "مشاركة 📤\n\nاستخدم الأزرار أدناه:\n\n"
+                + share_text
+                + (
+                    "\n\n⚠️ ملاحظة: لم يتم العثور على دومين ويب عام، لذلك الرابط احتياطي داخل تليجرام."
+                    if not using_web
+                    else ""
+                )
+            ),
+            keyboard,
+        )
     finally:
         db.close()
 
