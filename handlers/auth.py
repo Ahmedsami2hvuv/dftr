@@ -365,48 +365,40 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
         ]
 
-        # تنظيف كل الحسابات المرتبطة بهذا Telegram ID (احتياطي ضد أي حالة بيانات قديمة)
-        linked_users = db.query(User).filter(User.telegram_id == chat_id).all()
-        if linked_users:
-            for user in linked_users:
-                user.telegram_id = None
-                user.username = None
+        # تحديث مباشر أكثر ثباتاً لتفريغ الربط الحالي
+        try:
+            affected = (
+                db.query(User)
+                .filter(User.telegram_id == chat_id)
+                .update({User.telegram_id: None, User.username: None}, synchronize_session=False)
+            )
             db.commit()
-            out_text = "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى."
-        else:
-            out_text = "أنت غير مسجل حالياً. اختر خيار تسجيل الدخول."
+        except Exception:
+            db.rollback()
+            affected = 0
 
-        # رسالة جديدة مضمونة + تعطيل أزرار الرسالة السابقة إن أمكن
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=out_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
+        out_text = (
+            "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى."
+            if affected > 0
+            else "أنت غير مسجل حالياً. اختر خيار تسجيل الدخول."
         )
-        if query:
+
+        # أرسل في نفس المحادثة الحالية لثبات أعلى
+        if query and query.message:
+            await query.message.reply_text(out_text, reply_markup=InlineKeyboardMarkup(keyboard))
             try:
                 await query.edit_message_reply_markup(reply_markup=None)
             except Exception:
                 pass
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=out_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
 
-        # امسح أي حالة محادثة حالية للمستخدم
-        for k in (
-            "reg_name",
-            "reg_phone",
-            "auth_action",
-            "login_phone",
-            "forgot_phone",
-        ):
+        for k in ("reg_name", "reg_phone", "auth_action", "login_phone", "forgot_phone"):
             context.user_data.pop(k, None)
-    except Exception:
-        # fallback أخير حتى لا يبقى الزر بلا نتيجة للمستخدم
-        if chat_id:
-            try:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text="حدث خطأ أثناء تسجيل الخروج. أرسل /start ثم جرّب مرة ثانية.",
-                )
-            except Exception:
-                pass
     finally:
         db.close()
 
