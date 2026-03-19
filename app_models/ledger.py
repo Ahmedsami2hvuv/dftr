@@ -1,9 +1,51 @@
 # -*- coding: utf-8 -*-
-"""سجلات الدفتر والديون"""
+"""سجلات الدفتر والديون + العملاء ومعاملاتهم"""
 from sqlalchemy import Column, Integer, BigInteger, String, Numeric, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
+
+
+class Customer(Base):
+    """عميل في دفتر الديون (للمستخدم الحالي)"""
+    __tablename__ = "customers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    phone = Column(String(32), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="customers")
+    transactions = relationship("CustomerTransaction", back_populates="customer", order_by="CustomerTransaction.created_at.desc()")
+    share_links = relationship("ShareLink", back_populates="customer")
+
+
+class CustomerTransaction(Base):
+    """معاملة مع عميل: أعطيت أو أخذت"""
+    __tablename__ = "customer_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    amount = Column(Numeric(15, 2), nullable=False)
+    kind = Column(String(10), nullable=False)  # "gave" أعطيت أو "took" أخذت
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    customer = relationship("Customer", back_populates="transactions")
+
+
+class ShareLink(Base):
+    """رابط مشاركة لعميل (لرؤية المعاملات)"""
+    __tablename__ = "share_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    customer = relationship("Customer", back_populates="share_links")
 
 
 class LedgerEntry(Base):
