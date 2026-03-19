@@ -1140,7 +1140,7 @@ async def cust_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مشاركة: رسالة واتساب + رابط لرؤية المعاملات"""
     query = update.callback_query
-    await query.answer()
+    # لا نعمل answer هنا مباشرة، حتى نقدر نستخدم answer(url=...) للتحويل الفوري.
     cid = int(query.data.replace("cust_share_", ""))
     db = SessionLocal()
     try:
@@ -1190,23 +1190,33 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             if wa_num:
                 wa_url = f"https://wa.me/{wa_num}?text={quote(wa_text)}"
+                # تحويل مباشر إلى واتساب عند ضغط زر "مشاركة"
+                try:
+                    await query.answer(url=wa_url)
+                except Exception:
+                    await query.answer()
                 keyboard = [
                     [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
                     [InlineKeyboardButton("فتح واتساب وإرسال الرسالة", url=wa_url)],
                     [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
                 ]
             else:
+                await query.answer()
                 keyboard = [
                     [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
                     [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
                 ]
             await _safe_edit_callback_text(
                 query,
-                "مشاركة 📤\n\nانسخ النص أدناه أو استخدم الزر لفتح واتساب:\n\n" + share_text,
+                "مشاركة 📤\n\nاستخدم الأزرار أدناه:\n\n" + share_text,
                 keyboard,
             )
         except Exception:
             # fallback أخير: بدون URL buttons حتى لا يتعطل الزر نهائياً
+            try:
+                await query.answer()
+            except Exception:
+                pass
             keyboard = [[InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")]]
             await _safe_edit_callback_text(
                 query,
