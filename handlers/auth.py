@@ -352,10 +352,16 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         if not user:
-            await query.edit_message_text(
-                "أنت غير مسجل حالياً. اختر خيار تسجيل الدخول.",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-            )
+            try:
+                await query.edit_message_text(
+                    "أنت غير مسجل حالياً. اختر خيار تسجيل الدخول.",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                )
+            except Exception:
+                await query.message.reply_text(
+                    "أنت غير مسجل حالياً. اختر خيار تسجيل الدخول.",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                )
             return ConversationHandler.END
 
         user.telegram_id = None
@@ -363,10 +369,16 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user.username = None
         db.commit()
 
-        await query.edit_message_text(
-            "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى.",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
+        try:
+            await query.edit_message_text(
+                "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+        except Exception:
+            await query.message.reply_text(
+                "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
         # امسح أي حالة محادثة حالية للمستخدم
         for k in (
             "reg_name",
