@@ -1004,16 +1004,25 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"رؤية جميع المعاملات:\n{view_url}"
         )
         # زر يفتح واتساب على محادثة رقم العميل مع النص جاهز
-        wa_text = f"عليك رصيد {bal:.2f} {cur}\nرؤية جميع المعاملات: {view_url}" if bal >= 0 else f"لي رصيد {abs(bal):.2f} {cur}\nرؤية جميع المعاملات: {view_url}"
+        # نخلي رابط الصفحة بسطر لوحده حتى واتساب يتعامل معه كرابط تلقائي.
+        wa_text = (
+            f"{msg_balance}\n\n{view_url}"
+            if bal != 0
+            else f"الرصيد صفر\n\n{view_url}"
+        )
         wa_num = cust.phone and wa_number(cust.phone)
         if wa_num:
             wa_url = f"https://wa.me/{wa_num}?text={quote(wa_text)}"
             keyboard = [
+                [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
                 [InlineKeyboardButton("فتح واتساب وإرسال الرسالة", url=wa_url)],
                 [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
             ]
         else:
-            keyboard = [[InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")]]
+            keyboard = [
+                [InlineKeyboardButton("فتح صفحة المعاملات", url=view_url)],
+                [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
+            ]
         await query.edit_message_text(
             "مشاركة 📤\n\nانسخ النص أدناه أو استخدم الزر لفتح واتساب:\n\n" + share_text,
             reply_markup=InlineKeyboardMarkup(keyboard),
