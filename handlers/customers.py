@@ -49,7 +49,8 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("➕ إضافة عميل", callback_data="cust_add")]]
         for c in customers:
             bal, _, _ = _balance(c)
-            label = f"{'🔴' if bal > 0 else '🟢'} {c.name}" + (f" — {c.phone}" if c.phone else "")
+            # بالواجهة: اسم العميل فقط بدون رقم
+            label = f"{'🔴' if bal > 0 else '🟢'} {c.name}"
             keyboard.append([InlineKeyboardButton(label, callback_data=f"cust_{c.id}")])
         keyboard.append([InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")])
         await query.edit_message_text(
@@ -141,7 +142,8 @@ async def cust_phone_skip_click(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 def _tx_kind_ar(kind: str) -> str:
-    return "أخذت" if kind == "took" else "أعطيت"
+    # عرض نوع المعاملة بدوائر فقط حسب طلبك
+    return "🔴" if kind == "took" else "🟢"
 
 
 async def _build_customer_view(db, cust: Customer, offset: int):
@@ -172,30 +174,13 @@ async def _build_customer_view(db, cust: Customer, offset: int):
         f"📒 {cust.name}\n"
         + (f"📞 {cust.phone}\n" if cust.phone else "")
         + f"\n{balance_text}\n"
-        + f"أعطيت (مدين لك): {gave:.2f} {cur}\n"
-        + f"أخذت (دفع): {took:.2f} {cur}\n\n"
+        + f"🟢 أعطيت (مدين لك): {gave:.2f} {cur}\n"
+        + f"🔴 أخذت (دفع): {took:.2f} {cur}\n\n"
         + "آخر المعاملات:"
     )
 
     has_more = offset + TX_PAGE_SIZE < total
-    keyboard = [
-        [
-            InlineKeyboardButton("🔴 أخذت", callback_data=f"cust_took_{cust.id}"),
-            InlineKeyboardButton("🟢 أعطيت", callback_data=f"cust_gave_{cust.id}"),
-        ],
-    ]
-    # سكيب/متابعة: بجانب تعديل الحساب زر عرض الباقيات
-    edit_btn = InlineKeyboardButton("✏️ تعديل الحساب", callback_data=f"cust_edit_{cust.id}")
-    if has_more:
-        more_btn = InlineKeyboardButton(
-            "➕ عرض الباقيات",
-            callback_data=f"cust_tx_more_{cust.id}_{offset + TX_PAGE_SIZE}",
-        )
-        keyboard.append([more_btn, edit_btn])
-    else:
-        keyboard.append([edit_btn])
-
-    keyboard.append([InlineKeyboardButton("📤 مشاركة", callback_data=f"cust_share_{cust.id}")])
+    keyboard = []
 
     # معاملات قابلة للنقر
     if not txs:
@@ -209,6 +194,27 @@ async def _build_customer_view(db, cust: Customer, offset: int):
             if note_short:
                 label += f" ({note_short})"
             keyboard.append([InlineKeyboardButton(label[:64], callback_data=f"cust_tx_{t.id}")])
+
+    # زر أخذت/أعطيت في آخر المعاملات
+    keyboard.append(
+        [
+            InlineKeyboardButton("🔴 أخذت", callback_data=f"cust_took_{cust.id}"),
+            InlineKeyboardButton("🟢 أعطيت", callback_data=f"cust_gave_{cust.id}"),
+        ]
+    )
+
+    # عرض الباقيات بجانب تعديل الحساب
+    edit_btn = InlineKeyboardButton("✏️ تعديل الحساب", callback_data=f"cust_edit_{cust.id}")
+    if has_more:
+        more_btn = InlineKeyboardButton(
+            "➕ عرض الباقيات",
+            callback_data=f"cust_tx_more_{cust.id}_{offset + TX_PAGE_SIZE}",
+        )
+        keyboard.append([more_btn, edit_btn])
+    else:
+        keyboard.append([edit_btn])
+
+    keyboard.append([InlineKeyboardButton("📤 مشاركة", callback_data=f"cust_share_{cust.id}")])
 
     keyboard.append([InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")])
     return text, keyboard
@@ -272,7 +278,9 @@ async def _render_tx_detail(db, tx: CustomerTransaction):
         ],
         [
             InlineKeyboardButton("🔁 تبديل النوع", callback_data=f"cust_tx_toggle_kind_{tx.id}"),
-            InlineKeyboardButton("🗑 مسح/تراجع", callback_data=f"cust_tx_delete_{tx.id}"),
+        ],
+        [
+            InlineKeyboardButton("🗑 حذف المعاملة", callback_data=f"cust_tx_delete_req_{tx.id}"),
         ],
         [
             InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cust.id}"),
@@ -296,15 +304,56 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
             await query.edit_message_text("غير مسموح.")
             return
         text, keyboard = await _render_tx_detail(db, tx)
-        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        if getattr(tx, "photo_file_id", None):
+            await context.bot.send_photo(
+                chat_id=update.effective_user.id,
+                photo=tx.photo_file_id,
+                caption=text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+            # نخلي رسالة الواجهة القديمة بدون كيبورد
+            await query.edit_message_text("تم عرض تفاصيل المعاملة (مع الصورة) ✅")
+        else:
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     finally:
         db.close()
+
+
+async def cust_tx_delete_req_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """طلب حذف مع تأكيد من المستخدم"""
+    query = update.callback_query
+    await query.answer()
+    tx_id = int(query.data.replace("cust_tx_delete_req_", ""))
+    # نستخدم زر الرجوع للقائمة/التفاصيل بدون حذف
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✅ تأكيد الحذف",
+                callback_data=f"cust_tx_delete_do_{tx_id}",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "↩ تراجع",
+                callback_data=f"cust_tx_{tx_id}",
+            )
+        ],
+    ]
+    await query.edit_message_text(
+        "هل أنت متأكد من حذف هذه المعاملة؟",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
 
 
 async def cust_tx_delete_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    tx_id = int(query.data.replace("cust_tx_delete_", ""))
+    data = query.data or ""
+    if data.startswith("cust_tx_delete_do_"):
+        tx_id = int(data.replace("cust_tx_delete_do_", ""))
+    else:
+        # دعم قديم إن وجد
+        tx_id = int(data.replace("cust_tx_delete_", ""))
     db = SessionLocal()
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
@@ -787,7 +836,10 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception:
             await query.answer()
         return
-    if data.startswith("cust_tx_delete_"):
+    if data.startswith("cust_tx_delete_req_"):
+        await cust_tx_delete_req_click(update, context)
+        return
+    if data.startswith("cust_tx_delete_do_") or data.startswith("cust_tx_delete_"):
         await cust_tx_delete_click(update, context)
         return
     if data.startswith("cust_tx_toggle_kind_"):
