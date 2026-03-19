@@ -446,7 +446,12 @@ async def _safe_edit_callback_text(callback_query, text: str, keyboard):
 async def _build_customer_view(db, cust: Customer, offset: int):
     bal, gave, took = _balance(cust)
     cur = "د.ع."
-    balance_text = f"الرصيد الحالي: {bal:.2f} {cur}"
+    if bal > 0:
+        balance_text = f"🟢 الرصيد الحالي: {bal:.2f} {cur}"
+    elif bal < 0:
+        balance_text = f"🔴 الرصيد الحالي: {bal:.2f} {cur}"
+    else:
+        balance_text = f"⚪ الرصيد الحالي: {bal:.2f} {cur}"
 
     total = (
         db.query(CustomerTransaction)
