@@ -27,5 +27,5 @@ def get_db():
 
 def init_db():
     """إنشاء الجداول عند أول تشغيل"""
-    from models import User, LedgerEntry, Debt  # noqa: F401
+    from app_models import User, LedgerEntry, Debt  # noqa: F401
     Base.metadata.create_all(bind=engine)
