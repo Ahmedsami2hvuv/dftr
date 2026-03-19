@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from database import SessionLocal
-from app_models import User, Customer, CustomerTransaction, ShareLink
+from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerCategory
 from utils.phone import normalize_phone, wa_number
 from config import WEB_BASE_URL
 
@@ -25,6 +25,8 @@ TX_PAGE_SIZE = 15
 
 (TX_EDIT_AMOUNT, TX_EDIT_NOTE, TX_EDIT_DATE, TX_EDIT_PHOTO) = range(4)
 
+(CAT_ADD_NAME, CAT_ADD_KIND) = range(200, 202)
+
 
 def get_current_user(db, telegram_id: int):
     return db.query(User).filter(User.telegram_id == telegram_id).first()
@@ -34,6 +36,180 @@ def _balance(customer):
     gave = sum(t.amount for t in customer.transactions if t.kind == "gave")
     took = sum(t.amount for t in customer.transactions if t.kind == "took")
     return float(gave - took), float(gave), float(took)
+
+
+async def menu_customer_categories(update: Update, context: ContextTypes.DEFAULT_TYPE, back_customer_id: int):
+    """عرض أصناف الصنف + إضافة/مسح"""
+    query = update.callback_query
+    await query.answer()
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        if not user:
+            await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            return
+
+        context.user_data["cust_cat_back_customer_id"] = back_customer_id
+        cats = (
+            db.query(CustomerCategory)
+            .filter(CustomerCategory.user_id == user.id)
+            .order_by(CustomerCategory.created_at.desc())
+            .all()
+        )
+
+        keyboard = [
+            [InlineKeyboardButton("➕ إضافة صنف", callback_data="cust_cat_add")],
+            [InlineKeyboardButton("◀ رجوع", callback_data=f"cust_{back_customer_id}")],
+        ]
+
+        if cats:
+            for c in cats:
+                icon = "🔴" if c.kind == "took" else "🟢"
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(f"{icon} {c.name}", callback_data="noop"),
+                        InlineKeyboardButton("🗑 مسح", callback_data=f"cust_cat_del_req_{c.id}"),
+                    ]
+                )
+        else:
+            keyboard.append([InlineKeyboardButton("لا توجد أصناف بعد", callback_data="noop")])
+
+        await query.edit_message_text(
+            "📚 أصناف الصنف\n\n"
+            "الصنف يحدد نوع المعاملة: 🔴 أخذت أو 🟢 أعطيت.\n\n"
+            "اختر إضافة أو مسح صنف.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+    finally:
+        db.close()
+
+
+async def cust_cat_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بدء إضافة صنف جديد"""
+    query = update.callback_query
+    await query.answer()
+    context.user_data.pop("cust_cat_add_name", None)
+    context.user_data.pop("cust_cat_add_kind", None)
+    await query.edit_message_text("أرسل اسم الصنف الجديد:")
+    return CAT_ADD_NAME
+
+
+async def cust_cat_name_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    name = (update.message.text or "").strip()
+    if not name:
+        await update.message.reply_text("يرجى إرسال اسم صحيح للصنف.")
+        return CAT_ADD_NAME
+    context.user_data["cust_cat_add_name"] = name
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🔴 أخذت (took)", callback_data="cust_cat_kind_took"),
+            InlineKeyboardButton("🟢 أعطيت (gave)", callback_data="cust_cat_kind_gave"),
+        ]
+    ]
+    await update.message.reply_text("حدد نوع الصنف:", reply_markup=InlineKeyboardMarkup(keyboard))
+    return CAT_ADD_KIND
+
+
+async def cust_cat_kind_took_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    back_cid = context.user_data.get("cust_cat_back_customer_id")
+    name = context.user_data.get("cust_cat_add_name")
+    if not back_cid or not name:
+        await query.edit_message_text("انتهت الجلسة. ابدأ من جديد.")
+        return ConversationHandler.END
+
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        if not user:
+            await query.edit_message_text("غير مسموح.")
+            return ConversationHandler.END
+        db.add(CustomerCategory(user_id=user.id, name=name, kind="took"))
+        db.commit()
+    finally:
+        db.close()
+
+    # رجوع للقائمة
+    await menu_customer_categories(update, context, int(back_cid))
+    context.user_data.pop("cust_cat_add_name", None)
+    return ConversationHandler.END
+
+
+async def cust_cat_kind_gave_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    back_cid = context.user_data.get("cust_cat_back_customer_id")
+    name = context.user_data.get("cust_cat_add_name")
+    if not back_cid or not name:
+        await query.edit_message_text("انتهت الجلسة. ابدأ من جديد.")
+        return ConversationHandler.END
+
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        if not user:
+            await query.edit_message_text("غير مسموح.")
+            return ConversationHandler.END
+        db.add(CustomerCategory(user_id=user.id, name=name, kind="gave"))
+        db.commit()
+    finally:
+        db.close()
+
+    await menu_customer_categories(update, context, int(back_cid))
+    context.user_data.pop("cust_cat_add_name", None)
+    return ConversationHandler.END
+
+
+async def cust_cat_del_req_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    cat_id = int(query.data.replace("cust_cat_del_req_", ""))
+    back_cid = context.user_data.get("cust_cat_back_customer_id")
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✅ تأكيد الحذف",
+                callback_data=f"cust_cat_del_do_{cat_id}",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "↩ تراجع",
+                callback_data=f"cust_categories_menu_{back_cid}",
+            )
+        ],
+    ]
+    await query.edit_message_text(
+        "هل أنت متأكد من حذف هذا الصنف؟",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def cust_cat_del_do_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    cat_id = int(query.data.replace("cust_cat_del_do_", ""))
+    back_cid = context.user_data.get("cust_cat_back_customer_id")
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        if not user:
+            await query.edit_message_text("غير مسموح.")
+            return
+        cat = (
+            db.query(CustomerCategory)
+            .filter(CustomerCategory.id == cat_id, CustomerCategory.user_id == user.id)
+            .first()
+        )
+        if cat:
+            db.delete(cat)
+            db.commit()
+    finally:
+        db.close()
+
+    await menu_customer_categories(update, context, int(back_cid))
 
 
 async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -219,6 +395,14 @@ async def _build_customer_view(db, cust: Customer, offset: int):
         keyboard.append([edit_btn, share_btn])
     else:
         keyboard.append([edit_btn, share_btn])
+
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                "📚 أصناف الصنف", callback_data=f"cust_categories_menu_{cust.id}"
+            )
+        ]
+    )
 
     keyboard.append([InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")])
     return text, keyboard
@@ -855,6 +1039,26 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
     data = query.data
     if data == "cust_add" or data == "noop":
         await query.answer()
+        return
+
+    # --- أصناف الصنف ---
+    if data.startswith("cust_categories_menu_"):
+        try:
+            back_cid = int(data.replace("cust_categories_menu_", ""))
+        except ValueError:
+            await query.answer()
+            return
+        await query.answer()
+        await menu_customer_categories(update, context, back_cid)
+        return
+    if data.startswith("cust_cat_del_req_"):
+        await cust_cat_del_req_click(update, context)
+        return
+    if data.startswith("cust_cat_del_do_"):
+        await cust_cat_del_do_click(update, context)
+        return
+    if data == "cust_cat_add":
+        # سيتم التقاطها بواسطة ConversationHandler
         return
 
     # --- معاملات ---

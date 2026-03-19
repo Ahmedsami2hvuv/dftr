@@ -110,6 +110,15 @@ from handlers.customers import (
     cust_tx_edit_photo_start,
     cust_tx_edit_photo_done,
     cust_tx_edit_photo_back_click,
+    menu_customer_categories,
+    cust_cat_add_start,
+    cust_cat_name_done,
+    cust_cat_kind_took_click,
+    cust_cat_kind_gave_click,
+    cust_cat_del_req_click,
+    cust_cat_del_do_click,
+    CAT_ADD_NAME,
+    CAT_ADD_KIND,
     TX_EDIT_AMOUNT,
     TX_EDIT_NOTE,
     TX_EDIT_DATE,
@@ -314,6 +323,21 @@ def main():
         per_message=False,
     )
     app.add_handler(cust_tx_edit_conv)
+
+    # محادثة إضافة صنف (أصناف الصنف)
+    cust_cat_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(cust_cat_add_start, pattern="^cust_cat_add$")],
+        states={
+            CAT_ADD_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_cat_name_done)],
+            CAT_ADD_KIND: [
+                CallbackQueryHandler(cust_cat_kind_took_click, pattern="^cust_cat_kind_took$"),
+                CallbackQueryHandler(cust_cat_kind_gave_click, pattern="^cust_cat_kind_gave$"),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(cust_cat_conv)
 
     # router لكل callbacks الخاصة بالعميل (تفاصيل/حذف/مشاركة/قائمة)
     app.add_handler(CallbackQueryHandler(cust_callback_router, pattern="^cust_"))

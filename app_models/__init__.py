@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from .user import User
 from .ledger import (
     LedgerEntry,
@@ -5,6 +6,15 @@ from .ledger import (
     Customer,
     CustomerTransaction,
     ShareLink,
+    CustomerCategory,
 )
 
-__all__ = ["User", "LedgerEntry", "Debt", "Customer", "CustomerTransaction", "ShareLink"]
+__all__ = [
+    "User",
+    "LedgerEntry",
+    "Debt",
+    "Customer",
+    "CustomerTransaction",
+    "ShareLink",
+    "CustomerCategory",
+]

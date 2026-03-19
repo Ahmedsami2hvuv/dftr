@@ -53,6 +53,17 @@ class ShareLink(Base):
     customer = relationship("Customer", back_populates="share_links")
 
 
+class CustomerCategory(Base):
+    """اصناف للمعاملات ضمن دفتر الديون (تؤرخ نوع أخذت/أعطيت)"""
+    __tablename__ = "customer_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    kind = Column(String(10), nullable=False)  # "took" أو "gave"
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class LedgerEntry(Base):
     """قيد في دفتر الحسابات (دخل أو مصروف)"""
     __tablename__ = "ledger_entries"

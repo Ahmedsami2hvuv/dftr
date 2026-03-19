@@ -27,7 +27,15 @@ def get_db():
 
 def init_db():
     """إنشاء الجداول عند أول تشغيل + إضافة أعمدة للمستخدمين القدامى"""
-    from app_models import User, LedgerEntry, Debt, Customer, CustomerTransaction, ShareLink  # noqa: F401
+    from app_models import (
+        User,
+        LedgerEntry,
+        Debt,
+        Customer,
+        CustomerTransaction,
+        ShareLink,
+        CustomerCategory,
+    )  # noqa: F401
     Base.metadata.create_all(bind=engine)
     # إضافة أعمدة جديدة لجدول users إن وُجد بدونها (ترحيل بسيط)
     with engine.connect() as conn:
