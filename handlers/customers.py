@@ -41,6 +41,15 @@ def _balance(customer):
     return float(gave - took), float(gave), float(took)
 
 
+def _balance_status_emoji(bal: float) -> str:
+    """يطابق لون «الرصيد الحالي» في صفحة العميل: موجب 🟢، سالب 🔴، صفر ⚪."""
+    if bal > 0:
+        return "🟢"
+    if bal < 0:
+        return "🔴"
+    return "⚪"
+
+
 def _normalize_amount_digits(s: str) -> str:
     """تحويل الأرقام العربية/الفارسية إلى إنجليزية لتحليل المبلغ."""
     s = s.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
@@ -361,8 +370,8 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     total_out += amt
                 else:
                     total_in += amt
-            # بالواجهة: اسم العميل فقط بدون رقم
-            label = f"{'🔴' if bal > 0 else '🟢'} {c.name}"
+            # بالواجهة: لون الدائرة = لون الرصيد الحالي (كما في صفحة التفاصيل)
+            label = f"{_balance_status_emoji(bal)} {c.name}"
             keyboard.append([InlineKeyboardButton(label, callback_data=f"cust_{c.id}")])
         keyboard.append([InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")])
         remain = total_out - total_in
@@ -426,8 +435,9 @@ async def cust_search_query_done(update: Update, context: ContextTypes.DEFAULT_T
         lines = [f"نتائج البحث: {q}"]
         for c in matches:
             bal, _, _ = _balance(c)
-            lines.append(f"• {c.name} ({bal:.2f})")
-            kb.append([InlineKeyboardButton(c.name[:64], callback_data=f"cust_{c.id}")])
+            emo = _balance_status_emoji(bal)
+            lines.append(f"• {emo} {c.name} ({bal:.2f})")
+            kb.append([InlineKeyboardButton(f"{emo} {c.name}"[:64], callback_data=f"cust_{c.id}")])
         kb.append([InlineKeyboardButton("🔁 بحث جديد", callback_data="cust_search_start")])
         kb.append([InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")])
         await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(kb))
