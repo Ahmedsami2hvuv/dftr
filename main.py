@@ -3,6 +3,14 @@
 بوت تليجرام - دفتر حسابات (مثل كناش)
 التوكن والبيانات في متغيرات البيئة (Railway)
 """
+import sys
+from pathlib import Path
+
+# تأكد أن جذر المشروع في مسار الاستيراد (مهم على Railway)
+_ROOT = Path(__file__).resolve().parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import logging
 from dotenv import load_dotenv
 load_dotenv()
