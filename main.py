@@ -13,8 +13,17 @@ if str(_ROOT) not in sys.path:
 
 import logging
 import threading
+import warnings
 from dotenv import load_dotenv
+
 load_dotenv()
+
+try:
+    from telegram.warnings import PTBUserWarning
+
+    warnings.filterwarnings("ignore", category=PTBUserWarning)
+except Exception:
+    pass
 
 from telegram import Update
 from datetime import timedelta
@@ -158,6 +167,8 @@ from handlers.customers import (
     cust_tx_edit_note_done,
     cust_tx_edit_date_start,
     cust_tx_edit_date_done,
+    cust_tx_edit_date_pick,
+    cust_tx_edit_date_cancel_click,
     cust_tx_edit_photo_start,
     cust_tx_edit_photo_done,
     cust_tx_edit_photo_back_click,
@@ -181,6 +192,23 @@ from handlers.customers import (
     CUST_NOTE,
     CUST_EDIT_NAME,
     CUST_EDIT_PHONE,
+)
+from handlers.reminder import (
+    cust_reminder_start,
+    cust_reminder_due_date,
+    cust_reminder_offset,
+    cust_reminder_cancel,
+    reminder_job,
+    REMIND_DUE_DATE,
+    REMIND_OFFSET,
+)
+from handlers.partner_link import (
+    partner_link_invite_start,
+    partner_send_updates_click,
+    partner_batch_approve,
+    partner_batch_reject,
+    partner_link_accept_click,
+    partner_link_reject_click,
 )
 
 logging.basicConfig(
@@ -501,7 +529,11 @@ def main():
         states={
             TX_EDIT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_amount_done)],
             TX_EDIT_NOTE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_note_done)],
-            TX_EDIT_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_date_done)],
+            TX_EDIT_DATE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_date_done),
+                CallbackQueryHandler(cust_tx_edit_date_pick, pattern=r"^txdt_\d+_\d{8}$"),
+                CallbackQueryHandler(cust_tx_edit_date_cancel_click, pattern=r"^tx_edit_date_cancel$"),
+            ],
             TX_EDIT_PHOTO: [
                 MessageHandler(filters.PHOTO, cust_tx_edit_photo_done),
                 CallbackQueryHandler(cust_tx_edit_photo_back_click, pattern="^cust_tx_edit_photo_back_\\d+$"),
