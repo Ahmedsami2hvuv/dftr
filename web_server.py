@@ -335,10 +335,10 @@ def _render_page(token: str, offset: int) -> str:
                 display: none;
               }}
               .owner-badge {{
-                font-size: 0.62rem;
+                font-size: 0.8rem;
                 font-weight: 800;
                 letter-spacing: 0.06em;
-                opacity: 0.9;
+                opacity: 0.92;
                 margin-bottom: 6px;
                 position: relative;
                 z-index: 1;
@@ -354,7 +354,7 @@ def _render_page(token: str, offset: int) -> str:
                 z-index: 1;
               }}
               .owner-name {{
-                font-size: clamp(1rem, 4vw, 1.22rem);
+                font-size: clamp(1.1rem, 4.3vw, 1.35rem);
                 font-weight: 800;
                 line-height: 1.25;
                 margin: 0;
@@ -451,7 +451,7 @@ def _render_page(token: str, offset: int) -> str:
                   border-radius: 16px;
                 }}
                 .owner-badge {{
-                  font-size: 0.72rem;
+                  font-size: 0.92rem;
                   margin-bottom: 10px;
                 }}
                 .owner-name-row {{
@@ -461,7 +461,7 @@ def _render_page(token: str, offset: int) -> str:
                   flex-wrap: nowrap;
                 }}
                 .owner-name {{
-                  font-size: clamp(1.22rem, 1.85vw, 1.52rem);
+                  font-size: clamp(1.34rem, 2.05vw, 1.68rem);
                   white-space: normal;
                   overflow: visible;
                   text-overflow: clip;
