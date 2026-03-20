@@ -1975,19 +1975,14 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = int(query.data.replace("cust_took_", ""))
     context.user_data["cust_txn_kind"] = "took"
     context.user_data["cust_txn_cid"] = cid
-    keyboard = [
-        [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
-        [InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit")],
-        [InlineKeyboardButton("🧮 حاسبة", callback_data="calc_amt_open")],
-    ]
+    # افتح الحاسبة تلقائياً مباشرة عند اختيار النوع.
+    context.user_data["cust_calc_expr"] = "0"
+    context.user_data["cust_calc_last_was_equals"] = False
     await query.edit_message_text(
-        "أخذت 🔴\n\n"
-        "أرسل المبلغ بأي شكل يناسبك:\n"
-        "• المبلغ وبعدها الملاحظة أو الصورة\n"
-        "• أو المبلغ والملاحظة بسطر واحد\n"
-        "• سطرين: السطر الأول المبلغ والثاني الملاحظة\n"
-        "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        "🧮 حاسبة مبلغ المعاملة (أخذت 🔴)\n\n"
+        "استخدم الأزرار لإدخال عملية حسابية (مثال: `775.25+50-10`).\n"
+        "ثم اضغط `✅ إدخال المبلغ` تحت الأزرار.",
+        reply_markup=_kb_cust_amount_calc(cid, "0.00"),
     )
     return CUST_AMOUNT
 
@@ -1999,19 +1994,14 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = int(query.data.replace("cust_gave_", ""))
     context.user_data["cust_txn_kind"] = "gave"
     context.user_data["cust_txn_cid"] = cid
-    keyboard = [
-        [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
-        [InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit")],
-        [InlineKeyboardButton("🧮 حاسبة", callback_data="calc_amt_open")],
-    ]
+    # افتح الحاسبة تلقائياً مباشرة عند اختيار النوع.
+    context.user_data["cust_calc_expr"] = "0"
+    context.user_data["cust_calc_last_was_equals"] = False
     await query.edit_message_text(
-        "أعطيت 🟢\n\n"
-        "أرسل المبلغ بأي شكل يناسبك:\n"
-        "• المبلغ وبعدها الملاحظة أو الصورة\n"
-        "• أو المبلغ والملاحظة بسطر واحد\n"
-        "• سطرين: السطر الأول المبلغ والثاني الملاحظة\n"
-        "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        "🧮 حاسبة مبلغ المعاملة (أعطيت 🟢)\n\n"
+        "استخدم الأزرار لإدخال عملية حسابية (مثال: `775.25+50/2`).\n"
+        "ثم اضغط `✅ إدخال المبلغ` تحت الأزرار.",
+        reply_markup=_kb_cust_amount_calc(cid, "0.00"),
     )
     return CUST_AMOUNT
 
