@@ -458,7 +458,6 @@ async def forgot_new_password(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data["forgot_new_pwd"] = pwd
     await update.message.reply_text(
         "أعد إدخال كلمة المرور الجديدة للتأكيد:",
-        reply_markup=_kb_main_menu(),
     )
     return FORGOT_NEW_PASSWORD_CONFIRM
 
