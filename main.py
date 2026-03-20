@@ -162,6 +162,7 @@ from handlers.customers import (
     cust_txn_back_click,
     cust_txn_back_amount_click,
     cust_txn_exit_click,
+    cust_calc_amount_click,
     cust_edit_name_start,
     cust_edit_phone_start,
     cust_edit_name_done,
@@ -516,6 +517,7 @@ def main():
                 MessageHandler(filters.PHOTO, cust_amount_photo),
                 CallbackQueryHandler(cust_txn_back_click, pattern="^cust_txn_back_\\d+$"),
                 CallbackQueryHandler(cust_txn_exit_click, pattern="^cust_txn_exit$"),
+                CallbackQueryHandler(cust_calc_amount_click, pattern=r"^calc_amt_"),
                 CallbackQueryHandler(cust_callback_router, pattern="^cust_"),
             ],
             CUST_NOTE: [

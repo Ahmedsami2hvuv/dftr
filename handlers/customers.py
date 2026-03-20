@@ -4,7 +4,7 @@ import re
 import secrets
 from urllib.parse import quote
 from urllib.parse import urlparse
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, datetime, timedelta
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -36,6 +36,316 @@ TX_PAGE_SIZE = 15
 
 def get_current_user(db, telegram_id: int):
     return db.query(User).filter(User.telegram_id == telegram_id).first()
+
+
+def _calc_amount_tokens(expr: str) -> list[str]:
+    """تحليل تعبير حسابي بسيط للأرقام + و- و* و/ فقط (بدون فواصِل/أقواس)."""
+    expr = (expr or "").strip()
+    if not expr:
+        return []
+
+    tokens: list[str] = []
+    num = ""
+    allowed = set("0123456789.")
+    ops = set("+-*/")
+
+    for ch in expr:
+        if ch in allowed:
+            num += ch
+            continue
+        if ch in ops:
+            if not num:
+                raise ValueError("تعبير غير صالح")
+            tokens.append(num)
+            tokens.append(ch)
+            num = ""
+            continue
+        raise ValueError("حرف غير مسموح")
+
+    if num:
+        tokens.append(num)
+    return tokens
+
+
+def _calc_amount_compute(expr: str) -> Decimal:
+    """حساب تعبير بسيط باستخدام Decimal فقط."""
+    expr = (expr or "").strip().replace(" ", "")
+    if not expr:
+        raise ValueError("تعبير غير صالح")
+
+    # تحقق سريع من الصيغة (أرقام + فاصل عشري) مع عمليات فقط.
+    if not re.fullmatch(r"[0-9]+(\.[0-9]+)?([+\-*/][0-9]+(\.[0-9]+)?)*", expr):
+        raise ValueError("تعبير غير صالح")
+
+    tokens = _calc_amount_tokens(expr)
+    precedence = {"+": 1, "-": 1, "*": 2, "/": 2}
+
+    # تحويل RPN (Shunting-yard) ثم حساب.
+    out: list[str] = []
+    stack: list[str] = []
+    for t in tokens:
+        if t in precedence:
+            while stack and stack[-1] in precedence and precedence[stack[-1]] >= precedence[t]:
+                out.append(stack.pop())
+            stack.append(t)
+        else:
+            out.append(t)
+    while stack:
+        out.append(stack.pop())
+
+    eval_stack: list[Decimal] = []
+    for t in out:
+        if t in precedence:
+            if len(eval_stack) < 2:
+                raise ValueError("تعبير غير صالح")
+            b = eval_stack.pop()
+            a = eval_stack.pop()
+            if t == "+":
+                eval_stack.append(a + b)
+            elif t == "-":
+                eval_stack.append(a - b)
+            elif t == "*":
+                eval_stack.append(a * b)
+            elif t == "/":
+                if b == 0:
+                    raise ZeroDivisionError("القسمة على صفر")
+                eval_stack.append(a / b)
+        else:
+            eval_stack.append(Decimal(t))
+
+    if len(eval_stack) != 1:
+        raise ValueError("تعبير غير صالح")
+
+    res = eval_stack[0]
+    return res.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _calc_amount_display(expr: str) -> str:
+    """تنسيق قيمة رقمية ليظهر بشكل ثابت بسنتين."""
+    if expr is None:
+        return "0.00"
+    expr = str(expr)
+    if "." in expr:
+        # لو كانت 3+ منازل، نقرب لعرض أفضل.
+        try:
+            return _calc_amount_compute(expr).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP).__format__(
+                ".2f"
+            )
+        except Exception:
+            pass
+    try:
+        d = Decimal(expr)
+        return d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP).__format__(".2f")
+    except Exception:
+        return expr
+
+
+def _kb_cust_amount_calc(cid: int | None, expr_display: str):
+    """لوحة حاسبة مبلغ المعاملة."""
+    row_back = []
+    if cid:
+        row_back.append(InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}"))
+    row_back.append(InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit"))
+
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🧹 مسح", callback_data="calc_amt_clear"),
+             InlineKeyboardButton("⌫", callback_data="calc_amt_backspace"),
+             InlineKeyboardButton("÷", callback_data="calc_amt_op_div")],
+            [
+                InlineKeyboardButton("7", callback_data="calc_amt_digit_7"),
+                InlineKeyboardButton("8", callback_data="calc_amt_digit_8"),
+                InlineKeyboardButton("9", callback_data="calc_amt_digit_9"),
+                InlineKeyboardButton("×", callback_data="calc_amt_op_mul"),
+            ],
+            [
+                InlineKeyboardButton("4", callback_data="calc_amt_digit_4"),
+                InlineKeyboardButton("5", callback_data="calc_amt_digit_5"),
+                InlineKeyboardButton("6", callback_data="calc_amt_digit_6"),
+                InlineKeyboardButton("-", callback_data="calc_amt_op_sub"),
+            ],
+            [
+                InlineKeyboardButton("1", callback_data="calc_amt_digit_1"),
+                InlineKeyboardButton("2", callback_data="calc_amt_digit_2"),
+                InlineKeyboardButton("3", callback_data="calc_amt_digit_3"),
+                InlineKeyboardButton("+", callback_data="calc_amt_op_add"),
+            ],
+            [
+                InlineKeyboardButton("0", callback_data="calc_amt_digit_0"),
+                InlineKeyboardButton(".", callback_data="calc_amt_digit_dot"),
+                InlineKeyboardButton("=", callback_data="calc_amt_equals"),
+            ],
+            [InlineKeyboardButton(f"💰 {expr_display}", callback_data="calc_amt_noop")],
+            [InlineKeyboardButton("✅ إدخال المبلغ", callback_data="calc_amt_submit")],
+            row_back,
+        ]
+    )
+
+
+async def cust_calc_amount_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حاسبة تفاعلية لإدخال مبلغ المعاملة داخل حالة CUST_AMOUNT."""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data or ""
+
+    # cid مستخدم في أزرار الرجوع فقط.
+    cid = context.user_data.get("cust_txn_cid")
+    cid = int(cid) if cid else None
+
+    if data == "calc_amt_open" or data == "calc_amt_clear" or "calc_amt_clear" == data:
+        context.user_data["cust_calc_expr"] = "0"
+        context.user_data["cust_calc_last_was_equals"] = False
+    elif data == "calc_amt_backspace":
+        expr = context.user_data.get("cust_calc_expr") or "0"
+        if context.user_data.get("cust_calc_last_was_equals"):
+            context.user_data["cust_calc_last_was_equals"] = False
+            # يسمح بالحذف من الناتج
+        if expr in ("0", "0.00", ""):
+            expr = "0"
+        else:
+            expr = expr[:-1]
+            if not expr or expr == "-":
+                expr = "0"
+        context.user_data["cust_calc_expr"] = expr
+    elif data.startswith("calc_amt_digit_") or data == "calc_amt_digit_dot":
+        expr = context.user_data.get("cust_calc_expr") or "0"
+        if context.user_data.get("cust_calc_last_was_equals"):
+            # بعد "=": الرقم الجديد يبدأ تعبير جديد.
+            expr = "0"
+            context.user_data["cust_calc_last_was_equals"] = False
+
+        if data == "calc_amt_digit_dot":
+            digit = "."
+        else:
+            digit = data.replace("calc_amt_digit_", "", 1)
+
+        if digit == ".":
+            if expr.endswith(("+", "-", "*", "/")):
+                expr = expr + "0."
+            else:
+                # تحقق إذا الرقم الأخير يحتوي '.'.
+                last_op_pos = max(expr.rfind("+"), expr.rfind("-"), expr.rfind("*"), expr.rfind("/"))
+                last_num = expr[last_op_pos + 1 :]
+                if "." in last_num:
+                    # تجاهل '.' إذا موجود.
+                    context.user_data["cust_calc_expr"] = expr
+                    return CUST_AMOUNT
+                if expr == "0":
+                    expr = "0."
+                else:
+                    expr = expr + "."
+        else:
+            if expr in ("0", "0.00") and len(expr) <= 2:
+                # صفر بادئ.
+                expr = digit
+            elif expr.endswith(("+", "-", "*", "/")):
+                expr = expr + digit
+            else:
+                expr = expr + digit
+
+        context.user_data["cust_calc_expr"] = expr
+    elif data.startswith("calc_amt_op_"):
+        expr = context.user_data.get("cust_calc_expr") or "0"
+        op_map = {
+            "calc_amt_op_add": "+",
+            "calc_amt_op_sub": "-",
+            "calc_amt_op_mul": "*",
+            "calc_amt_op_div": "/",
+        }
+        op = op_map.get(data)
+        if not op:
+            return CUST_AMOUNT
+
+        context.user_data["cust_calc_last_was_equals"] = False
+        if expr.endswith(("+", "-", "*", "/")):
+            expr = expr[:-1] + op
+        else:
+            expr = expr + op
+        context.user_data["cust_calc_expr"] = expr
+    elif data == "calc_amt_equals":
+        expr = context.user_data.get("cust_calc_expr") or "0"
+        try:
+            result = _calc_amount_compute(expr)
+        except Exception:
+            await query.edit_message_text(
+                "تعبير غير صالح. جرّب من جديد.",
+                reply_markup=_kb_cust_amount_calc(cid, context.user_data.get("cust_calc_expr") or "0"),
+            )
+            return CUST_AMOUNT
+        context.user_data["cust_calc_expr"] = f"{result:.2f}"
+        context.user_data["cust_calc_last_was_equals"] = True
+    elif data == "calc_amt_submit":
+        expr = context.user_data.get("cust_calc_expr") or "0"
+        try:
+            amount = _calc_amount_compute(expr)
+        except ZeroDivisionError:
+            await query.edit_message_text(
+                "لا يمكن القسمة على صفر.",
+                reply_markup=_kb_cust_amount_calc(cid, context.user_data.get("cust_calc_expr") or "0"),
+            )
+            return CUST_AMOUNT
+        except Exception:
+            await query.edit_message_text(
+                "تعبير غير صالح. صححه ثم اضغط إدخال المبلغ.",
+                reply_markup=_kb_cust_amount_calc(cid, context.user_data.get("cust_calc_expr") or "0"),
+            )
+            return CUST_AMOUNT
+
+        context.user_data.pop("cust_calc_expr", None)
+        context.user_data.pop("cust_calc_last_was_equals", None)
+        context.user_data["cust_txn_amount"] = amount
+        kind = context.user_data.get("cust_txn_kind")
+
+        # أزل أزرار الحاسبة من الرسالة السابقة.
+        try:
+            await query.edit_message_text(
+                f"تم استلام المبلغ ✅\nالمبلغ: {amount:.2f} د.ع.",
+            )
+        except Exception:
+            pass
+
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "⏭️ تخطي الملاحظة",
+                    callback_data="cust_note_skip_btn",
+                )
+            ],
+            [
+                InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
+                InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit"),
+            ],
+        ]
+
+        await query.message.reply_text(
+            "تم استلام المبلغ ✅\n\nأرسل ملاحظة أو صورة.\n"
+            "يمكنك استخدام «تخطي الملاحظة» إن لم تكن هناك ملاحظة.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return CUST_NOTE
+    elif data == "calc_amt_noop":
+        pass
+    else:
+        # زر غير معروف.
+        return CUST_AMOUNT
+
+    expr = context.user_data.get("cust_calc_expr") or "0"
+    expr_display = expr
+    # لو كان Expr رقم كامل: نظهره بشكل منسق أكثر.
+    try:
+        expr_display = _calc_amount_compute(expr) if re.fullmatch(r"[0-9]+(\.[0-9]+)?", expr) else expr
+        if isinstance(expr_display, Decimal):
+            expr_display = f"{expr_display:.2f}"
+    except Exception:
+        expr_display = expr
+
+    await query.edit_message_text(
+        "🧮 حاسبة مبلغ المعاملة\n\nاكتب العملية ثم اضغط `=` ثم `✅ إدخال المبلغ`.",
+        parse_mode="Markdown",
+        reply_markup=_kb_cust_amount_calc(cid, expr_display),
+    )
+    return CUST_AMOUNT
 
 
 def _kb_cust_txn_flow(cid: int | None) -> InlineKeyboardMarkup:
@@ -1657,6 +1967,7 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
         [InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit")],
+        [InlineKeyboardButton("🧮 حاسبة", callback_data="calc_amt_open")],
     ]
     await query.edit_message_text(
         "أخذت 🔴\n\n"
@@ -1680,6 +1991,7 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
         [InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit")],
+        [InlineKeyboardButton("🧮 حاسبة", callback_data="calc_amt_open")],
     ]
     await query.edit_message_text(
         "أعطيت 🟢\n\n"
