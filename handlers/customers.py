@@ -2040,6 +2040,20 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     cid = int(query.data.replace("cust_took_", ""))
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        cust = db.query(Customer).filter(Customer.id == cid).first()
+        if not user or not cust or cust.user_id != user.id:
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً (أو هذه العملية غير مسموحة).",
+                reply_markup=kb_main_menu(),
+            )
+            context.user_data.pop("cust_txn_cid", None)
+            context.user_data.pop("cust_txn_kind", None)
+            return ConversationHandler.END
+    finally:
+        db.close()
     context.user_data["cust_txn_kind"] = "took"
     context.user_data["cust_txn_cid"] = cid
     # افتح الحاسبة تلقائياً مباشرة عند اختيار النوع.
@@ -2060,6 +2074,20 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     cid = int(query.data.replace("cust_gave_", ""))
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        cust = db.query(Customer).filter(Customer.id == cid).first()
+        if not user or not cust or cust.user_id != user.id:
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً (أو هذه العملية غير مسموحة).",
+                reply_markup=kb_main_menu(),
+            )
+            context.user_data.pop("cust_txn_cid", None)
+            context.user_data.pop("cust_txn_kind", None)
+            return ConversationHandler.END
+    finally:
+        db.close()
     context.user_data["cust_txn_kind"] = "gave"
     context.user_data["cust_txn_cid"] = cid
     # افتح الحاسبة تلقائياً مباشرة عند اختيار النوع.
