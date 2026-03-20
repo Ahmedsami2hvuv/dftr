@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from telegram import Update
+from datetime import timedelta
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -525,8 +527,48 @@ def main():
     )
     app.add_handler(cust_cat_conv)
 
+    # تذكيرات التسديد (قبل router العام)
+    reminder_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(cust_reminder_start, pattern=r"^cust_reminder_\d+$"),
+        ],
+        states={
+            REMIND_DUE_DATE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_reminder_due_date),
+                CommandHandler("cancel", cust_reminder_cancel),
+            ],
+            REMIND_OFFSET: [
+                CallbackQueryHandler(cust_reminder_offset, pattern=r"^remind_off_\d+_[0-5]$"),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cust_reminder_cancel)],
+        allow_reentry=True,
+        per_chat=True,
+        per_message=False,
+    )
+    app.add_handler(reminder_conv)
+
+    # ربط المستخدمين + موافقة المعاملات المعلّقة
+    app.add_handler(CallbackQueryHandler(partner_link_invite_start, pattern=r"^cust_partner_invite_\d+$"))
+    app.add_handler(CallbackQueryHandler(partner_send_updates_click, pattern=r"^cust_partner_send_\d+$"))
+    app.add_handler(CallbackQueryHandler(partner_batch_approve, pattern=r"^ppart_ok_"))
+    app.add_handler(CallbackQueryHandler(partner_batch_reject, pattern=r"^ppart_no_"))
+    app.add_handler(CallbackQueryHandler(partner_link_accept_click, pattern=r"^plink_yes_"))
+    app.add_handler(CallbackQueryHandler(partner_link_reject_click, pattern=r"^plink_no_"))
+
     # router لكل callbacks الخاصة بالعميل (تفاصيل/حذف/مشاركة/قائمة)
     app.add_handler(CallbackQueryHandler(cust_callback_router, pattern="^cust_"))
+
+    if app.job_queue:
+        app.job_queue.run_repeating(
+            reminder_job,
+            interval=timedelta(hours=1),
+            first=timedelta(seconds=20),
+            name="payment_reminders",
+        )
+        logger.info("مجدول تذكيرات التسديد: كل ساعة")
+    else:
+        logger.warning("JobQueue غير متوفر — ثبّت: pip install \"python-telegram-bot[job-queue]\"")
 
     logger.info("البوت يعمل...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

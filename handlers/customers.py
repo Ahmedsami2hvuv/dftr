@@ -11,6 +11,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from database import SessionLocal
 from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerCategory
+from app_models.partner import PartnerLink
 from utils.phone import is_plausible_iraq_mobile, normalize_phone, wa_number
 from config import WEB_BASE_URL
 
@@ -611,6 +612,14 @@ async def _build_customer_view(db, cust: Customer, offset: int):
     )
 
     has_more = offset + TX_PAGE_SIZE < total
+    plink = (
+        db.query(PartnerLink)
+        .filter(
+            PartnerLink.status == "accepted",
+            (PartnerLink.inviter_customer_id == cust.id) | (PartnerLink.invitee_customer_id == cust.id),
+        )
+        .first()
+    )
     keyboard = []
 
     # معاملات قابلة للنقر
@@ -639,18 +648,27 @@ async def _build_customer_view(db, cust: Customer, offset: int):
         ]
     )
 
-    # عرض الباقيات بجانب تعديل الحساب
+    # عرض الباقيات بجانب تعديل الحساب (+ إرسال تحديثات إن وُجد ربط)
     edit_btn = InlineKeyboardButton("✏️ تعديل الحساب", callback_data=f"cust_edit_{cust.id}")
     share_btn = InlineKeyboardButton("📤 مشاركة", callback_data=f"cust_share_{cust.id}")
+    send_upd_btn = InlineKeyboardButton("📤 إرسال التحديثات", callback_data=f"cust_partner_send_{cust.id}")
     if has_more:
         more_btn = InlineKeyboardButton(
             "➕ عرض الباقيات",
             callback_data=f"cust_tx_more_{cust.id}_{offset + TX_PAGE_SIZE}",
         )
         keyboard.append([more_btn])
-        keyboard.append([edit_btn, share_btn])
+        if plink:
+            keyboard.append([edit_btn, send_upd_btn])
+            keyboard.append([share_btn])
+        else:
+            keyboard.append([edit_btn, share_btn])
     else:
-        keyboard.append([edit_btn, share_btn])
+        if plink:
+            keyboard.append([edit_btn, send_upd_btn])
+            keyboard.append([share_btn])
+        else:
+            keyboard.append([edit_btn, share_btn])
 
     keyboard.append([InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")])
     return text, keyboard
@@ -1253,6 +1271,10 @@ async def cust_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         db.add(t)
         db.commit()
+        db.refresh(t)
+        from handlers.partner_link import maybe_queue_partner_tx
+
+        maybe_queue_partner_tx(db, t)
         text, keyboard = await _build_customer_view(db, cust, offset=0)
         await update.message.reply_text(
             text,
@@ -1327,6 +1349,10 @@ async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         db.add(t)
         db.commit()
+        db.refresh(t)
+        from handlers.partner_link import maybe_queue_partner_tx
+
+        maybe_queue_partner_tx(db, t)
         text, keyboard = await _build_customer_view(db, cust, offset=0)
         await query.edit_message_text(
             text,
@@ -1353,13 +1379,30 @@ async def cust_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user or cust.user_id != user.id:
             await query.edit_message_text("غير مسموح.")
             return
+        plink = (
+            db.query(PartnerLink)
+            .filter(
+                PartnerLink.status == "accepted",
+                (PartnerLink.inviter_customer_id == cid) | (PartnerLink.invitee_customer_id == cid),
+            )
+            .first()
+        )
         text = f"تعديل: {cust.name}\n" + (f"الرقم: {cust.phone}" if cust.phone else "لا يوجد رقم")
         keyboard = [
             [InlineKeyboardButton("تغيير الاسم", callback_data=f"cust_editname_{cid}")],
             [InlineKeyboardButton("تغيير الرقم", callback_data=f"cust_editphone_{cid}")],
-            [InlineKeyboardButton("🗑 حذف العميل", callback_data=f"cust_del_req_{cid}")],
-            [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")],
         ]
+        if plink:
+            keyboard.append(
+                [InlineKeyboardButton("📤 إرسال التحديثات", callback_data=f"cust_partner_send_{cid}")]
+            )
+        else:
+            keyboard.append(
+                [InlineKeyboardButton("🔗 ربط مع مستخدم آخر", callback_data=f"cust_partner_invite_{cid}")]
+            )
+        keyboard.append([InlineKeyboardButton("🔔 تذكيرات التسديد", callback_data=f"cust_reminder_{cid}")])
+        keyboard.append([InlineKeyboardButton("🗑 حذف العميل", callback_data=f"cust_del_req_{cid}")])
+        keyboard.append([InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")])
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     finally:
         db.close()
@@ -1607,6 +1650,21 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
     data = query.data
     if data == "cust_add" or data == "noop":
         await query.answer()
+        return
+
+    # ربط الشركاء / إرسال تحديثات — يُستدعى من داخل محادثة المعاملة أيضاً
+    if data.startswith("cust_partner_invite_"):
+        from handlers.partner_link import partner_link_invite_start
+
+        await partner_link_invite_start(update, context)
+        return
+    if data.startswith("cust_partner_send_"):
+        from handlers.partner_link import partner_send_updates_click
+
+        await partner_send_updates_click(update, context)
+        return
+    if data.startswith("cust_reminder_"):
+        await query.answer("أنهِ إضافة المعاملة الحالية أولاً أو اضغط إلغاء.", show_alert=True)
         return
 
     # --- أصناف الصنف ---

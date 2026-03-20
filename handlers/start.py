@@ -9,6 +9,13 @@ from config import ADMIN_ID
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args or []
+    # ربط مستخدمين: /start plink_TOKEN
+    if args and args[0].startswith("plink_"):
+        token = args[0].replace("plink_", "", 1)
+        from handlers.partner_link import handle_start_partner_link
+
+        await handle_start_partner_link(update, context, token)
+        return
     # رابط مشاركة: /start view_TOKEN
     if args and args[0].startswith("view_"):
         token = args[0].replace("view_", "", 1)

@@ -38,6 +38,9 @@ def init_db():
         LedgerCategory,
         FeedbackMessage,
         SiteSetting,
+        PartnerLink,
+        PartnerPendingTx,
+        CustomerPaymentReminder,
     )  # noqa: F401
     Base.metadata.create_all(bind=engine)
     # إضافة أعمدة جديدة لجدول users إن وُجد بدونها (ترحيل بسيط)
