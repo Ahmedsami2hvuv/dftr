@@ -79,11 +79,11 @@ async def debt_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return DEBT_AMOUNT
     context.user_data["debt_amount"] = amount
     keyboard = [
-        [InlineKeyboardButton("⏭️ سكيب الوصف", callback_data="debt_skip_desc_btn")],
+        [InlineKeyboardButton("⏭️ تخطي الوصف", callback_data="debt_skip_desc_btn")],
     ]
     await update.message.reply_text(
         "اختياري: وصف.\n"
-        "إذا تريد تخطي الوصف اضغط زر (سكيب الوصف).",
+        "إذا تريد تخطي الوصف اضغط زر (تخطي الوصف).",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return DEBT_DESC
@@ -122,7 +122,7 @@ async def debt_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def debt_skip_desc_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """سكيب الوصف عبر زر بدل كتابة /skip"""
+    """تخطي الوصف عبر زر بدل كتابة /skip"""
     query = update.callback_query
     await query.answer()
     db = SessionLocal()

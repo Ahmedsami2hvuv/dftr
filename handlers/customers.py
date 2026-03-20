@@ -358,7 +358,6 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         customers = db.query(Customer).filter(Customer.user_id == user.id).order_by(Customer.created_at.desc()).all()
         keyboard = [
-            [InlineKeyboardButton("🔎 بحث", callback_data="cust_search_start")],
             [InlineKeyboardButton("➕ إضافة عميل", callback_data="cust_add")],
         ]
         total_out = 0.0  # الصادر الكلي (أعطيت)
@@ -371,9 +370,16 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     total_out += amt
                 else:
                     total_in += amt
-            # بالواجهة: لون الدائرة = لون الرصيد الحالي (كما في صفحة التفاصيل)
-            label = f"{_balance_status_emoji(bal)} {c.name}"
-            keyboard.append([InlineKeyboardButton(label, callback_data=f"cust_{c.id}")])
+            # كل عميل بسطر فيه زرين: الاسم + المبلغ (وكلاهما يفتح نفس صفحة العميل)
+            name_label = f"{_balance_status_emoji(bal)} {c.name}"[:40]
+            amount_label = f"{bal:.2f} د.ع."
+            keyboard.append(
+                [
+                    InlineKeyboardButton(name_label, callback_data=f"cust_{c.id}"),
+                    InlineKeyboardButton(amount_label, callback_data=f"cust_{c.id}"),
+                ]
+            )
+        keyboard.append([InlineKeyboardButton("🔎 بحث", callback_data="cust_search_start")])
         keyboard.append([InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")])
         remain = total_out - total_in
         await query.edit_message_text(
@@ -469,9 +475,9 @@ async def cust_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["cust_name"] = name
     await update.message.reply_text(
         "تم ✅\n\nأرسل رقم هاتف العميل (اختياري).\n"
-        "إذا تريد تخطي الرقم اضغط زر السكيب.",
+        "إذا تريد تخطي الرقم اضغط زر التخطي.",
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("⏭️ سكيب الرقم", callback_data="cust_phone_skip_btn")]]
+            [[InlineKeyboardButton("⏭️ تخطي الرقم", callback_data="cust_phone_skip_btn")]]
         ),
     )
     return CUST_PHONE
@@ -485,7 +491,7 @@ async def cust_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = normalize_phone(raw)
     if not is_plausible_iraq_mobile(phone):
         await update.message.reply_text(
-            "رقم غير صحيح. جرّب: 077… أو 7××× أو +964… أو اضغط سكيب."
+            "رقم غير صحيح. جرّب: 077… أو 7××× أو +964… أو اضغط تخطي."
         )
         return CUST_PHONE
     db = SessionLocal()
@@ -1378,21 +1384,21 @@ async def cust_note_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cid = context.user_data.get("cust_txn_cid")
     keyboard = [
-        [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
+        [InlineKeyboardButton("⏭️ تخطي الملاحظة", callback_data="cust_note_skip_btn")],
         [
             InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
             InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit"),
         ],
     ]
     await update.message.reply_text(
-        "تم استلام الصورة ✅\n\nالآن أرسل الملاحظة نصاً (أو استخدم سكيب).",
+        "تم استلام الصورة ✅\n\nالآن أرسل الملاحظة نصاً (أو اضغط تخطي).",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return CUST_NOTE
 
 
 async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """سكيب الملاحظة عبر زر بدل كتابة /skip"""
+    """تخطي الملاحظة عبر زر بدل كتابة /skip"""
     query = update.callback_query
     await query.answer()
     db = SessionLocal()
