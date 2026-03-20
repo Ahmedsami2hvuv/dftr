@@ -83,6 +83,75 @@ def _is_pure_amount_line(s: str) -> bool:
         return False
 
 
+def _parse_name_and_phone_from_text(text: str) -> tuple[str, str | None]:
+    """
+    يستخرج (اسم، رقم خام) من رسالة واحدة أو سطرين:
+    - سطران: اسم ثم رقم / رقم ثم اسم / عدة أسطر اسم ثم سطر رقم
+    - سطر واحد: كلمات ثم رقم في النهاية (أو رقم ثم اسم)
+    إذا لم يُعثر على رقم صالح: (النص كاملاً كاسم، None).
+    إذا كان النص رقماً فقط بلا اسم: ("", None).
+    """
+    text = (text or "").strip()
+    if not text:
+        return "", None
+
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if len(lines) >= 2:
+        last = lines[-1]
+        if is_plausible_iraq_mobile(normalize_phone(last)):
+            name = " ".join(lines[:-1]).strip()
+            if name:
+                return name, last.strip()
+        first = lines[0]
+        if is_plausible_iraq_mobile(normalize_phone(first)):
+            name = " ".join(lines[1:]).strip()
+            if name:
+                return name, first.strip()
+        return " ".join(lines).strip(), None
+
+    parts = lines[0].split()
+    if len(parts) == 1:
+        only = parts[0]
+        if is_plausible_iraq_mobile(normalize_phone(only)):
+            return "", None
+        return only, None
+
+    for i in range(len(parts) - 1, -1, -1):
+        chunk = " ".join(parts[i:])
+        if is_plausible_iraq_mobile(normalize_phone(chunk)):
+            name = " ".join(parts[:i]).strip()
+            if name:
+                return name, chunk
+    return text, None
+
+
+async def _save_new_customer_from_add_flow(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, name: str, phone_norm: str | None
+) -> bool:
+    """يحفظ عميلاً جديداً ويرد برسالة نجاح. يعيد False إن لم يُحفظ."""
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("انتهت الجلسة. استخدم /start")
+            return False
+        c = Customer(user_id=user.id, name=name, phone=phone_norm)
+        db.add(c)
+        db.commit()
+        db.refresh(c)
+        keyboard = [
+            [InlineKeyboardButton("عرض العميل", callback_data=f"cust_{c.id}")],
+            [InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")],
+        ]
+        await update.message.reply_text(
+            f"تمت إضافة العميل ✅ {c.name}" + (f" — {c.phone}" if c.phone else ""),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return True
+    finally:
+        db.close()
+
+
 def _looks_like_phone_not_amount(s: str) -> bool:
     """تمييز أرقام هواتف عراقية شائعة عن المبالغ."""
     t = _normalize_amount_digits(s.strip()).replace(" ", "")
@@ -696,16 +765,39 @@ async def cust_search_back_click(update: Update, context: ContextTypes.DEFAULT_T
 async def cust_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("إضافة عميل 📝\n\nأرسل اسم العميل (إجباري):")
+    await query.edit_message_text(
+        "إضافة عميل 📝\n\n"
+        "أرسل اسم العميل (إجباري).\n\n"
+        "يمكنك:\n"
+        "• الاسم والرقم في سطر واحد (مثال: أحمد 07701234567)\n"
+        "• أو سطرين: الاسم ثم الرقم تحته\n"
+        "• أو الاسم الآن والرقم في رسالة لاحقة"
+    )
     return CUST_NAME
 
 
 async def cust_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = (update.message.text or "").strip()
-    if not name:
-        await update.message.reply_text("يرجى إرسال اسم العميل.")
+    raw = (update.message.text or "").strip()
+    name_part, phone_raw = _parse_name_and_phone_from_text(raw)
+    if not name_part:
+        await update.message.reply_text(
+            "يرجى إرسال اسم العميل.\n"
+            "إذا أرسلت الرقم وحده، اكتب الاسم معه أو في الرسالة التالية."
+        )
         return CUST_NAME
-    context.user_data["cust_name"] = name
+    context.user_data["cust_name"] = name_part
+    if phone_raw is not None:
+        phone_norm = normalize_phone(phone_raw)
+        if not is_plausible_iraq_mobile(phone_norm):
+            await update.message.reply_text(
+                "الرقم بجانب الاسم غير صحيح.\n"
+                "جرّب: 077… أو 7××× أو +964… أو أرسل الاسم فقط ثم الرقم في رسالة أخرى."
+            )
+            return CUST_NAME
+        if await _save_new_customer_from_add_flow(update, context, name_part, phone_norm):
+            context.user_data.pop("cust_name", None)
+        return ConversationHandler.END
+
     await update.message.reply_text(
         "تم ✅\n\nأرسل رقم هاتف العميل (اختياري).\n"
         "إذا تريد تخطي الرقم اضغط زر التخطي.",
@@ -721,33 +813,21 @@ async def cust_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         raw = update.message.contact.phone_number or ""
     else:
         raw = (update.message.text or "").strip()
+        _, extracted = _parse_name_and_phone_from_text(raw)
+        if extracted and is_plausible_iraq_mobile(normalize_phone(extracted)):
+            raw = extracted
     phone = normalize_phone(raw)
     if not is_plausible_iraq_mobile(phone):
         await update.message.reply_text(
             "رقم غير صحيح. جرّب: 077… أو 7××× أو +964… أو اضغط تخطي."
         )
         return CUST_PHONE
-    db = SessionLocal()
-    try:
-        user = get_current_user(db, update.effective_user.id)
-        if not user:
-            await update.message.reply_text("انتهت الجلسة. استخدم /start")
-            context.user_data.pop("cust_name", None)
-            return ConversationHandler.END
-        c = Customer(user_id=user.id, name=context.user_data["cust_name"], phone=phone)
-        db.add(c)
-        db.commit()
-        keyboard = [
-            [InlineKeyboardButton("عرض العميل", callback_data=f"cust_{c.id}")],
-            [InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")],
-        ]
-        await update.message.reply_text(
-            f"تمت إضافة العميل ✅ {c.name}" + (f" — {c.phone}" if c.phone else ""),
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
-    finally:
-        db.close()
-    context.user_data.pop("cust_name", None)
+    name = context.user_data.get("cust_name")
+    if not name:
+        await update.message.reply_text("انتهت الجلسة. ابدأ إضافة عميل من جديد.")
+        return ConversationHandler.END
+    if await _save_new_customer_from_add_flow(update, context, name, phone):
+        context.user_data.pop("cust_name", None)
     return ConversationHandler.END
 
 
