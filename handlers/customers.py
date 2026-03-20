@@ -412,6 +412,20 @@ async def cust_search_global_message(update: Update, context: ContextTypes.DEFAU
     q = update.message.text.strip()
     if not q:
         return
+    if context.user_data.get("last_menu") == "ledger":
+        await update.message.reply_text(
+            "لتسجيل مبلغ (مثل الراتب):\n"
+            "① من رسالة «الدخل والمصروف» اضغط الصنف (مثلاً «راتبك الثابت»).\n"
+            "② ثم أرسل المبلغ رقماً فقط.\n\n"
+            "كتابة نص هنا لا تُسجَّل كقيد — لازم تختار الصنف أولاً.",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("◀ الدخل والمصروف", callback_data="menu_ledger")],
+                    [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
+                ]
+            ),
+        )
+        return
     await reply_customer_search_results(update, q)
 
 
@@ -419,6 +433,7 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """قائمة دفتر الديون: إضافة عميل + قائمة العملاء"""
     query = update.callback_query
     await query.answer()
+    context.user_data["last_menu"] = "customers"
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)

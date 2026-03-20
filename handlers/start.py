@@ -50,6 +50,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tid = int(update.effective_user.id)
         user = db.query(User).filter(User.telegram_id == tid).first()
         if user:
+            context.user_data["last_menu"] = "main"
             text = (
                 f"مرحباً مجدداً، {user.full_name or user.username or 'صديقي'} 👋\n\n"
                 "استخدم القائمة أدناه لإدارة دفترك.\n"
@@ -82,6 +83,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """القائمة الرئيسية للمستخدم المسجل"""
     query = update.callback_query
     await query.answer()
+    context.user_data["last_menu"] = "main"
     keyboard = [
         [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
         [InlineKeyboardButton("📒 الدخل والمصروف", callback_data="menu_ledger")],

@@ -15,6 +15,26 @@ ICON_GIVEN = "🟢"
 KIND_TAKEN = "took"
 KIND_GIVEN = "gave"
 
+LEDGER_CANCEL_ADD = "ledger_cancel_add"
+
+
+def _kb_after_ledger_action() -> InlineKeyboardMarkup:
+    """بعد حفظ قيد أو إلغاء — رجوع للدفتر أو القائمة."""
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("◀ الدخل والمصروف", callback_data="menu_ledger")],
+            [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
+        ]
+    )
+
+
+def _kb_ledger_amount_errors() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("◀ إلغاء وإغلاق", callback_data=LEDGER_CANCEL_ADD)],
+        ]
+    )
+
 DEFAULT_CATEGORIES = [
     ("راتبك الثابت", KIND_TAKEN),
     ("مدخولات اضافية", KIND_TAKEN),
@@ -37,6 +57,24 @@ def _ensure_default_categories(db, user_id: int):
 
 def _cat_icon(kind: str) -> str:
     return ICON_TAKEN if kind == KIND_TAKEN else ICON_GIVEN
+
+
+async def ledger_cancel_add_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إلغاء إضافة قيد والعودة لشاشة الدخل والمصروف."""
+    query = update.callback_query
+    await query.answer()
+    for k in (
+        "ledger_category_id",
+        "ledger_kind",
+        "ledger_category",
+        "ledger_amount",
+        "ledger_category_kind",
+        "ledger_category_name",
+        "ledger_skip",
+    ):
+        context.user_data.pop(k, None)
+    await menu_ledger(update, context)
+    return ConversationHandler.END
 
 
 async def ledger_pick_category_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -76,6 +114,9 @@ async def ledger_pick_category_click(update: Update, context: ContextTypes.DEFAU
         await query.edit_message_text(
             f"أرسل المبلغ للصنف:\n{_cat_icon(cat.kind)} {cat.name}\n\n"
             "رقم فقط (مثال: 50000).",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ رجوع", callback_data=LEDGER_CANCEL_ADD)]]
+            ),
         )
         return ADD_AMOUNT
     finally:
@@ -85,6 +126,7 @@ async def ledger_pick_category_click(update: Update, context: ContextTypes.DEFAU
 async def ledger_categories_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    context.user_data["last_menu"] = "ledger"
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)
@@ -132,19 +174,36 @@ async def ledger_categories_menu(update: Update, context: ContextTypes.DEFAULT_T
         db.close()
 
 
+async def ledger_cat_add_cancel_to_categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.pop("ledger_cat_name", None)
+    context.user_data.pop("ledger_cat_kind", None)
+    await ledger_categories_menu(update, context)
+    return ConversationHandler.END
+
+
 async def ledger_cat_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data.pop("ledger_cat_name", None)
     context.user_data.pop("ledger_cat_kind", None)
-    await query.edit_message_text("أرسل اسم الصنف الجديد:")
+    await query.edit_message_text(
+        "أرسل اسم الصنف الجديد:",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("◀ رجوع", callback_data="ledger_categories_menu")]]
+        ),
+    )
     return CAT_ADD_NAME
 
 
 async def ledger_cat_name_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = (update.message.text or "").strip()
     if not name:
-        await update.message.reply_text("يرجى إرسال اسم صحيح للصنف.")
+        await update.message.reply_text(
+            "يرجى إرسال اسم صحيح للصنف.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ رجوع", callback_data="ledger_categories_menu")]]
+            ),
+        )
         return CAT_ADD_NAME
     context.user_data["ledger_cat_name"] = name
 
@@ -257,6 +316,7 @@ async def ledger_cat_del_do_click(update: Update, context: ContextTypes.DEFAULT_
 async def menu_ledger(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    context.user_data["last_menu"] = "ledger"
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)
@@ -303,6 +363,7 @@ async def menu_ledger(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("📚 أصناف الصنف", callback_data="ledger_categories_menu")])
         keyboard.append([InlineKeyboardButton("📋 آخر القيود", callback_data="ledger_list")])
         keyboard.append([InlineKeyboardButton("◀ دفتر الديون", callback_data="menu_customers")])
+        keyboard.append([InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")])
 
         text = (
             "الدخل والمصروف 📒\n\n"
@@ -346,14 +407,21 @@ async def ledger_add_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         amount = Decimal(update.message.text.replace(",", "").strip())
         if amount <= 0:
-            await update.message.reply_text("أدخل مبلغاً أكبر من صفر.")
+            await update.message.reply_text(
+                "أدخل مبلغاً أكبر من صفر.",
+                reply_markup=_kb_ledger_amount_errors(),
+            )
             return ADD_AMOUNT
     except Exception:
-        await update.message.reply_text("أدخل رقماً صحيحاً للمبلغ.")
+        await update.message.reply_text(
+            "أدخل رقماً صحيحاً للمبلغ.",
+            reply_markup=_kb_ledger_amount_errors(),
+        )
         return ADD_AMOUNT
     context.user_data["ledger_amount"] = amount
     keyboard = [
         [InlineKeyboardButton("⏭️ تخطي الوصف", callback_data="ledger_skip_desc_btn")],
+        [InlineKeyboardButton("◀ رجوع", callback_data=LEDGER_CANCEL_ADD)],
     ]
     await update.message.reply_text(
         "اختياري: أرسل وصفاً للقيد.\n"
@@ -390,7 +458,8 @@ async def ledger_add_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kind_ar = "أخذت" if entry.kind == "income" else "أعطيت"
         await update.message.reply_text(
             f"تم تسجيل {kind_ar} بمبلغ {entry.amount} ✅\n"
-            + (f"الوصف: {entry.description}" if entry.description else "")
+            + (f"الوصف: {entry.description}" if entry.description else ""),
+            reply_markup=_kb_after_ledger_action(),
         )
     finally:
         db.close()
@@ -403,6 +472,7 @@ async def ledger_add_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ledger_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    context.user_data["last_menu"] = "ledger"
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)
@@ -465,7 +535,10 @@ async def ledger_skip_desc_click(update: Update, context: ContextTypes.DEFAULT_T
         db.add(entry)
         db.commit()
         kind_ar = "أخذت" if entry.kind == "income" else "أعطيت"
-        await query.edit_message_text(f"تم تسجيل {kind_ar} بمبلغ {entry.amount} ✅")
+        await query.edit_message_text(
+            f"تم تسجيل {kind_ar} بمبلغ {entry.amount} ✅",
+            reply_markup=_kb_after_ledger_action(),
+        )
     finally:
         db.close()
     context.user_data.pop("ledger_category_kind", None)

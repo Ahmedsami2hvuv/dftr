@@ -69,12 +69,14 @@ from handlers.auth import (
 from handlers.ledger_handler import (
     menu_ledger,
     ledger_pick_category_click,
+    ledger_cancel_add_click,
     ledger_add_amount,
     ledger_add_desc,
     ledger_skip_desc_click,
     ledger_list,
     ledger_categories_menu,
     ledger_cat_add_start,
+    ledger_cat_add_cancel_to_categories,
     ledger_cat_name_done,
     ledger_cat_kind_took_click,
     ledger_cat_kind_gave_click,
@@ -93,6 +95,7 @@ from handlers.debts import (
     debt_amount,
     debt_desc,
     debt_skip_desc_click,
+    debt_cancel_to_menu,
     debt_list,
     DEBT_WHO,
     DEBT_AMOUNT,
@@ -293,14 +296,18 @@ def main():
             CallbackQueryHandler(ledger_pick_category_click, pattern="^ledger_pick_cat_\\d+$"),
         ],
         states={
-            ADD_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_add_amount)],
+            ADD_AMOUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_add_amount),
+                CallbackQueryHandler(ledger_cancel_add_click, pattern="^ledger_cancel_add$"),
+            ],
             ADD_DESC: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_add_desc),
                 CallbackQueryHandler(ledger_skip_desc_click, pattern="^ledger_skip_desc_btn$"),
+                CallbackQueryHandler(ledger_cancel_add_click, pattern="^ledger_cancel_add$"),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
-        per_message=True,
+        per_message=False,
     )
     app.add_handler(ledger_add_conv)
 
@@ -308,10 +315,18 @@ def main():
     ledger_cat_add_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(ledger_cat_add_start, pattern="^ledger_cat_add$")],
         states={
-            CAT_ADD_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_cat_name_done)],
+            CAT_ADD_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ledger_cat_name_done),
+                CallbackQueryHandler(
+                    ledger_cat_add_cancel_to_categories, pattern="^ledger_categories_menu$"
+                ),
+            ],
             CAT_ADD_KIND: [
                 CallbackQueryHandler(ledger_cat_kind_took_click, pattern="^ledger_cat_kind_took$"),
                 CallbackQueryHandler(ledger_cat_kind_gave_click, pattern="^ledger_cat_kind_gave$"),
+                CallbackQueryHandler(
+                    ledger_cat_add_cancel_to_categories, pattern="^ledger_categories_menu$"
+                ),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
@@ -326,15 +341,22 @@ def main():
             CallbackQueryHandler(debt_add_i_owe, pattern="^debt_add_i_owe$"),
         ],
         states={
-            DEBT_WHO: [MessageHandler(filters.TEXT & ~filters.COMMAND, debt_who)],
-            DEBT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, debt_amount)],
+            DEBT_WHO: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, debt_who),
+                CallbackQueryHandler(debt_cancel_to_menu, pattern="^menu_debts$"),
+            ],
+            DEBT_AMOUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, debt_amount),
+                CallbackQueryHandler(debt_cancel_to_menu, pattern="^menu_debts$"),
+            ],
             DEBT_DESC: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, debt_desc),
                 CallbackQueryHandler(debt_skip_desc_click, pattern="^debt_skip_desc_btn$"),
+                CallbackQueryHandler(debt_cancel_to_menu, pattern="^menu_debts$"),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
-        per_message=True,
+        per_message=False,
     )
     app.add_handler(debt_add_conv)
 

@@ -13,9 +13,20 @@ def get_current_user(db, telegram_id: int):
     return db.query(User).filter(User.telegram_id == telegram_id).first()
 
 
+async def debt_cancel_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إلغاء تسجيل دين والعودة لقائمة الديون."""
+    query = update.callback_query
+    context.user_data.pop("debt_to_name", None)
+    context.user_data.pop("debt_amount", None)
+    context.user_data.pop("debt_they_owe_me", None)
+    await menu_debts(update, context)
+    return ConversationHandler.END
+
+
 async def menu_debts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    context.user_data["last_menu"] = "debts"
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)
@@ -42,7 +53,10 @@ async def debt_add_they_owe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["debt_they_owe_me"] = 1
     await query.edit_message_text(
         "تسجيل دين لصالحك (هم مدينون لك) 📥\n\n"
-        "أرسل اسم الشخص أو الجهة (مثال: أحمد، أو محل الخضار):"
+        "أرسل اسم الشخص أو الجهة (مثال: أحمد، أو محل الخضار):",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("◀ رجوع", callback_data="menu_debts")]]
+        ),
     )
     return DEBT_WHO
 
@@ -53,7 +67,10 @@ async def debt_add_i_owe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["debt_they_owe_me"] = 0
     await query.edit_message_text(
         "تسجيل دين عليك (أنت مدين) 📤\n\n"
-        "أرسل اسم الشخص أو الجهة التي تدين لها:"
+        "أرسل اسم الشخص أو الجهة التي تدين لها:",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("◀ رجوع", callback_data="menu_debts")]]
+        ),
     )
     return DEBT_WHO
 
@@ -61,10 +78,20 @@ async def debt_add_i_owe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def debt_who(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = (update.message.text or "").strip()
     if not name:
-        await update.message.reply_text("أرسل الاسم.")
+        await update.message.reply_text(
+            "أرسل الاسم.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ رجوع", callback_data="menu_debts")]]
+            ),
+        )
         return DEBT_WHO
     context.user_data["debt_to_name"] = name
-    await update.message.reply_text("أرسل المبلغ (رقم فقط):")
+    await update.message.reply_text(
+        "أرسل المبلغ (رقم فقط):",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("◀ رجوع", callback_data="menu_debts")]]
+        ),
+    )
     return DEBT_AMOUNT
 
 
@@ -72,14 +99,25 @@ async def debt_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         amount = Decimal(update.message.text.replace(",", "").strip())
         if amount <= 0:
-            await update.message.reply_text("أدخل مبلغاً أكبر من صفر.")
+            await update.message.reply_text(
+                "أدخل مبلغاً أكبر من صفر.",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("◀ رجوع", callback_data="menu_debts")]]
+                ),
+            )
             return DEBT_AMOUNT
     except Exception:
-        await update.message.reply_text("أدخل رقماً صحيحاً.")
+        await update.message.reply_text(
+            "أدخل رقماً صحيحاً.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ رجوع", callback_data="menu_debts")]]
+            ),
+        )
         return DEBT_AMOUNT
     context.user_data["debt_amount"] = amount
     keyboard = [
         [InlineKeyboardButton("⏭️ تخطي الوصف", callback_data="debt_skip_desc_btn")],
+        [InlineKeyboardButton("◀ رجوع", callback_data="menu_debts")],
     ]
     await update.message.reply_text(
         "اختياري: وصف.\n"
@@ -112,7 +150,13 @@ async def debt_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.commit()
         direction = "مدينون لك" if debt.is_they_owe_me else "أنت مدين"
         await update.message.reply_text(
-            f"تم تسجيل الدين ✅\n{debt.to_name}: {debt.amount} — {direction}"
+            f"تم تسجيل الدين ✅\n{debt.to_name}: {debt.amount} — {direction}",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("◀ الديون", callback_data="menu_debts")],
+                    [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
+                ]
+            ),
         )
     finally:
         db.close()
@@ -143,7 +187,13 @@ async def debt_skip_desc_click(update: Update, context: ContextTypes.DEFAULT_TYP
         db.commit()
         direction = "مدينون لك" if debt.is_they_owe_me else "أنت مدين"
         await query.edit_message_text(
-            f"تم تسجيل الدين ✅\n{debt.to_name}: {debt.amount} — {direction}"
+            f"تم تسجيل الدين ✅\n{debt.to_name}: {debt.amount} — {direction}",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("◀ الديون", callback_data="menu_debts")],
+                    [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
+                ]
+            ),
         )
     finally:
         db.close()

@@ -13,6 +13,7 @@ def get_current_user(db, telegram_id: int):
 async def menu_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    context.user_data["last_menu"] = "profile"
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)
