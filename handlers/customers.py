@@ -346,6 +346,75 @@ async def cust_cat_del_do_click(update: Update, context: ContextTypes.DEFAULT_TY
     await menu_customer_categories(update, context, int(back_cid))
 
 
+def _cust_row_buttons(c: Customer) -> list[InlineKeyboardButton]:
+    """مبلغ يسار، اسم يمين (عرض تيليجرام). داخل زر الاسم: محاذاة بداية النص عبر LRM."""
+    bal, _, _ = _balance(c)
+    emo = _balance_status_emoji(bal)
+    name_label = f"\u200e{emo} {c.name}"[:40]
+    amount_label = f"{bal:.2f} د.ع."
+    cid = c.id
+    return [
+        InlineKeyboardButton(amount_label, callback_data=f"cust_{cid}"),
+        InlineKeyboardButton(name_label, callback_data=f"cust_{cid}"),
+    ]
+
+
+async def reply_customer_search_results(update: Update, q: str) -> None:
+    """نتائج بحث العملاء بنفس منطق البحث من دفتر الديون (رسالة جديدة)."""
+    msg = update.effective_message
+    if not msg:
+        return
+    if not q:
+        await msg.reply_text("اكتب نص بحث صحيح.")
+        return
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, update.effective_user.id)
+        if not user:
+            await msg.reply_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            return
+        matches = (
+            db.query(Customer)
+            .filter(Customer.user_id == user.id, Customer.name.ilike(f"%{q}%"))
+            .order_by(Customer.created_at.desc())
+            .limit(25)
+            .all()
+        )
+        if not matches:
+            kb = [
+                [InlineKeyboardButton("🔁 بحث جديد", callback_data="cust_search_start")],
+                [InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")],
+            ]
+            await msg.reply_text(
+                "لا يوجد عملاء مطابقون لهذا البحث.",
+                reply_markup=InlineKeyboardMarkup(kb),
+            )
+            return
+
+        kb = []
+        lines = [f"نتائج البحث: {q}"]
+        for c in matches:
+            bal, _, _ = _balance(c)
+            emo = _balance_status_emoji(bal)
+            lines.append(f"• {emo} {c.name} ({bal:.2f})")
+            kb.append(_cust_row_buttons(c))
+        kb.append([InlineKeyboardButton("🔁 بحث جديد", callback_data="cust_search_start")])
+        kb.append([InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")])
+        await msg.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(kb))
+    finally:
+        db.close()
+
+
+async def cust_search_global_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بحث بالاسم من أي مكان (بدون فتح دفتر الديون) — يعمل فقط خارج محادثات أخرى."""
+    if not update.message or not update.message.text:
+        return
+    q = update.message.text.strip()
+    if not q:
+        return
+    await reply_customer_search_results(update, q)
+
+
 async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """قائمة دفتر الديون: إضافة عميل + قائمة العملاء"""
     query = update.callback_query
@@ -361,22 +430,13 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_out = 0.0  # الصادر الكلي (أعطيت)
         total_in = 0.0   # الوارد الكلي (أخذت)
         for c in customers:
-            bal, _, _ = _balance(c)
             for t in c.transactions:
                 amt = float(t.amount or 0)
                 if t.kind == "gave":
                     total_out += amt
                 else:
                     total_in += amt
-            # كل عميل بسطر فيه زرين: الاسم + المبلغ (وكلاهما يفتح نفس صفحة العميل)
-            name_label = f"{_balance_status_emoji(bal)} {c.name}"[:40]
-            amount_label = f"{bal:.2f} د.ع."
-            keyboard.append(
-                [
-                    InlineKeyboardButton(name_label, callback_data=f"cust_{c.id}"),
-                    InlineKeyboardButton(amount_label, callback_data=f"cust_{c.id}"),
-                ]
-            )
+            keyboard.append(_cust_row_buttons(c))
         keyboard.append([InlineKeyboardButton("➕ إضافة عميل", callback_data="cust_add")])
         keyboard.append([InlineKeyboardButton("🔎 بحث", callback_data="cust_search_start")])
         keyboard.append([InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")])
@@ -412,43 +472,7 @@ async def cust_search_query_done(update: Update, context: ContextTypes.DEFAULT_T
     if not q:
         await update.message.reply_text("اكتب نص بحث صحيح.")
         return CUST_SEARCH_QUERY
-    db = SessionLocal()
-    try:
-        user = get_current_user(db, update.effective_user.id)
-        if not user:
-            await update.message.reply_text("يجب تسجيل الدخول أولاً. استخدم /start")
-            return ConversationHandler.END
-        # بحث تقريبي بسيط: contains
-        matches = (
-            db.query(Customer)
-            .filter(Customer.user_id == user.id, Customer.name.ilike(f"%{q}%"))
-            .order_by(Customer.created_at.desc())
-            .limit(25)
-            .all()
-        )
-        if not matches:
-            kb = [
-                [InlineKeyboardButton("🔁 بحث جديد", callback_data="cust_search_start")],
-                [InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")],
-            ]
-            await update.message.reply_text(
-                "لا يوجد عملاء مطابقون لهذا البحث.",
-                reply_markup=InlineKeyboardMarkup(kb),
-            )
-            return ConversationHandler.END
-
-        kb = []
-        lines = [f"نتائج البحث: {q}"]
-        for c in matches:
-            bal, _, _ = _balance(c)
-            emo = _balance_status_emoji(bal)
-            lines.append(f"• {emo} {c.name} ({bal:.2f})")
-            kb.append([InlineKeyboardButton(f"{emo} {c.name}"[:64], callback_data=f"cust_{c.id}")])
-        kb.append([InlineKeyboardButton("🔁 بحث جديد", callback_data="cust_search_start")])
-        kb.append([InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")])
-        await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(kb))
-    finally:
-        db.close()
+    await reply_customer_search_results(update, q)
     return ConversationHandler.END
 
 

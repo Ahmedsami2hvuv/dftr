@@ -143,6 +143,7 @@ from handlers.customers import (
     cust_search_start,
     cust_search_query_done,
     cust_search_back_click,
+    cust_search_global_message,
     cust_took,
     cust_gave,
     cust_amount,
@@ -590,6 +591,14 @@ def main():
 
     # router لكل callbacks الخاصة بالعميل (تفاصيل/حذف/مشاركة/قائمة)
     app.add_handler(CallbackQueryHandler(cust_callback_router, pattern="^cust_"))
+
+    # بحث بالاسم من المحادثة مباشرة (بدون فتح دفتر الديون) — آخر معالج نصي بعد كل المحادثات
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+            cust_search_global_message,
+        )
+    )
 
     if app.job_queue:
         app.job_queue.run_repeating(

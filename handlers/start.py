@@ -52,7 +52,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user:
             text = (
                 f"مرحباً مجدداً، {user.full_name or user.username or 'صديقي'} 👋\n\n"
-                "استخدم القائمة أدناه لإدارة دفترك."
+                "استخدم القائمة أدناه لإدارة دفترك.\n"
+                "أو اكتب أي جزء من اسم العميل للبحث عنه مباشرة."
             )
             keyboard = [
                 [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
