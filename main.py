@@ -597,9 +597,7 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel_auth)],
         per_message=False,
     )
-    # احجب أي معالجات أخرى لنفس رسالة النص حتى لا يشتغل بحث العملاء العام
-    # أثناء إدخال اسم الصنف.
-    app.add_handler(cust_cat_conv, block=True)
+    app.add_handler(cust_cat_conv)
 
     # تذكيرات التسديد (قبل router العام)
     reminder_conv = ConversationHandler(

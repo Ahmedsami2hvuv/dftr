@@ -639,6 +639,8 @@ async def cust_cat_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """بدء إضافة صنف جديد"""
     query = update.callback_query
     await query.answer()
+    context.user_data.pop("in_cust_cat_add_flow", None)
+    context.user_data["in_cust_cat_add_flow"] = True
     context.user_data.pop("cust_cat_add_name", None)
     context.user_data.pop("cust_cat_add_kind", None)
     await query.edit_message_text(
@@ -674,6 +676,7 @@ async def cust_cat_kind_took_click(update: Update, context: ContextTypes.DEFAULT
     back_cid = context.user_data.get("cust_cat_back_customer_id")
     name = context.user_data.get("cust_cat_add_name")
     if not back_cid or not name:
+        context.user_data.pop("in_cust_cat_add_flow", None)
         await query.edit_message_text(
             "انتهت الجلسة. ابدأ من جديد.",
             reply_markup=_kb_cust_cat_back(context),
@@ -684,6 +687,7 @@ async def cust_cat_kind_took_click(update: Update, context: ContextTypes.DEFAULT
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
+            context.user_data.pop("in_cust_cat_add_flow", None)
             await query.edit_message_text("غير مسموح.", reply_markup=kb_main_menu())
             return ConversationHandler.END
         db.add(CustomerCategory(user_id=user.id, name=name, kind="took"))
@@ -694,6 +698,7 @@ async def cust_cat_kind_took_click(update: Update, context: ContextTypes.DEFAULT
     # رجوع للقائمة
     await menu_customer_categories(update, context, int(back_cid))
     context.user_data.pop("cust_cat_add_name", None)
+    context.user_data.pop("in_cust_cat_add_flow", None)
     return ConversationHandler.END
 
 
@@ -703,6 +708,7 @@ async def cust_cat_kind_gave_click(update: Update, context: ContextTypes.DEFAULT
     back_cid = context.user_data.get("cust_cat_back_customer_id")
     name = context.user_data.get("cust_cat_add_name")
     if not back_cid or not name:
+        context.user_data.pop("in_cust_cat_add_flow", None)
         await query.edit_message_text(
             "انتهت الجلسة. ابدأ من جديد.",
             reply_markup=_kb_cust_cat_back(context),
@@ -713,6 +719,7 @@ async def cust_cat_kind_gave_click(update: Update, context: ContextTypes.DEFAULT
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
+            context.user_data.pop("in_cust_cat_add_flow", None)
             await query.edit_message_text("غير مسموح.", reply_markup=kb_main_menu())
             return ConversationHandler.END
         db.add(CustomerCategory(user_id=user.id, name=name, kind="gave"))
@@ -722,6 +729,7 @@ async def cust_cat_kind_gave_click(update: Update, context: ContextTypes.DEFAULT
 
     await menu_customer_categories(update, context, int(back_cid))
     context.user_data.pop("cust_cat_add_name", None)
+    context.user_data.pop("in_cust_cat_add_flow", None)
     return ConversationHandler.END
 
 
@@ -875,6 +883,10 @@ async def cust_search_global_message(update: Update, context: ContextTypes.DEFAU
         return
     text = update.message.text.strip()
     if not text:
+        return
+    # إذا المستخدم داخل محادثة إضافة صنف، لا نسمح لمعالج البحث العام أن يرد
+    # حتى لا تظهر رسائل بحث/إضافة كعميل أثناء إدخال اسم الصنف.
+    if context.user_data.get("in_cust_cat_add_flow"):
         return
     if context.user_data.get("last_menu") == "ledger":
         await update.message.reply_text(

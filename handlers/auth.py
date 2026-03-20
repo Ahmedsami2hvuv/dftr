@@ -409,6 +409,7 @@ async def forgot_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for k in ("reg_name", "reg_phone", "auth_action", "login_phone", "forgot_phone"):
         context.user_data.pop(k, None)
+    context.user_data.pop("in_cust_cat_add_flow", None)
     await update.message.reply_text("تم الرجوع.", reply_markup=_kb_main_menu())
     return ConversationHandler.END
 
