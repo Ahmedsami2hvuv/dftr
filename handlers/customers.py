@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
+from sqlalchemy import func
 from database import SessionLocal
 from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerCategory
 from app_models.partner import PartnerLink
@@ -428,6 +429,33 @@ async def cust_cat_del_do_click(update: Update, context: ContextTypes.DEFAULT_TY
     await menu_customer_categories(update, context, int(back_cid))
 
 
+def _customers_ordered_by_usage_least_first(
+    db, user_id: int, *, name_ilike: str | None = None, limit: int | None = None
+):
+    """
+    قائمة عملاء المستخدم: الأقل معاملاتاً أولاً (أعلى الشاشة)، الأكثر معاملاتاً آخراً (أسفل).
+    """
+    txn_n = (
+        db.query(
+            CustomerTransaction.customer_id.label("cid"),
+            func.count(CustomerTransaction.id).label("n"),
+        )
+        .group_by(CustomerTransaction.customer_id)
+        .subquery()
+    )
+    q = (
+        db.query(Customer)
+        .outerjoin(txn_n, Customer.id == txn_n.c.cid)
+        .filter(Customer.user_id == user_id)
+        .order_by(func.coalesce(txn_n.c.n, 0).asc(), Customer.id.asc())
+    )
+    if name_ilike is not None:
+        q = q.filter(Customer.name.ilike(f"%{name_ilike}%"))
+    if limit is not None:
+        q = q.limit(limit)
+    return q.all()
+
+
 def _cust_row_buttons(c: Customer) -> list[InlineKeyboardButton]:
     """مبلغ يسار، اسم يمين (عرض تيليجرام). داخل زر الاسم: محاذاة بداية النص عبر LRM."""
     bal, _, _ = _balance(c)
@@ -457,12 +485,8 @@ async def reply_customer_search_results(
         if not user:
             await msg.reply_text("يجب تسجيل الدخول أولاً. استخدم /start")
             return
-        matches = (
-            db.query(Customer)
-            .filter(Customer.user_id == user.id, Customer.name.ilike(f"%{q}%"))
-            .order_by(Customer.created_at.desc())
-            .limit(25)
-            .all()
+        matches = _customers_ordered_by_usage_least_first(
+            db, user.id, name_ilike=q, limit=25
         )
         if not matches:
             context.user_data["pending_add_name"] = q.strip()
@@ -581,12 +605,8 @@ async def _edit_quick_customer_picker(query, context: ContextTypes.DEFAULT_TYPE)
             await query.edit_message_text("يجب تسجيل الدخول أولاً.")
             _clear_quick_amount_flow(context)
             return
-        customers = (
-            db.query(Customer)
-            .filter(Customer.user_id == user.id)
-            .order_by(Customer.created_at.desc())
-            .limit(40)
-            .all()
+        customers = _customers_ordered_by_usage_least_first(
+            db, user.id, limit=40
         )
         amt = context.user_data.get("quick_amount")
         kind = context.user_data.get("quick_flow_kind")
@@ -704,7 +724,7 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user:
             await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
             return
-        customers = db.query(Customer).filter(Customer.user_id == user.id).order_by(Customer.created_at.desc()).all()
+        customers = _customers_ordered_by_usage_least_first(db, user.id)
         keyboard: list[list[InlineKeyboardButton]] = []
         total_out = 0.0  # الصادر الكلي (أعطيت)
         total_in = 0.0   # الوارد الكلي (أخذت)
