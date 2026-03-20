@@ -20,14 +20,60 @@ from app_models import BRAND_LOGO_SETTING_KEY, Customer, CustomerTransaction, Sh
 from config import BOT_LOGO_BASE64
 from config import BOT_TOKEN
 from config import BOT_USERNAME
+from config import WEB_BASE_URL
+from creditbook_web import (
+    _clear_cookie_headers,
+    _set_cookie_headers,
+    get_user_from_cookie_header,
+    load_dashboard_rows,
+    render_dashboard_html,
+    render_login_page,
+    render_owner_customer_page,
+    try_login,
+)
 from utils.phone import format_phone_iq_local_display, wa_number as _wa_number
 
 # شعار البوت (احتياطي إذا لم يُضبط BOT_LOGO_BASE64 في Railway)
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _LOGO_PATH = _STATIC_DIR / "bot_logo.png"
 _LOGO_B64_PATH = _STATIC_DIR / "bot_logo.b64.txt"
+_CREDITBOOK_APP_CSS = _STATIC_DIR / "creditbook_app.css"
 
 TX_PAGE_SIZE = 15
+
+
+def _request_is_secure(handler: BaseHTTPRequestHandler) -> bool:
+    if WEB_BASE_URL.startswith("https"):
+        return True
+    return (handler.headers.get("X-Forwarded-Proto") or "").lower() == "https"
+
+
+def _send_html_page(
+    handler: BaseHTTPRequestHandler,
+    status: int,
+    body: str,
+    extra_headers: list[tuple[str, str]] | None = None,
+) -> None:
+    handler.send_response(status)
+    for k, v in extra_headers or []:
+        handler.send_header(k, v)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    handler.send_header("Pragma", "no-cache")
+    handler.end_headers()
+    handler.wfile.write(body.encode("utf-8"))
+
+
+def _redirect(
+    handler: BaseHTTPRequestHandler,
+    location: str,
+    extra_headers: list[tuple[str, str]] | None = None,
+) -> None:
+    handler.send_response(302)
+    handler.send_header("Location", location)
+    for k, v in extra_headers or []:
+        handler.send_header(k, v)
+    handler.end_headers()
 
 
 def _html_escape(s: str) -> str:
@@ -550,6 +596,70 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 offset = 0
 
+        brand_img_src, favicon_href = _brand_visual_for_page()
+        cookie_header = self.headers.get("Cookie")
+        web_user = get_user_from_cookie_header(cookie_header)
+
+        if path == "/creditbook/static/creditbook_app.css":
+            try:
+                data = _CREDITBOOK_APP_CSS.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/css; charset=utf-8")
+                self.send_header("Cache-Control", "public, max-age=3600")
+                self.end_headers()
+                self.wfile.write(data)
+            except Exception:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"Not found")
+            return
+
+        if path == "/creditbook/app":
+            loc = "/creditbook/dashboard" if web_user else "/creditbook/login"
+            _redirect(self, loc)
+            return
+
+        if path == "/creditbook/login":
+            if web_user:
+                _redirect(self, "/creditbook/dashboard")
+                return
+            page = render_login_page(None, favicon_href, brand_img_src)
+            _send_html_page(self, 200, page)
+            return
+
+        if path == "/creditbook/dashboard":
+            if not web_user:
+                _redirect(self, "/creditbook/login")
+                return
+            rows = load_dashboard_rows(web_user.id)
+            page = render_dashboard_html(web_user, rows, favicon_href, brand_img_src)
+            _send_html_page(self, 200, page)
+            return
+
+        cust_m = re.match(r"^/creditbook/customer/(?P<cid>\d+)$", path)
+        if cust_m:
+            if not web_user:
+                _redirect(self, "/creditbook/login")
+                return
+            cid = int(cust_m.group("cid"))
+            page = render_owner_customer_page(
+                web_user,
+                cid,
+                web_user.id,
+                offset,
+                favicon_href,
+                brand_img_src,
+            )
+            if page is None:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"Not found")
+                return
+            _send_html_page(self, 200, page)
+            return
+
         if path in ("/creditbook/logo", "/creditbook/logo.png"):
             try:
                 data, ctype = _get_brand_logo_bytes_ctype()
@@ -630,6 +740,43 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Pragma", "no-cache")
         self.end_headers()
         self.wfile.write(html.encode("utf-8"))
+
+    def do_POST(self):  # noqa: N802
+        parsed = urlparse(self.path)
+        path = parsed.path or "/"
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length) if length else b""
+        try:
+            body = raw.decode("utf-8")
+        except Exception:
+            body = ""
+        body_qs = parse_qs(body, keep_blank_values=True)
+        secure = _request_is_secure(self)
+        brand_img_src, favicon_href = _brand_visual_for_page()
+
+        if path == "/creditbook/login":
+            phone = (body_qs.get("phone") or [""])[0]
+            pwd = (body_qs.get("password") or [""])[0]
+            err, uid = try_login(phone, pwd)
+            if err:
+                page = render_login_page(err, favicon_href, brand_img_src)
+                _send_html_page(self, 200, page)
+                return
+            extra = _set_cookie_headers(uid, secure)
+            _redirect(self, "/creditbook/dashboard", extra)
+            return
+
+        if path == "/creditbook/logout":
+            extra = _clear_cookie_headers(secure)
+            _redirect(self, "/creditbook/login", extra)
+            return
+
+        self.send_response(404)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(b"Not found")
 
 
 def start_web_server(port: int) -> ThreadingHTTPServer:

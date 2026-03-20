@@ -42,3 +42,16 @@ BOT_LOGO_BASE64 = (os.environ.get("BOT_LOGO_BASE64") or os.environ.get("WEB_BRAN
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN مطلوب. أضفه في Railway أو في ملف .env")
+
+
+def web_session_secret() -> str:
+    """
+    مفتاح توقيع كوكي جلسة الموقع (تسجيل الدخول عبر المتصفح).
+    يُفضّل تعيين WEB_SESSION_SECRET في Railway (سلسلة عشوائية طويلة).
+    """
+    import hashlib
+
+    raw = get_env("WEB_SESSION_SECRET")
+    if raw:
+        return raw
+    return hashlib.sha256(("dftr_web_sess_v1:" + BOT_TOKEN).encode("utf-8")).hexdigest()

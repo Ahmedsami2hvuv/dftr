@@ -3,7 +3,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import SessionLocal
 from app_models import User
-from config import ADMIN_ID
+from config import ADMIN_ID, WEB_BASE_URL
 
 
 def get_current_user(db, telegram_id: int):
@@ -49,6 +49,7 @@ async def menu_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"تاريخ التسجيل: {user.created_at.strftime('%Y-%m-%d')}"
         keyboard = [
             [InlineKeyboardButton("🔐 تغيير الرمز", callback_data="auth_change_password")],
+            [InlineKeyboardButton("🌐 موقع دفتر الديون", url=f"{WEB_BASE_URL}/creditbook/app")],
             [InlineKeyboardButton("💡 إرسال مشكلة أو اقتراح", callback_data="send_feedback")],
             [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
         ]

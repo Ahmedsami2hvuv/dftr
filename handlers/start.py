@@ -4,7 +4,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import SessionLocal
 from app_models import User, ShareLink
-from config import ADMIN_ID
+from config import ADMIN_ID, WEB_BASE_URL
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -84,6 +84,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
                 [InlineKeyboardButton("📒 الدخل والمصروف", callback_data="menu_ledger")],
                 [InlineKeyboardButton("👤 حسابي", callback_data="menu_profile")],
+                [InlineKeyboardButton("🌐 موقع دفتر الديون", url=f"{WEB_BASE_URL}/creditbook/app")],
                 [InlineKeyboardButton("🧾 طريقة الاستخدام", callback_data="usage_instructions")],
             ]
             if update.effective_user.id == ADMIN_ID:
@@ -144,6 +145,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
         [InlineKeyboardButton("📒 الدخل والمصروف", callback_data="menu_ledger")],
         [InlineKeyboardButton("👤 حسابي", callback_data="menu_profile")],
+        [InlineKeyboardButton("🌐 موقع دفتر الديون", url=f"{WEB_BASE_URL}/creditbook/app")],
         [InlineKeyboardButton("🧾 طريقة الاستخدام", callback_data="usage_instructions")],
     ]
     if update.effective_user.id == ADMIN_ID:

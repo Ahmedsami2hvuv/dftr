@@ -1,0 +1,162 @@
+/* دفتر الديون — واجهة الويب (نفس روح صفحة المشاركة) */
+body {
+  font-family: 'Tajawal', Arial, sans-serif;
+  background: linear-gradient(160deg, #ecfdf5 0%, #f0fdfa 35%, #f7f7f7 100%);
+  padding: 16px;
+  margin: 0;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+.card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(15, 118, 110, 0.1), 0 1px 4px rgba(0,0,0,0.06);
+  border: 1px solid rgba(13, 148, 136, 0.12);
+  max-width: 720px;
+  margin: 0 auto;
+}
+.brand-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  flex: 0 1 auto;
+}
+.brand h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 4vw, 1.95rem);
+  font-weight: 900;
+  color: #0f172a;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  background: linear-gradient(120deg, #0f766e, #0d9488, #14b8a6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.brand-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.35);
+  border: 3px solid rgba(255,255,255,0.95);
+}
+.bal-red { color: #c62828; }
+.bal-green { color: #2e7d32; }
+.btn {
+  display: inline-block;
+  padding: 10px 16px;
+  color: #fff !important;
+  text-decoration: none;
+  border-radius: 999px;
+  margin-top: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 6px 14px rgba(0,0,0,.14);
+  transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 9px 18px rgba(0,0,0,.18);
+  opacity: .95;
+}
+.btn-primary { background: linear-gradient(135deg, #0d9488, #0f766e); }
+.btn-secondary { background: linear-gradient(135deg, #64748b, #475569); }
+.btn-bot { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+.err {
+  background: #fef2f2;
+  color: #b91c1c;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+label { display: block; margin: 10px 0 4px; font-weight: 700; color: #334155; }
+input[type=text], input[type=tel], input[type=password] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  font-size: 16px;
+  font-family: inherit;
+}
+form.login-form { margin-top: 8px; }
+.cust-row {
+  display: block;
+  padding: 14px;
+  margin: 10px 0;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #fafafa;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow .15s ease;
+}
+.cust-row:hover { box-shadow: 0 4px 14px rgba(15, 118, 110, 0.12); }
+.cust-name { font-weight: 800; font-size: 1.05rem; color: #0f172a; }
+.cust-meta { font-size: 0.9rem; color: #64748b; margin-top: 4px; }
+.cust-bal { font-weight: 800; margin-top: 6px; font-size: 1.05rem; }
+.tx {
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 10px 0;
+}
+.top { color: #666; font-size: 12px; }
+.tx-content {
+  margin-top: 6px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tx-text { flex: 1; min-width: 0; }
+.main { margin-top: 6px; font-size: 15px; font-weight: 700; }
+.remain { margin-top: 6px; font-size: 13px; }
+.remain.bal-red { color: #c62828; }
+.remain.bal-green { color: #2e7d32; }
+.note { margin-top: 6px; color: #444; font-size: 13px; }
+.photo-wrap { flex: 0 0 auto; margin-top: 2px; }
+.photo {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  cursor: pointer;
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.hint {
+  color: #64748b;
+  font-size: 0.92rem;
+  margin: 8px 0 14px;
+  line-height: 1.5;
+}
+@media (max-width: 560px) {
+  .brand-header { flex-direction: column; align-items: stretch; }
+  .brand { justify-content: center; }
+}
