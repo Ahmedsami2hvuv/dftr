@@ -888,9 +888,18 @@ async def cust_search_global_message(update: Update, context: ContextTypes.DEFAU
     # حتى لا تظهر رسائل بحث/إضافة كعميل أثناء إدخال اسم الصنف.
     if context.user_data.get("in_cust_cat_add_flow"):
         return
-    # أثناء أي محادثة مصادقة (تسجيل/دخول/نسيت كلمة المرور) لا نتعامل
-    # مع النص العام حتى لا يُفسَّر رمز التحقق كمبلغ سريع.
-    if context.user_data.get("auth_action") in {"register", "login", "forgot"}:
+    # أثناء مسارات المصادقة/الاستعادة لا نتعامل مع النص العام:
+    # هذا يمنع رمز التحقق (أرقام فقط مثل 305245) من أن يُفسَّر كمبلغ سريع.
+    auth_like_keys = (
+        "auth_action",
+        "login_phone",
+        "forgot_phone",
+        "forgot_reset_user_id",
+        "forgot_new_pwd",
+        "chpwd_old_ok",
+        "chpwd_new",
+    )
+    if any(context.user_data.get(k) is not None for k in auth_like_keys):
         return
     if context.user_data.get("last_menu") == "ledger":
         await update.message.reply_text(
