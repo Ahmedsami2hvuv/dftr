@@ -20,7 +20,7 @@ from app_models import BRAND_LOGO_SETTING_KEY, Customer, CustomerTransaction, Sh
 from config import BOT_LOGO_BASE64
 from config import BOT_TOKEN
 from config import BOT_USERNAME
-from utils.phone import format_phone_iq_local_display, wa_number as _wa_number
+from utils.phone import format_phone_iq_local_display, normalize_phone, wa_number as _wa_number
 
 # شعار البوت (احتياطي إذا لم يُضبط BOT_LOGO_BASE64 في Railway)
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -176,7 +176,8 @@ def _render_page(token: str, offset: int) -> str:
                     f"<img class='photo' src='/creditbook/photo/{fid}' alt='صورة المعاملة'/></a></div>"
                 )
             remain = running_after_by_tx.get(t.id, bal)
-            remain_class = "bal-red" if remain > 0 else ("bal-green" if remain < 0 else "")
+            # موجب = لصالحك (أخضر) كما في البوت
+            remain_class = "bal-green" if remain > 0 else ("bal-red" if remain < 0 else "")
             tx_kind_class = "bal-red" if t.kind == "took" else "bal-green"
             tx_rows.append(
                 f"""
@@ -206,7 +207,7 @@ def _render_page(token: str, offset: int) -> str:
             balance_text += f"{abs(bal):.2f}"
         else:
             balance_text += "0"
-        balance_class = "bal-red" if bal > 0 else ("bal-green" if bal < 0 else "")
+        balance_class = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
 
         owner = cust.user
         owner_name = (owner.full_name or owner.username or "صاحب الحساب") if owner else "صاحب الحساب"
@@ -228,9 +229,15 @@ def _render_page(token: str, offset: int) -> str:
         brand_img_src, favicon_href = _brand_visual_for_page()
         # بدون تسميات «صاحب الحساب / العميل» — الاسم والرقم فقط، رقم محلي 11 رقم يبدأ بـ 0
         owner_disp_phone = format_phone_iq_local_display(owner_phone) if owner_phone else ""
-        owner_meta = _html_escape(owner_name) + (
-            f" — {_html_escape(owner_disp_phone)}" if owner_disp_phone else ""
-        )
+        owner_name_esc = _html_escape(owner_name)
+        if owner_disp_phone:
+            tel_np = normalize_phone(owner_phone)
+            tel_href = _html_escape(f"tel:{tel_np}")
+            owner_phone_html = (
+                f"<a class='owner-phone' href='{tel_href}' dir='ltr'>{_html_escape(owner_disp_phone)}</a>"
+            )
+        else:
+            owner_phone_html = "<span class='owner-phone-muted'>لم يُضف رقم بعد</span>"
         cust_disp_phone = format_phone_iq_local_display((cust.phone or "").strip()) if cust.phone else ""
         cust_meta = _html_escape(cust.name) + (
             f" — {_html_escape(cust_disp_phone)}" if cust_disp_phone else ""
@@ -242,37 +249,148 @@ def _render_page(token: str, offset: int) -> str:
             <meta charset='utf-8'/>
             <meta name='viewport' content='width=device-width, initial-scale=1'/>
             <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
+            <link rel='preconnect' href='https://fonts.googleapis.com'/>
+            <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin/>
+            <link href='https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap' rel='stylesheet'/>
             <title>{title}</title>
             <style>
-              body {{ font-family: Arial, sans-serif; background: #f7f7f7; padding: 16px; }}
-              .card {{ background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }}
+              body {{
+                font-family: 'Tajawal', Arial, sans-serif;
+                background: linear-gradient(160deg, #ecfdf5 0%, #f0fdfa 35%, #f7f7f7 100%);
+                padding: 16px;
+                margin: 0;
+              }}
+              .card {{
+                background: #fff;
+                border-radius: 20px;
+                padding: 20px;
+                box-shadow: 0 8px 32px rgba(15, 118, 110, 0.1), 0 1px 4px rgba(0,0,0,0.06);
+                border: 1px solid rgba(13, 148, 136, 0.12);
+              }}
+              /* في RTL: العنصر الأول يميناً = الشعار والعنوان، الثاني يساراً = صاحب الدفتر */
+              .brand-header {{
+                display: flex;
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: stretch;
+                gap: 18px;
+                margin-bottom: 18px;
+                flex-wrap: wrap;
+              }}
               .brand {{
                 display: flex;
                 flex-direction: row;
                 align-items: center;
-                justify-content: flex-start;
-                gap: 12px;
-                flex-wrap: nowrap;
-                margin-bottom: 14px;
+                gap: 14px;
+                flex: 0 1 auto;
               }}
               .brand h2 {{
                 margin: 0;
-                font-size: 1.85rem;
-                font-weight: 800;
+                font-size: clamp(1.35rem, 4vw, 1.95rem);
+                font-weight: 900;
                 color: #0f172a;
-                line-height: 1.15;
-                letter-spacing: -0.02em;
+                line-height: 1.2;
+                letter-spacing: -0.03em;
+                background: linear-gradient(120deg, #0f766e, #0d9488, #14b8a6);
+                -webkit-background-clip: text;
+                background-clip: text;
+                -webkit-text-fill-color: transparent;
               }}
               .brand-logo {{
-                width: 56px;
-                height: 56px;
-                border-radius: 14px;
+                width: 64px;
+                height: 64px;
+                border-radius: 18px;
                 object-fit: cover;
                 flex-shrink: 0;
-                box-shadow: 0 3px 10px rgba(0,0,0,.12);
+                box-shadow: 0 8px 24px rgba(13, 148, 136, 0.35);
+                border: 3px solid rgba(255,255,255,0.95);
               }}
-              .balance {{ font-size: 18px; margin: 8px 0 16px 0; }}
-              .bal-red {{ color: #d32f2f; }}
+              .owner-showcase {{
+                flex: 1 1 260px;
+                max-width: 400px;
+                min-width: 200px;
+                background: linear-gradient(145deg, #0d9488 0%, #0f766e 42%, #115e59 100%);
+                color: #fff;
+                padding: 18px 20px;
+                border-radius: 20px;
+                box-shadow:
+                  0 16px 40px rgba(15, 118, 110, 0.45),
+                  inset 0 1px 0 rgba(255,255,255,0.2);
+                position: relative;
+                overflow: hidden;
+              }}
+              .owner-showcase::before {{
+                content: "";
+                position: absolute;
+                top: -50%;
+                inset-inline-end: -15%;
+                width: 140px;
+                height: 140px;
+                background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 68%);
+                pointer-events: none;
+              }}
+              .owner-showcase::after {{
+                content: "";
+                position: absolute;
+                bottom: -20%;
+                inset-inline-start: -10%;
+                width: 100px;
+                height: 100px;
+                background: radial-gradient(circle, rgba(20, 184, 166, 0.35) 0%, transparent 70%);
+                pointer-events: none;
+              }}
+              .owner-badge {{
+                font-size: 0.72rem;
+                font-weight: 800;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                opacity: 0.92;
+                margin-bottom: 8px;
+                position: relative;
+                z-index: 1;
+              }}
+              .owner-name {{
+                font-size: clamp(1.15rem, 3.5vw, 1.55rem);
+                font-weight: 900;
+                line-height: 1.25;
+                margin-bottom: 10px;
+                text-shadow: 0 2px 12px rgba(0,0,0,0.15);
+                position: relative;
+                z-index: 1;
+              }}
+              .owner-phone {{
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 1.05rem;
+                font-weight: 700;
+                color: #ecfdf5 !important;
+                text-decoration: none;
+                padding: 8px 14px;
+                background: rgba(0,0,0,0.15);
+                border-radius: 999px;
+                border: 1px solid rgba(255,255,255,0.25);
+                transition: transform .15s ease, background .15s ease;
+                position: relative;
+                z-index: 1;
+              }}
+              .owner-phone:hover {{
+                background: rgba(0,0,0,0.25);
+                transform: scale(1.02);
+              }}
+              .owner-phone::before {{
+                content: "📞";
+                font-size: 1rem;
+              }}
+              .owner-phone-muted {{
+                font-size: 0.95rem;
+                opacity: 0.85;
+                font-weight: 600;
+                position: relative;
+                z-index: 1;
+              }}
+              .balance {{ font-size: 18px; margin: 8px 0 16px 0; font-weight: 700; }}
+              .bal-red {{ color: #c62828; }}
               .bal-green {{ color: #2e7d32; }}
               .tx {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 12px; margin: 10px 0; }}
               .top {{ color: #666; font-size: 12px; }}
@@ -280,7 +398,7 @@ def _render_page(token: str, offset: int) -> str:
               .tx-text {{ flex: 1; min-width: 0; }}
               .main {{ margin-top: 6px; font-size: 15px; font-weight: 700; }}
               .remain {{ margin-top: 6px; font-size: 13px; }}
-              .remain.bal-red {{ color: #d32f2f; }}
+              .remain.bal-red {{ color: #c62828; }}
               .remain.bal-green {{ color: #2e7d32; }}
               .note {{ margin-top: 6px; color: #444; font-size: 13px; }}
               .photo-wrap {{ flex: 0 0 auto; margin-top: 2px; }}
@@ -302,22 +420,32 @@ def _render_page(token: str, offset: int) -> str:
                 box-shadow: 0 9px 18px rgba(0,0,0,.18);
                 opacity: .95;
               }}
-              .wa {{ background: linear-gradient(135deg, #22c55e, #15803d); margin-left: 8px; }}
+              .wa {{ background: linear-gradient(135deg, #22c55e, #15803d); margin-inline-start: 8px; }}
               .bot {{ background: linear-gradient(135deg, #3b82f6, #1d4ed8); }}
-              .meta {{ margin-bottom: 6px; line-height: 1.45; }}
-              .owner-line {{ font-size: 14px; color: #475569; font-weight: 600; }}
-              .customer-line {{ font-size: 14px; color: #475569; }}
+              .meta {{ margin-bottom: 10px; line-height: 1.5; }}
+              .customer-line {{ font-size: 15px; color: #334155; font-weight: 600; }}
               .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }}
+              @media (max-width: 560px) {{
+                .brand-header {{ flex-direction: column; align-items: stretch; }}
+                .owner-showcase {{ order: -1; max-width: 100%; }}
+                .brand {{ justify-content: center; }}
+              }}
             </style>
           </head>
           <body>
             <div class='card'>
-              <div class='brand'>
-                <img class='brand-logo' src="{_html_escape(brand_img_src)}" width='56' height='56' alt='دفتر الديون'/>
-                <h2>دفتر الديون</h2>
+              <div class='brand-header'>
+                <div class='brand'>
+                  <img class='brand-logo' src="{_html_escape(brand_img_src)}" width='64' height='64' alt='دفتر الديون'/>
+                  <h2>دفتر الديون</h2>
+                </div>
+                <div class='owner-showcase'>
+                  <div class='owner-badge'>صاحب الدفتر</div>
+                  <div class='owner-name'>{owner_name_esc}</div>
+                  {owner_phone_html}
+                </div>
               </div>
-              <div class='meta owner-line'>{owner_meta}</div>
-              <div class='meta customer-line'>{cust_meta}</div>
+              <div class='meta customer-line'>👤 {cust_meta}</div>
               <div class='balance {balance_class}'>{balance_text} د.ع.</div>
               <div class='actions'>{wa_btn}{bot_btn}</div>
               {''.join(tx_rows) if tx_rows else '<p>لا توجد معاملات.</p>'}
