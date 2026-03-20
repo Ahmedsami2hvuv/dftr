@@ -441,7 +441,10 @@ async def ledger_add_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await update.message.reply_text("انتهت الجلسة. استخدم /start")
+            await update.message.reply_text(
+                "انتهت الجلسة. استخدم /start",
+                reply_markup=_kb_after_ledger_action(),
+            )
             return ConversationHandler.END
 
         cat_kind = context.user_data.get("ledger_category_kind", KIND_TAKEN)
