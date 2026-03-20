@@ -267,14 +267,14 @@ def _render_page(token: str, offset: int) -> str:
                 box-shadow: 0 8px 32px rgba(15, 118, 110, 0.1), 0 1px 4px rgba(0,0,0,0.06);
                 border: 1px solid rgba(13, 148, 136, 0.12);
               }}
-              /* في RTL: العنصر الأول يميناً = الشعار والعنوان، الثاني يساراً = صاحب الدفتر */
+              /* في RTL: يمين = الشعار والعنوان، يسار = بطاقة صغيرة «صنع بواسطة» */
               .brand-header {{
                 display: flex;
                 flex-direction: row;
                 justify-content: space-between;
-                align-items: stretch;
-                gap: 18px;
-                margin-bottom: 18px;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 14px;
                 flex-wrap: wrap;
               }}
               .brand {{
@@ -306,55 +306,47 @@ def _render_page(token: str, offset: int) -> str:
                 border: 3px solid rgba(255,255,255,0.95);
               }}
               .owner-showcase {{
-                flex: 1 1 260px;
-                max-width: 400px;
-                min-width: 200px;
-                background: linear-gradient(145deg, #0d9488 0%, #0f766e 42%, #115e59 100%);
+                flex: 0 1 auto;
+                max-width: min(260px, 92vw);
+                min-width: 0;
+                background: linear-gradient(145deg, #0d9488 0%, #0f766e 55%, #115e59 100%);
                 color: #fff;
-                padding: 18px 20px;
-                border-radius: 20px;
+                padding: 8px 10px;
+                border-radius: 12px;
                 box-shadow:
-                  0 16px 40px rgba(15, 118, 110, 0.45),
-                  inset 0 1px 0 rgba(255,255,255,0.2);
+                  0 6px 18px rgba(15, 118, 110, 0.35),
+                  inset 0 1px 0 rgba(255,255,255,0.15);
                 position: relative;
                 overflow: hidden;
               }}
               .owner-showcase::before {{
                 content: "";
                 position: absolute;
-                top: -50%;
-                inset-inline-end: -15%;
-                width: 140px;
-                height: 140px;
-                background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 68%);
+                top: -30%;
+                inset-inline-end: -20%;
+                width: 80px;
+                height: 80px;
+                background: radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 70%);
                 pointer-events: none;
               }}
               .owner-showcase::after {{
-                content: "";
-                position: absolute;
-                bottom: -20%;
-                inset-inline-start: -10%;
-                width: 100px;
-                height: 100px;
-                background: radial-gradient(circle, rgba(20, 184, 166, 0.35) 0%, transparent 70%);
-                pointer-events: none;
+                display: none;
               }}
               .owner-badge {{
-                font-size: 0.72rem;
+                font-size: 0.62rem;
                 font-weight: 800;
-                letter-spacing: 0.12em;
-                text-transform: uppercase;
-                opacity: 0.92;
-                margin-bottom: 8px;
+                letter-spacing: 0.06em;
+                opacity: 0.9;
+                margin-bottom: 4px;
                 position: relative;
                 z-index: 1;
               }}
               .owner-name {{
-                font-size: clamp(1.15rem, 3.5vw, 1.55rem);
-                font-weight: 900;
-                line-height: 1.25;
-                margin-bottom: 10px;
-                text-shadow: 0 2px 12px rgba(0,0,0,0.15);
+                font-size: clamp(0.9rem, 2.8vw, 1.1rem);
+                font-weight: 800;
+                line-height: 1.2;
+                margin-bottom: 6px;
+                text-shadow: 0 1px 6px rgba(0,0,0,0.12);
                 position: relative;
                 z-index: 1;
               }}
@@ -362,11 +354,11 @@ def _render_page(token: str, offset: int) -> str:
                 display: inline-flex;
                 align-items: center;
                 gap: 8px;
-                font-size: 1.05rem;
+                font-size: 0.85rem;
                 font-weight: 700;
                 color: #ecfdf5 !important;
                 text-decoration: none;
-                padding: 8px 14px;
+                padding: 5px 10px;
                 background: rgba(0,0,0,0.15);
                 border-radius: 999px;
                 border: 1px solid rgba(255,255,255,0.25);
@@ -440,7 +432,7 @@ def _render_page(token: str, offset: int) -> str:
                   <h2>دفتر الديون</h2>
                 </div>
                 <div class='owner-showcase'>
-                  <div class='owner-badge'>صاحب الدفتر</div>
+                  <div class='owner-badge'>صنع بواسطة</div>
                   <div class='owner-name'>{owner_name_esc}</div>
                   {owner_phone_html}
                 </div>

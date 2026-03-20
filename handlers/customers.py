@@ -1035,9 +1035,9 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(
         "أخذت 🔴\n\n"
         "أرسل المبلغ بأي شكل يناسبك:\n"
-        "• رقم فقط: 38\n"
-        "• سطر واحد: 38 الفيروز\n"
-        "• سطران: السطر الأول المبلغ والثاني الملاحظة\n"
+        "• المبلغ وبعدها الملاحظة أو الصورة\n"
+        "• أو المبلغ والملاحظة بسطر واحد\n"
+        "• سطرين: السطر الأول المبلغ والثاني الملاحظة\n"
         "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
@@ -1058,9 +1058,9 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(
         "أعطيت 🟢\n\n"
         "أرسل المبلغ بأي شكل يناسبك:\n"
-        "• رقم فقط: 38\n"
-        "• سطر واحد: 38 الفيروز\n"
-        "• سطران: السطر الأول المبلغ والثاني الملاحظة\n"
+        "• المبلغ وبعدها الملاحظة أو الصورة\n"
+        "• أو المبلغ والملاحظة بسطر واحد\n"
+        "• سطرين: السطر الأول المبلغ والثاني الملاحظة\n"
         "• أو صورة وتضع في تعليق الصورة المبلغ (والملاحظة إن وجدت)",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
@@ -1109,7 +1109,7 @@ async def cust_txn_back_amount_click(update: Update, context: ContextTypes.DEFAU
     await _safe_edit_callback_text(
         query,
         "رجوع لتعديل السعر.\n\n"
-        "أرسل المبلغ (رقم أو 38 الفيروز أو سطرين… أو صورة بالتعليق).",
+        "أرسل المبلغ (رقم أو مبلغ+ملاحظة أو سطرين أو صورة بالتعليق).",
         keyboard,
     )
     return CUST_AMOUNT
