@@ -83,6 +83,19 @@ def _is_pure_amount_line(s: str) -> bool:
         return False
 
 
+def _looks_like_phone_not_amount(s: str) -> bool:
+    """تمييز أرقام هواتف عراقية شائعة عن المبالغ."""
+    t = _normalize_amount_digits(s.strip()).replace(" ", "")
+    if t.startswith("964"):
+        rest = t[3:].lstrip("0")
+        t = ("0" + rest) if rest else t
+    if re.match(r"^07\d{9}$", t):
+        return True
+    if re.match(r"^7\d{9}$", t) and len(t) == 10:
+        return True
+    return False
+
+
 def _parse_single_line_amount_note(line: str):
     """
     أمثلة: 38 | 38 الفيروز | 38,500 باقي
@@ -359,7 +372,9 @@ def _cust_row_buttons(c: Customer) -> list[InlineKeyboardButton]:
     ]
 
 
-async def reply_customer_search_results(update: Update, q: str) -> None:
+async def reply_customer_search_results(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, q: str
+) -> None:
     """نتائج بحث العملاء بنفس منطق البحث من دفتر الديون (رسالة جديدة)."""
     msg = update.effective_message
     if not msg:
@@ -381,7 +396,9 @@ async def reply_customer_search_results(update: Update, q: str) -> None:
             .all()
         )
         if not matches:
+            context.user_data["pending_add_name"] = q.strip()
             kb = [
+                [InlineKeyboardButton("➕ إضافة كعميل بهذا الاسم", callback_data="cust_add_pending")],
                 [InlineKeyboardButton("🔁 بحث جديد", callback_data="cust_search_start")],
                 [InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")],
             ]
@@ -409,8 +426,8 @@ async def cust_search_global_message(update: Update, context: ContextTypes.DEFAU
     """بحث بالاسم من أي مكان (بدون فتح دفتر الديون) — يعمل فقط خارج محادثات أخرى."""
     if not update.message or not update.message.text:
         return
-    q = update.message.text.strip()
-    if not q:
+    text = update.message.text.strip()
+    if not text:
         return
     if context.user_data.get("last_menu") == "ledger":
         await update.message.reply_text(
@@ -426,7 +443,185 @@ async def cust_search_global_message(update: Update, context: ContextTypes.DEFAU
             ),
         )
         return
-    await reply_customer_search_results(update, q)
+    if _looks_like_phone_not_amount(text):
+        await update.message.reply_text(
+            "يبدو أن هذا رقم هاتف وليس مبلغاً للبحث بالاسم.\n"
+            "لإضافة عميل برقم: افتح «دفتر الديون» ← إضافة عميل.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ دفتر الديون", callback_data="menu_customers")]]
+            ),
+        )
+        return
+    if _is_pure_amount_line(text):
+        amt = _parse_decimal_amount_token(text)
+        if amt is not None:
+            context.user_data["quick_amount"] = amt
+            await update.message.reply_text(
+                "ما هذا الرقم؟ هل هو مبلغ؟",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton("🔴 أخذت", callback_data="qamt_k_took"),
+                            InlineKeyboardButton("🟢 أعطيت", callback_data="qamt_k_gave"),
+                        ],
+                        [InlineKeyboardButton("❌ إلغاء", callback_data="qamt_cancel")],
+                    ]
+                ),
+            )
+            return
+    await reply_customer_search_results(update, context, text)
+
+
+async def qamt_kind_took_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if context.user_data.get("quick_amount") is None:
+        await query.edit_message_text("انتهت الجلسة. أرسل الرقم من جديد.")
+        return
+    context.user_data["quick_flow_kind"] = "took"
+    await _edit_quick_customer_picker(query, context)
+
+
+async def qamt_kind_gave_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if context.user_data.get("quick_amount") is None:
+        await query.edit_message_text("انتهت الجلسة. أرسل الرقم من جديد.")
+        return
+    context.user_data["quick_flow_kind"] = "gave"
+    await _edit_quick_customer_picker(query, context)
+
+
+def _clear_quick_amount_flow(context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data.pop("quick_amount", None)
+    context.user_data.pop("quick_flow_kind", None)
+
+
+async def qamt_cancel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    _clear_quick_amount_flow(context)
+    await query.edit_message_text("تم الإلغاء.")
+
+
+async def _edit_quick_customer_picker(query, context: ContextTypes.DEFAULT_TYPE) -> None:
+    db = SessionLocal()
+    try:
+        user = get_current_user(db, query.from_user.id)
+        if not user:
+            await query.edit_message_text("يجب تسجيل الدخول أولاً.")
+            _clear_quick_amount_flow(context)
+            return
+        customers = (
+            db.query(Customer)
+            .filter(Customer.user_id == user.id)
+            .order_by(Customer.created_at.desc())
+            .limit(40)
+            .all()
+        )
+        amt = context.user_data.get("quick_amount")
+        kind = context.user_data.get("quick_flow_kind")
+        if amt is None or kind not in ("took", "gave"):
+            await query.edit_message_text("انتهت الجلسة.")
+            _clear_quick_amount_flow(context)
+            return
+        if not customers:
+            _clear_quick_amount_flow(context)
+            await query.edit_message_text(
+                "لا يوجد عملاء بعد.\nأضف عميلاً من دفتر الديون أولاً.",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("◀ دفتر الديون", callback_data="menu_customers")]]
+                ),
+            )
+            return
+        kind_ar = "أخذت 🔴" if kind == "took" else "أعطيت 🟢"
+        lines = [
+            f"{kind_ar}",
+            f"المبلغ: {amt} د.ع.",
+            "",
+            "لأي عميل هذا المبلغ؟ اختر من الأزرار:",
+        ]
+        kb = []
+        for c in customers:
+            bal, _, _ = _balance(c)
+            emo = _balance_status_emoji(bal)
+            label = f"\u200e{emo} {c.name}"[:58]
+            kb.append([InlineKeyboardButton(label, callback_data=f"qamt_pick_{c.id}")])
+        kb.append([InlineKeyboardButton("❌ إلغاء", callback_data="qamt_cancel")])
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(kb))
+    finally:
+        db.close()
+
+
+async def quick_txn_pick_customer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار عميل بعد تحديد المبلغ والنوع — يدخل خطوة الملاحظة."""
+    query = update.callback_query
+    await query.answer()
+    try:
+        cid = int(query.data.replace("qamt_pick_", ""))
+    except ValueError:
+        await query.edit_message_text("خطأ.")
+        return ConversationHandler.END
+    amt = context.user_data.pop("quick_amount", None)
+    kind = context.user_data.pop("quick_flow_kind", None)
+    if amt is None or kind not in ("took", "gave"):
+        await query.edit_message_text("انتهت الجلسة.")
+        return ConversationHandler.END
+    db = SessionLocal()
+    cust_name = ""
+    try:
+        cust = db.query(Customer).filter(Customer.id == cid).first()
+        user = get_current_user(db, update.effective_user.id)
+        if not cust or not user or cust.user_id != user.id:
+            await query.edit_message_text("غير مسموح أو العميل غير موجود.")
+            return ConversationHandler.END
+        cust_name = cust.name
+    finally:
+        db.close()
+    context.user_data["cust_txn_cid"] = cid
+    context.user_data["cust_txn_kind"] = kind
+    context.user_data["cust_txn_amount"] = amt
+    context.user_data.pop("cust_txn_note_text", None)
+    context.user_data.pop("cust_txn_photo_file_id", None)
+    kind_label = "أخذت 🔴" if kind == "took" else "أعطيت 🟢"
+    keyboard = [
+        [InlineKeyboardButton("⏭️ تخطي الملاحظة", callback_data="cust_note_skip_btn")],
+        [
+            InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
+            InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit"),
+        ],
+    ]
+    await query.edit_message_text(
+        f"{kind_label}\n"
+        f"العميل: {cust_name}\n"
+        f"المبلغ: {amt} د.ع.\n\n"
+        "أرسل ملاحظة نصاً أو صورة.\n"
+        "يمكنك «تخطي الملاحظة» إن لم تكن هناك ملاحظة.",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return CUST_NOTE
+
+
+async def cust_add_from_search_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إضافة عميل بالاسم المحفوظ من نتائج بحث فارغة."""
+    query = update.callback_query
+    await query.answer()
+    name = context.user_data.pop("pending_add_name", None)
+    if not name or not str(name).strip():
+        await query.edit_message_text(
+            "انتهت الجلسة. أعد البحث ثم اضغط «إضافة كعميل بهذا الاسم»."
+        )
+        return ConversationHandler.END
+    context.user_data["cust_name"] = name.strip()
+    await query.edit_message_text(
+        f"إضافة عميل: {name.strip()}\n\n"
+        "أرسل رقم هاتف العميل (اختياري).\n"
+        "أو اضغط تخطي.",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("⏭️ تخطي الرقم", callback_data="cust_phone_skip_btn")]]
+        ),
+    )
+    return CUST_PHONE
 
 
 async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -487,7 +682,7 @@ async def cust_search_query_done(update: Update, context: ContextTypes.DEFAULT_T
     if not q:
         await update.message.reply_text("اكتب نص بحث صحيح.")
         return CUST_SEARCH_QUERY
-    await reply_customer_search_results(update, q)
+    await reply_customer_search_results(update, context, q)
     return ConversationHandler.END
 
 
@@ -1762,6 +1957,9 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
     """توجيه callback: عمليات العملاء والمعاملات"""
     query = update.callback_query
     data = query.data
+    if data == "cust_add_pending":
+        await query.answer("أعد البحث ثم اضغط الإضافة من الرسالة الجديدة.", show_alert=True)
+        return
     if data == "cust_add" or data == "noop":
         await query.answer()
         return

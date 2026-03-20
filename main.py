@@ -140,6 +140,7 @@ from web_server import start_web_server
 from handlers.customers import (
     menu_customers,
     cust_add_start,
+    cust_add_from_search_start,
     cust_name,
     cust_phone,
     cust_phone_skip_click,
@@ -147,8 +148,12 @@ from handlers.customers import (
     cust_search_query_done,
     cust_search_back_click,
     cust_search_global_message,
+    qamt_kind_took_click,
+    qamt_kind_gave_click,
+    qamt_cancel_click,
     cust_took,
     cust_gave,
+    quick_txn_pick_customer,
     cust_amount,
     cust_amount_photo,
     cust_note,
@@ -465,7 +470,10 @@ def main():
     app.add_handler(CallbackQueryHandler(auth_logout, pattern="^auth_logout$"))
 
     cust_add_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(cust_add_start, pattern="^cust_add$")],
+        entry_points=[
+            CallbackQueryHandler(cust_add_start, pattern="^cust_add$"),
+            CallbackQueryHandler(cust_add_from_search_start, pattern="^cust_add_pending$"),
+        ],
         states={
             CUST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_name)],
             CUST_PHONE: [
@@ -499,6 +507,7 @@ def main():
         entry_points=[
             CallbackQueryHandler(cust_took, pattern="^cust_took_\\d+$"),
             CallbackQueryHandler(cust_gave, pattern="^cust_gave_\\d+$"),
+            CallbackQueryHandler(quick_txn_pick_customer, pattern="^qamt_pick_\\d+$"),
         ],
         states={
             CUST_AMOUNT: [
@@ -610,6 +619,11 @@ def main():
     app.add_handler(CallbackQueryHandler(partner_batch_reject, pattern=r"^ppart_no_"))
     app.add_handler(CallbackQueryHandler(partner_link_accept_click, pattern=r"^plink_yes_"))
     app.add_handler(CallbackQueryHandler(partner_link_reject_click, pattern=r"^plink_no_"))
+
+    # مبلغ مكتوب كرقم فقط: أخذت / أعطيت / إلغاء
+    app.add_handler(CallbackQueryHandler(qamt_kind_took_click, pattern="^qamt_k_took$"))
+    app.add_handler(CallbackQueryHandler(qamt_kind_gave_click, pattern="^qamt_k_gave$"))
+    app.add_handler(CallbackQueryHandler(qamt_cancel_click, pattern="^qamt_cancel$"))
 
     # router لكل callbacks الخاصة بالعميل (تفاصيل/حذف/مشاركة/قائمة)
     app.add_handler(CallbackQueryHandler(cust_callback_router, pattern="^cust_"))
