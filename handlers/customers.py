@@ -994,11 +994,12 @@ async def _build_customer_view(db, cust: Customer, offset: int):
     bal, gave, took = _balance(cust)
     cur = "د.ع."
     if bal > 0:
-        balance_text = f"🟢 الرصيد الحالي: {bal:.2f} {cur}"
+        # تحسين الوضوح: نخلي "الرصيد الحالي" كسطر مستقل تحت اسم العميل.
+        balance_text = f"🟢\n📌 الرصيد الحالي: {bal:.2f} {cur}"
     elif bal < 0:
-        balance_text = f"🔴 الرصيد الحالي: {bal:.2f} {cur}"
+        balance_text = f"🔴\n📌 الرصيد الحالي: {bal:.2f} {cur}"
     else:
-        balance_text = f"⚪ الرصيد الحالي: {bal:.2f} {cur}"
+        balance_text = f"⚪\n📌 الرصيد الحالي: {bal:.2f} {cur}"
 
     total = (
         db.query(CustomerTransaction)
