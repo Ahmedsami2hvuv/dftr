@@ -556,15 +556,18 @@ async def auth_change_password_start(update: Update, context: ContextTypes.DEFAU
 async def chpwd_use_forgot_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text(
-        "للاستعادة بدون كلمة المرور الحالية اختر «نسيت كلمة المرور» أدناه.",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
-                [InlineKeyboardButton("◀ حسابي", callback_data="menu_profile")],
-            ]
-        ),
+    text = "للاستعادة بدون كلمة المرور الحالية اختر «نسيت كلمة المرور» أدناه."
+    kb = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+            [InlineKeyboardButton("◀ حسابي", callback_data="menu_profile")],
+        ]
     )
+    try:
+        await query.edit_message_text(text, reply_markup=kb)
+    except Exception:
+        # أحياناً قد تفشل edit على رسائل قديمة؛ نضمن ظهور النتيجة برسالة جديدة.
+        await context.bot.send_message(chat_id=update.effective_user.id, text=text, reply_markup=kb)
     return ConversationHandler.END
 
 
