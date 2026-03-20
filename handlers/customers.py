@@ -342,7 +342,6 @@ async def cust_calc_amount_click(update: Update, context: ContextTypes.DEFAULT_T
 
     await query.edit_message_text(
         "🧮 حاسبة مبلغ المعاملة\n\nاكتب العملية ثم اضغط `=` ثم `✅ إدخال المبلغ`.",
-        parse_mode="Markdown",
         reply_markup=_kb_cust_amount_calc(cid, expr_display),
     )
     return CUST_AMOUNT
