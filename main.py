@@ -45,7 +45,9 @@ from handlers.auth import (
     auth_register,
     auth_login,
     auth_forgot,
-    auth_logout,
+    auth_logout_confirm,
+    auth_logout_do,
+    auth_change_password_start,
     reg_name,
     reg_phone,
     reg_password,
@@ -54,8 +56,14 @@ from handlers.auth import (
     forgot_phone,
     forgot_enter_code_click,
     forgot_code,
+    forgot_new_password,
+    forgot_new_password_confirm,
     forgot_back_phone_click,
     forgot_copy_code_click,
+    chpwd_use_forgot_click,
+    chpwd_old,
+    chpwd_new,
+    chpwd_new_confirm,
     cancel_auth,
     REG_NAME,
     REG_PHONE,
@@ -65,6 +73,11 @@ from handlers.auth import (
     FORGOT_PHONE,
     FORGOT_WAIT,
     FORGOT_CODE,
+    FORGOT_NEW_PASSWORD,
+    FORGOT_NEW_PASSWORD_CONFIRM,
+    CHPWD_OLD,
+    CHPWD_NEW,
+    CHPWD_NEW_CONFIRM,
 )
 from handlers.ledger_handler import (
     menu_ledger,
@@ -291,11 +304,34 @@ def main():
                 CallbackQueryHandler(forgot_back_phone_click, pattern="^forgot_back_phone$"),
                 CallbackQueryHandler(forgot_copy_code_click, pattern="^forgot_copy_code$"),
             ],
+            FORGOT_NEW_PASSWORD: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_new_password),
+            ],
+            FORGOT_NEW_PASSWORD_CONFIRM: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_new_password_confirm),
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel_auth)],
         per_message=False,
     )
     app.add_handler(forgot_conv)
+
+    chpwd_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(auth_change_password_start, pattern="^auth_change_password$"),
+        ],
+        states={
+            CHPWD_OLD: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, chpwd_old),
+                CallbackQueryHandler(chpwd_use_forgot_click, pattern="^chpwd_use_forgot$"),
+            ],
+            CHPWD_NEW: [MessageHandler(filters.TEXT & ~filters.COMMAND, chpwd_new)],
+            CHPWD_NEW_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, chpwd_new_confirm)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(chpwd_conv)
 
     # محادثة إضافة قيد دفتر
     ledger_add_conv = ConversationHandler(
@@ -471,8 +507,9 @@ def main():
     # دفتر الديون (عملاء)
     app.add_handler(CallbackQueryHandler(menu_customers, pattern="^menu_customers$"))
 
-    # تسجيل خروج
-    app.add_handler(CallbackQueryHandler(auth_logout, pattern="^auth_logout$"))
+    # تسجيل خروج (تأكيد ثم تنفيذ)
+    app.add_handler(CallbackQueryHandler(auth_logout_confirm, pattern="^auth_logout_confirm$"))
+    app.add_handler(CallbackQueryHandler(auth_logout_do, pattern="^auth_logout_do$"))
 
     cust_add_conv = ConversationHandler(
         entry_points=[

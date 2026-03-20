@@ -28,7 +28,12 @@ from utils.phone import (
     FORGOT_PHONE,
     FORGOT_WAIT,
     FORGOT_CODE,
-) = range(8)
+    FORGOT_NEW_PASSWORD,
+    FORGOT_NEW_PASSWORD_CONFIRM,
+    CHPWD_OLD,
+    CHPWD_NEW,
+    CHPWD_NEW_CONFIRM,
+) = range(13)
 
 
 def _kb_main_menu() -> InlineKeyboardMarkup:
@@ -389,37 +394,280 @@ async def forgot_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
             db.commit()
             context.user_data.pop("forgot_phone", None)
             return ConversationHandler.END
-        user.telegram_id = update.effective_user.id
-        user.username = update.effective_user.username
+        # التحقق ناجح: لا نربط التليجرام بعد — يجب تعيين كلمة مرور جديدة أولاً
         user.reset_code = None
         user.reset_code_expires = None
         db.commit()
+        context.user_data["forgot_reset_user_id"] = user.id
+        await update.message.reply_text(
+            "تم التحقق من الرمز ✅\n\n"
+            "لم يُكمل النظام تسجيل الدخول بعد؛ يجب أن تضع الآن كلمة مرور جديدة للحساب (4 أحرف على الأقل).\n\n"
+            "أرسل كلمة المرور الجديدة:",
+            reply_markup=_kb_main_menu(),
+        )
+    finally:
+        db.close()
+    return FORGOT_NEW_PASSWORD
+
+
+async def forgot_new_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pwd = (update.message.text or "").strip()
+    uid = context.user_data.get("forgot_reset_user_id")
+    if not uid:
+        await update.message.reply_text(
+            "انتهت الجلسة. ابدأ من «نسيت كلمة المرور» مرة أخرى.",
+            reply_markup=_kb_main_menu(),
+        )
+        return ConversationHandler.END
+    if not pwd or len(pwd) < 4:
+        await update.message.reply_text(
+            "كلمة المرور يجب أن تكون 4 أحرف على الأقل.",
+            reply_markup=_kb_main_menu(),
+        )
+        return FORGOT_NEW_PASSWORD
+    context.user_data["forgot_new_pwd"] = pwd
+    await update.message.reply_text(
+        "أعد إدخال كلمة المرور الجديدة للتأكيد:",
+        reply_markup=_kb_main_menu(),
+    )
+    return FORGOT_NEW_PASSWORD_CONFIRM
+
+
+async def forgot_new_password_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pwd2 = (update.message.text or "").strip()
+    uid = context.user_data.get("forgot_reset_user_id")
+    pwd1 = context.user_data.get("forgot_new_pwd")
+    if not uid or not pwd1:
+        await update.message.reply_text(
+            "انتهت الجلسة. ابدأ من «نسيت كلمة المرور» مرة أخرى.",
+            reply_markup=_kb_main_menu(),
+        )
+        return ConversationHandler.END
+    if pwd2 != pwd1:
+        await update.message.reply_text(
+            "التأكيد لا يطابق كلمة المرور. أرسل كلمة مرور جديدة مرة أخرى:",
+            reply_markup=_kb_main_menu(),
+        )
+        context.user_data.pop("forgot_new_pwd", None)
+        return FORGOT_NEW_PASSWORD
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == uid).first()
+        if not user:
+            await update.message.reply_text(
+                "خطأ في الحساب. أعد المحاولة.",
+                reply_markup=_kb_main_menu(),
+            )
+            return ConversationHandler.END
+        if user.telegram_id and user.telegram_id != update.effective_user.id:
+            await update.message.reply_text(
+                "هذا الحساب مربوط بتليجرام آخر. تواصل مع الإدارة إن كان خطأ.",
+                reply_markup=_kb_main_menu(),
+            )
+            return ConversationHandler.END
+        user.password_hash = hash_password(pwd1)
+        user.telegram_id = update.effective_user.id
+        user.username = update.effective_user.username
+        db.commit()
         keyboard = [[InlineKeyboardButton("القائمة الرئيسية", callback_data="main_menu")]]
         await update.message.reply_text(
-            f"تم التحقق بنجاح ✅ مرحباً {user.full_name or 'بك'}.",
+            f"تم تعيين كلمة المرور وتسجيل الدخول ✅ مرحباً {user.full_name or user.username or 'بك'}.",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
     finally:
         db.close()
-    context.user_data.pop("forgot_phone", None)
-    context.user_data.pop("auth_action", None)
+    for k in (
+        "forgot_reset_user_id",
+        "forgot_new_pwd",
+        "forgot_phone",
+        "auth_action",
+    ):
+        context.user_data.pop(k, None)
     return ConversationHandler.END
 
 
 async def cancel_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    for k in ("reg_name", "reg_phone", "auth_action", "login_phone", "forgot_phone"):
+    for k in (
+        "reg_name",
+        "reg_phone",
+        "auth_action",
+        "login_phone",
+        "forgot_phone",
+        "forgot_reset_user_id",
+        "forgot_new_pwd",
+        "chpwd_old_ok",
+        "chpwd_new",
+    ):
         context.user_data.pop(k, None)
     context.user_data.pop("in_cust_cat_add_flow", None)
     await update.message.reply_text("تم الرجوع.", reply_markup=_kb_main_menu())
     return ConversationHandler.END
 
 
-async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def auth_change_password_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    db = SessionLocal()
+    try:
+        u = get_user_by_telegram(db, update.effective_user.id)
+        if not u:
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً.",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+                        [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
+                    ]
+                ),
+            )
+            return ConversationHandler.END
+    finally:
+        db.close()
+    kb = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("🔑 نسيت الرمز", callback_data="chpwd_use_forgot"),
+            ],
+            [InlineKeyboardButton("◀ حسابي", callback_data="menu_profile")],
+        ]
+    )
+    await query.edit_message_text(
+        "🔐 تغيير كلمة المرور\n\nأرسل كلمة المرور الحالية:",
+        reply_markup=kb,
+    )
+    return CHPWD_OLD
+
+
+async def chpwd_use_forgot_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "للاستعادة بدون كلمة المرور الحالية اختر «نسيت كلمة المرور» أدناه.",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+                [InlineKeyboardButton("◀ حسابي", callback_data="menu_profile")],
+            ]
+        ),
+    )
+    return ConversationHandler.END
+
+
+async def chpwd_old(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pwd = (update.message.text or "").strip()
+    db = SessionLocal()
+    try:
+        user = get_user_by_telegram(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("انتهت الجلسة.", reply_markup=_kb_main_menu())
+            return ConversationHandler.END
+        if user.password_hash and not check_password(pwd, user.password_hash):
+            await update.message.reply_text(
+                "كلمة المرور الحالية غير صحيحة. حاول مرة أخرى أو استخدم «نسيت الرمز» من شاشة تغيير المرور.",
+                reply_markup=_kb_main_menu(),
+            )
+            return CHPWD_OLD
+        if not user.password_hash:
+            await update.message.reply_text(
+                "لا توجد كلمة مرور مخزنة لهذا الحساب. استخدم تسجيل الدخول أو نسيت كلمة المرور.",
+                reply_markup=_kb_main_menu(),
+            )
+            return ConversationHandler.END
+    finally:
+        db.close()
+    context.user_data["chpwd_old_ok"] = True
+    await update.message.reply_text(
+        "أرسل كلمة المرور الجديدة (4 أحرف على الأقل):",
+        reply_markup=_kb_main_menu(),
+    )
+    return CHPWD_NEW
+
+
+async def chpwd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get("chpwd_old_ok"):
+        await update.message.reply_text("ابدأ من «تغيير الرمز» في حسابي.", reply_markup=_kb_main_menu())
+        return ConversationHandler.END
+    pwd = (update.message.text or "").strip()
+    if not pwd or len(pwd) < 4:
+        await update.message.reply_text(
+            "كلمة المرور يجب أن تكون 4 أحرف على الأقل.",
+            reply_markup=_kb_main_menu(),
+        )
+        return CHPWD_NEW
+    context.user_data["chpwd_new"] = pwd
+    await update.message.reply_text("أعد إدخال كلمة المرور الجديدة للتأكيد:", reply_markup=_kb_main_menu())
+    return CHPWD_NEW_CONFIRM
+
+
+async def chpwd_new_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pwd2 = (update.message.text or "").strip()
+    pwd1 = context.user_data.get("chpwd_new")
+    if not context.user_data.get("chpwd_old_ok") or not pwd1:
+        await update.message.reply_text("انتهت الجلسة. افتح «تغيير الرمز» من جديد.", reply_markup=_kb_main_menu())
+        return ConversationHandler.END
+    if pwd2 != pwd1:
+        await update.message.reply_text(
+            "التأكيد لا يطابق. أرسل كلمة مرور جديدة مرة أخرى:",
+            reply_markup=_kb_main_menu(),
+        )
+        context.user_data.pop("chpwd_new", None)
+        return CHPWD_NEW
+    db = SessionLocal()
+    try:
+        user = get_user_by_telegram(db, update.effective_user.id)
+        if not user:
+            await update.message.reply_text("انتهت الجلسة.", reply_markup=_kb_main_menu())
+            return ConversationHandler.END
+        user.password_hash = hash_password(pwd1)
+        db.commit()
+        await update.message.reply_text(
+            "تم تغيير كلمة المرور ✅",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ حسابي", callback_data="menu_profile")]]
+            ),
+        )
+    finally:
+        db.close()
+    for k in ("chpwd_old_ok", "chpwd_new"):
+        context.user_data.pop(k, None)
+    return ConversationHandler.END
+
+
+async def auth_logout_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    db = SessionLocal()
+    try:
+        u = get_user_by_telegram(db, update.effective_user.id)
+        if not u:
+            await query.edit_message_text(
+                "أنت غير مسجل حالياً.",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+                        [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
+                    ]
+                ),
+            )
+            return
+    finally:
+        db.close()
+    await query.edit_message_text(
+        "هل تريد حقاً تسجيل الخروج من هذا الحساب على هذا الجهاز؟",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("✅ نعم، تسجيل الخروج", callback_data="auth_logout_do")],
+                [InlineKeyboardButton("◀ رجوع", callback_data="menu_profile")],
+            ]
+        ),
+    )
+
+
+async def auth_logout_do(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تسجيل خروج حقيقي: إزالة ربط telegram_id حتى يرجع يطلب تسجيل الدخول."""
     query = update.callback_query
     if not update.effective_user:
         return ConversationHandler.END
-    # دائماً معرف التليجرام كـ int — نفس المنطق المستخدم في /start
     uid = int(update.effective_user.id)
     if query:
         try:
@@ -435,7 +683,6 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
         ]
 
-        # تحديث عبر SQL مباشر لتفادي أي اختلاف نوع/كاش مع ORM
         affected = 0
         try:
             result = db.execute(
@@ -461,18 +708,20 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 affected = 0
 
         out_text = (
-            "تم تسجيل الخروج ✅\n\nالآن يجب تسجيل الدخول مرة أخرى."
+            "تم تسجيل الخروج ✅\n\nللوصول إلى حسابك مرة أخرى استخدم تسجيل الدخول أو إنشاء حساب أو نسيت كلمة المرور."
             if affected > 0
             else "أنت غير مسجل حالياً. اختر خيار تسجيل الدخول."
         )
 
-        # أرسل في نفس المحادثة الحالية لثبات أعلى
         if query and query.message:
             await query.message.reply_text(out_text, reply_markup=InlineKeyboardMarkup(keyboard))
             try:
-                await query.edit_message_reply_markup(reply_markup=None)
+                await query.edit_message_text("تم تسجيل الخروج.", reply_markup=None)
             except Exception:
-                pass
+                try:
+                    await query.edit_message_reply_markup(reply_markup=None)
+                except Exception:
+                    pass
         else:
             await context.bot.send_message(
                 chat_id=uid,
@@ -480,7 +729,6 @@ async def auth_logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=InlineKeyboardMarkup(keyboard),
             )
 
-        # إفراغ جلسة المحادثات حتى لا يبقى المستخدم في حالة Conversation ويُعاد فتح القائمة من كاش قديم
         context.user_data.clear()
     finally:
         db.close()
