@@ -70,6 +70,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
                 [InlineKeyboardButton("📒 الدخل والمصروف", callback_data="menu_ledger")],
                 [InlineKeyboardButton("👤 حسابي", callback_data="menu_profile")],
+                [InlineKeyboardButton("🧾 طريقة الاستخدام", callback_data="usage_instructions")],
             ]
             if update.effective_user.id == ADMIN_ID:
                 keyboard.append([InlineKeyboardButton("🔐 لوحة الأدمن", callback_data="admin_panel")])
@@ -98,10 +99,72 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
         [InlineKeyboardButton("📒 الدخل والمصروف", callback_data="menu_ledger")],
         [InlineKeyboardButton("👤 حسابي", callback_data="menu_profile")],
+        [InlineKeyboardButton("🧾 طريقة الاستخدام", callback_data="usage_instructions")],
     ]
     if update.effective_user.id == ADMIN_ID:
         keyboard.append([InlineKeyboardButton("🔐 لوحة الأدمن", callback_data="admin_panel")])
     await query.edit_message_text(
         "القائمة الرئيسية 📒\n\nاختر ما تريد:",
         reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def usage_instructions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض شرح طريقة استخدام البوت بشكل مفصل ومنسق."""
+    query = update.callback_query
+    await query.answer()
+    text = (
+        "📘 طريقة الاستخدام (شرح مفصل)\n\n"
+        "هذا البوت يساعدك على تتبع ديون العملاء وإدخال دخل/مصروف، مع إمكانية مشاركة التفاصيل.\n\n"
+        "1) تسجيل الدخول ✅\n"
+        "قبل كل شيء يجب أن يكون لديك حساب داخل النظام.\n"
+        "• استخدم زر: «تسجيل الدخول»\n"
+        "• ثم أدخل رقم الهاتف وكلمة المرور.\n"
+        "• إذا نسيت كلمة المرور استخدم «نسيت كلمة المرور».\n\n"
+        "2) دفتر الديون 📒\n"
+        "من هنا تدير العملاء والمعاملات (أخذت/أعطيت).\n"
+        "• اختر «دفتر الديون» من القائمة.\n"
+        "• سترى قائمة العملاء + زر إضافة عميل.\n\n"
+        "2.1) إضافة عميل ➕\n"
+        "• اضغط «➕ إضافة عميل»\n"
+        "• أرسل اسم العميل (إجباري)\n"
+        "• ثم أرسل رقم الهاتف (اختياري)\n"
+        "• يمكنك تخطي رقم الهاتف إذا لا تريد حفظه.\n\n"
+        "2.2) إنشاء معاملة مع العميل 🧾\n"
+        "من صفحة العميل اختر واحداً:\n"
+        "• 🔴 «أخذت»: يعني العميل دفع لك (يقلّل/يغيّر الرصيد حسب الحالة)\n"
+        "• 🟢 «أعطيت»: يعني أنت دفعت/سلمت للعميل (العميل مدين لك)\n\n"
+        "ثم سيطلب منك مبلغ المعاملة:\n"
+        "• يمكنك كتابة رقم فقط (مثال: 775.25)\n"
+        "• أو استخدام الحاسبة التفاعلية 🧮 داخل شاشة إدخال المبلغ\n"
+        "  (0-9 + و - و × و ÷ ثم زر = ثم «✅ إدخال المبلغ»).\n\n"
+        "بعد المبلغ:\n"
+        "• أرسل ملاحظة نصية (اختياري)\n"
+        "• أو أرسل صورة مع ملاحظة إن رغبت\n"
+        "• ويمكنك تخطي الملاحظة بالزر.\n\n"
+        "2.3) تعديل/حذف معاملة ✏️\n"
+        "من شاشة «تفاصيل المعاملة» ستجد أزرار:\n"
+        "• تعديل المبلغ/الملاحظة/التاريخ/الصورة/النوع\n"
+        "• زر «حذف» مع شاشة تأكيد قبل الحذف.\n\n"
+        "3) الدخل والمصروف 💵\n"
+        "من هنا تدخل قيود مالية (دخل أو مصروف).\n"
+        "• اختر «الدخل والمصروف»\n"
+        "• اختر صنف الصنف (مثل: راتبك الثابت أو مصروفات...)\n"
+        "• أدخل المبلغ رقم فقط\n"
+        "• ثم الوصف اختياري\n\n"
+        "4) الشراكة/مشاركة الحساب 📤\n"
+        "من صفحة العميل يوجد زر «مشاركة».\n"
+        "• ستحصل على رابط يمكنك فتحه لمشاهدة المعاملات\n"
+        "• ويمكنك إرسال رسالة واتساب مع الرابط.\n\n"
+        "5) تذكيرات مهمة ⚠️\n"
+        "• إذا ظهر زر «◀ رجوع» استخدمه للعودة للخطوة السابقة.\n"
+        "• إذا انتهت الجلسة سيظهر زر الرجوع.\n"
+        "• الحاسبة تساعدك في إدخال العمليات بسرعة بدون أخطاء.\n\n"
+        "إذا تريد، جرّب خطوة كاملة: إضافة عميل ثم معاملة واحدة (أخذت أو أعطيت) مع ملاحظة.\n"
+    )
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("◀ رجوع", callback_data="main_menu")]]
+        ),
     )

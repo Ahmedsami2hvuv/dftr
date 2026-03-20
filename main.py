@@ -40,7 +40,7 @@ from telegram.ext import (
 from config import BOT_TOKEN
 from database import init_db
 
-from handlers.start import cmd_start, main_menu
+from handlers.start import cmd_start, main_menu, usage_instructions
 from handlers.auth import (
     auth_register,
     auth_login,
@@ -442,6 +442,9 @@ def main():
 
     # أزرار القوائم
     app.add_handler(CallbackQueryHandler(main_menu, pattern="^main_menu$"))
+    app.add_handler(
+        CallbackQueryHandler(usage_instructions, pattern="^usage_instructions$")
+    )
     app.add_handler(CallbackQueryHandler(menu_ledger, pattern="^menu_ledger$"))
     app.add_handler(CallbackQueryHandler(ledger_list, pattern="^ledger_list$"))
     app.add_handler(CallbackQueryHandler(ledger_categories_menu, pattern="^ledger_categories_menu$"))
