@@ -21,6 +21,7 @@ from config import BOT_LOGO_BASE64
 from config import BOT_TOKEN
 from config import BOT_USERNAME
 from config import WEB_BASE_URL
+from config import WEB_TX_UPLOAD_DIR
 from creditbook_web import (
     _clear_cookie_headers,
     _set_cookie_headers,
@@ -41,6 +42,8 @@ from creditbook_web_actions import (
     action_tx_toggle_kind,
     action_tx_update,
     action_txn_add,
+    is_safe_web_photo_name,
+    parse_tx_datetime,
 )
 from utils.phone import format_phone_iq_local_display, wa_number as _wa_number
 
@@ -51,6 +54,61 @@ _LOGO_B64_PATH = _STATIC_DIR / "bot_logo.b64.txt"
 _CREDITBOOK_APP_CSS = _STATIC_DIR / "creditbook_app.css"
 
 TX_PAGE_SIZE = 15
+
+
+def _mime_for_ext(fn: str) -> str:
+    fn = fn.lower()
+    if fn.endswith(".png"):
+        return "image/png"
+    if fn.endswith((".jpg", ".jpeg")):
+        return "image/jpeg"
+    if fn.endswith(".webp"):
+        return "image/webp"
+    if fn.endswith(".gif"):
+        return "image/gif"
+    return "application/octet-stream"
+
+
+def _try_local_web_photo(file_id: str) -> tuple[bytes, str] | None:
+    if not file_id.startswith("web:"):
+        return None
+    name = file_id[4:]
+    if not is_safe_web_photo_name(name):
+        return None
+    p = WEB_TX_UPLOAD_DIR / name
+    if not p.is_file():
+        return None
+    return p.read_bytes(), _mime_for_ext(name)
+
+
+def _parse_multipart_post(raw: bytes, content_type: str) -> dict[str, str | tuple[bytes, str]]:
+    import cgi
+    import io
+
+    fs = cgi.FieldStorage(
+        fp=io.BytesIO(raw),
+        environ={
+            "REQUEST_METHOD": "POST",
+            "CONTENT_TYPE": content_type,
+            "CONTENT_LENGTH": str(len(raw)),
+        },
+        keep_blank_values=True,
+    )
+    out: dict[str, str | tuple[bytes, str]] = {}
+    lst = getattr(fs, "list", None)
+    if not lst:
+        return out
+    for field in lst:
+        name = field.name
+        if field.filename:
+            data = field.file.read() if field.file else b""
+            out[name] = (data, field.filename or "")
+        else:
+            v = field.value
+            if isinstance(v, bytes):
+                v = v.decode("utf-8", errors="replace")
+            out[name] = v
+    return out
 
 
 def _request_is_secure(handler: BaseHTTPRequestHandler) -> bool:
@@ -737,6 +795,15 @@ class Handler(BaseHTTPRequestHandler):
         photo_view_match = re.match(r"^/creditbook/photo-view/(?P<fid>.+)$", path)
         if photo_match:
             file_id = unquote(photo_match.group("fid"))
+            local = _try_local_web_photo(file_id)
+            if local:
+                data, ctype = local
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Cache-Control", "private, max-age=3600")
+                self.end_headers()
+                self.wfile.write(data)
+                return
             file_url = _resolve_telegram_file_url(file_id)
             if not file_url:
                 self.send_response(404)
@@ -751,6 +818,13 @@ class Handler(BaseHTTPRequestHandler):
 
         if photo_view_match:
             file_id = unquote(photo_view_match.group("fid"))
+            local = _try_local_web_photo(file_id)
+            if local:
+                enc = quote(file_id, safe="")
+                self.send_response(302)
+                self.send_header("Location", f"/creditbook/photo/{enc}")
+                self.end_headers()
+                return
             file_url = _resolve_telegram_file_url(file_id)
             if not file_url:
                 self.send_response(404)
@@ -804,19 +878,44 @@ class Handler(BaseHTTPRequestHandler):
             path = path.rstrip("/")
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length) if length else b""
-        try:
-            body = raw.decode("utf-8")
-        except Exception:
-            body = ""
-        body_qs = parse_qs(body, keep_blank_values=True)
+        ct = self.headers.get("Content-Type") or ""
+        mp: dict[str, str | tuple[bytes, str]] | None = None
+        if "multipart/form-data" in ct.lower() and length > 0:
+            try:
+                mp = _parse_multipart_post(raw, ct)
+            except Exception:
+                mp = {}
+        if mp is None:
+            try:
+                body = raw.decode("utf-8")
+            except Exception:
+                body = ""
+            body_qs = parse_qs(body, keep_blank_values=True)
+        else:
+            body_qs = {}
+
+        def _s(name: str) -> str:
+            if mp is not None:
+                v = mp.get(name, "")
+                return v if isinstance(v, str) else ""
+            return (body_qs.get(name) or [""])[0]
+
+        def _f(name: str) -> tuple[bytes | None, str | None]:
+            if mp is None:
+                return None, None
+            v = mp.get(name)
+            if isinstance(v, tuple) and len(v) == 2 and isinstance(v[0], bytes):
+                return v[0], v[1]
+            return None, None
+
         secure = _request_is_secure(self)
         brand_img_src, favicon_href = _brand_visual_for_page()
         cookie_header = self.headers.get("Cookie")
         web_user = get_user_from_cookie_header(cookie_header)
 
         if path == "/creditbook/login":
-            phone = (body_qs.get("phone") or [""])[0]
-            pwd = (body_qs.get("password") or [""])[0]
+            phone = _s("phone")
+            pwd = _s("password")
             err, uid = try_login(phone, pwd)
             if err:
                 page = render_login_page(err, favicon_href, brand_img_src)
@@ -841,12 +940,12 @@ class Handler(BaseHTTPRequestHandler):
             return quote(msg[:400], safe="")
 
         if path == "/creditbook/customer/create":
-            csrf = (body_qs.get("csrf") or [""])[0]
+            csrf = _s("csrf")
             if not csrf_verify(uid, "cust_create", csrf):
                 _redirect(self, "/creditbook/dashboard?err=" + _e("انتهت صلاحية النموذج. حدّث الصفحة."))
                 return
-            name = (body_qs.get("name") or [""])[0]
-            phone = (body_qs.get("phone") or [""])[0]
+            name = _s("name")
+            phone = _s("phone")
             err, cid = action_customer_create(uid, name, phone)
             if err:
                 _redirect(self, "/creditbook/dashboard?err=" + _e(err))
@@ -857,15 +956,15 @@ class Handler(BaseHTTPRequestHandler):
         m_up = re.match(r"^/creditbook/customer/(?P<cid>\d+)/update$", path)
         if m_up:
             cid = int(m_up.group("cid"))
-            csrf = (body_qs.get("csrf") or [""])[0]
+            csrf = _s("csrf")
             if not csrf_verify(uid, f"cust_upd_{cid}", csrf):
                 _redirect(self, f"/creditbook/customer/{cid}?err=" + _e("انتهت صلاحية النموذج."))
                 return
             err = action_customer_update(
                 uid,
                 cid,
-                (body_qs.get("name") or [""])[0],
-                (body_qs.get("phone") or [""])[0],
+                _s("name"),
+                _s("phone"),
             )
             if err:
                 _redirect(self, f"/creditbook/customer/{cid}?err=" + _e(err))
@@ -876,7 +975,7 @@ class Handler(BaseHTTPRequestHandler):
         m_del = re.match(r"^/creditbook/customer/(?P<cid>\d+)/delete$", path)
         if m_del:
             cid = int(m_del.group("cid"))
-            csrf = (body_qs.get("csrf") or [""])[0]
+            csrf = _s("csrf")
             if not csrf_verify(uid, f"cust_del_{cid}", csrf):
                 _redirect(self, f"/creditbook/customer/{cid}?err=" + _e("انتهت صلاحية النموذج."))
                 return
@@ -890,17 +989,21 @@ class Handler(BaseHTTPRequestHandler):
         m_txn = re.match(r"^/creditbook/customer/(?P<cid>\d+)/txn_add$", path)
         if m_txn:
             cid = int(m_txn.group("cid"))
-            csrf = (body_qs.get("csrf") or [""])[0]
+            csrf = _s("csrf")
             if not csrf_verify(uid, f"cust_txn_{cid}", csrf):
                 _redirect(self, f"/creditbook/customer/{cid}?err=" + _e("انتهت صلاحية النموذج."))
                 return
-            kind = (body_qs.get("kind") or [""])[0].strip()
+            kind = _s("kind").strip()
+            pbytes, pname = _f("photo")
             err = action_txn_add(
                 uid,
                 cid,
                 kind,
-                (body_qs.get("amount") or [""])[0],
-                (body_qs.get("note") or [""])[0],
+                _s("amount"),
+                _s("note"),
+                parse_tx_datetime(_s("txn_datetime")),
+                pbytes,
+                pname,
             )
             if err:
                 _redirect(self, f"/creditbook/customer/{cid}?err=" + _e(err))
@@ -911,15 +1014,20 @@ class Handler(BaseHTTPRequestHandler):
         m_tu = re.match(r"^/creditbook/tx/(?P<tid>\d+)/update$", path)
         if m_tu:
             tid = int(m_tu.group("tid"))
-            csrf = (body_qs.get("csrf") or [""])[0]
+            csrf = _s("csrf")
             if not csrf_verify(uid, f"tx_edit_{tid}", csrf):
                 _redirect(self, f"/creditbook/tx/{tid}?err=" + _e("انتهت صلاحية النموذج."))
                 return
+            pbytes, pname = _f("photo")
             err = action_tx_update(
                 uid,
                 tid,
-                (body_qs.get("amount") or [""])[0],
-                (body_qs.get("note") or [""])[0],
+                _s("amount"),
+                _s("note"),
+                parse_tx_datetime(_s("txn_datetime")),
+                pbytes,
+                pname,
+                _s("remove_photo") == "1",
             )
             if err:
                 _redirect(self, f"/creditbook/tx/{tid}?err=" + _e(err))
@@ -930,7 +1038,7 @@ class Handler(BaseHTTPRequestHandler):
         m_tk = re.match(r"^/creditbook/tx/(?P<tid>\d+)/toggle_kind$", path)
         if m_tk:
             tid = int(m_tk.group("tid"))
-            csrf = (body_qs.get("csrf") or [""])[0]
+            csrf = _s("csrf")
             if not csrf_verify(uid, f"tx_kind_{tid}", csrf):
                 _redirect(self, f"/creditbook/tx/{tid}?err=" + _e("انتهت صلاحية النموذج."))
                 return
@@ -944,7 +1052,7 @@ class Handler(BaseHTTPRequestHandler):
         m_td = re.match(r"^/creditbook/tx/(?P<tid>\d+)/delete$", path)
         if m_td:
             tid = int(m_td.group("tid"))
-            csrf = (body_qs.get("csrf") or [""])[0]
+            csrf = _s("csrf")
             if not csrf_verify(uid, f"tx_del_{tid}", csrf):
                 _redirect(self, f"/creditbook/tx/{tid}?err=" + _e("انتهت صلاحية النموذج."))
                 return

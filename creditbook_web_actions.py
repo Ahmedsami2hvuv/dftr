@@ -2,8 +2,13 @@
 """عمليات تعديل دفتر الديون من الموقع (نفس قواعد البوت)."""
 from __future__ import annotations
 
+import re
+import uuid
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
+from config import WEB_TX_UPLOAD_DIR
 from database import SessionLocal
 from app_models import (
     Customer,
@@ -16,6 +21,49 @@ from app_models import (
 from handlers.customers import _parse_amount_and_optional_note
 from handlers.partner_link import maybe_queue_partner_tx
 from utils.phone import is_plausible_iraq_mobile, normalize_phone
+
+_WEB_PHOTO_SAFE = re.compile(r"^[a-f0-9]{32}\.(jpg|jpeg|png|gif|webp)$", re.I)
+
+
+def is_safe_web_photo_name(name: str) -> bool:
+    return bool(name and _WEB_PHOTO_SAFE.match(name))
+
+
+def unlink_web_photo(photo_file_id: str | None) -> None:
+    if not photo_file_id or not str(photo_file_id).startswith("web:"):
+        return
+    name = str(photo_file_id)[4:]
+    if not is_safe_web_photo_name(name):
+        return
+    p = WEB_TX_UPLOAD_DIR / name
+    try:
+        if p.is_file():
+            p.unlink()
+    except OSError:
+        pass
+
+
+def save_web_photo_bytes(data: bytes, orig_filename: str) -> tuple[str | None, str | None]:
+    """إرجاع (اسم الملف المحفوظ، رسالة خطأ)."""
+    if not data or len(data) > 5_000_000:
+        return None, "حجم الصورة يجب أن يكون أقل من 5 ميجابايت."
+    ext = Path(orig_filename or "").suffix.lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
+        ext = ".jpg"
+    name = f"{uuid.uuid4().hex}{ext}"
+    WEB_TX_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    (WEB_TX_UPLOAD_DIR / name).write_bytes(data)
+    return name, None
+
+
+def parse_tx_datetime(s: str | None) -> datetime | None:
+    if not s or not str(s).strip():
+        return None
+    s = str(s).strip()
+    try:
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
 
 
 def _get_customer_owned(db, user_id: int, cid: int) -> Customer | None:
@@ -105,6 +153,8 @@ def action_customer_delete(user_id: int, cid: int) -> str | None:
         cust = _get_customer_owned(db, user_id, cid)
         if not cust:
             return "العميل غير موجود."
+        for (pf,) in db.query(CustomerTransaction.photo_file_id).filter(CustomerTransaction.customer_id == cid).all():
+            unlink_web_photo(pf)
         tx_ids = [
             r[0]
             for r in db.query(CustomerTransaction.id).filter(CustomerTransaction.customer_id == cid).all()
@@ -153,7 +203,16 @@ def action_customer_delete(user_id: int, cid: int) -> str | None:
         db.close()
 
 
-def action_txn_add(user_id: int, cid: int, kind: str, amount_text: str, note_text: str) -> str | None:
+def action_txn_add(
+    user_id: int,
+    cid: int,
+    kind: str,
+    amount_text: str,
+    note_text: str,
+    created_at: datetime | None = None,
+    photo_bytes: bytes | None = None,
+    photo_oriname: str | None = None,
+) -> str | None:
     if kind not in ("gave", "took"):
         return "نوع المعاملة غير صالح."
     amt_line = (amount_text or "").strip()
@@ -167,6 +226,13 @@ def action_txn_add(user_id: int, cid: int, kind: str, amount_text: str, note_tex
     amt, note_opt = _parse_amount_and_optional_note(combined)
     if amt is None:
         return "لم أستخرج مبلغاً صحيحاً (مثال: 775.25 أو سطران: المبلغ ثم الملاحظة)."
+    photo_id = None
+    if photo_bytes and len(photo_bytes) > 0:
+        fn, err = save_web_photo_bytes(photo_bytes, photo_oriname or "")
+        if err:
+            return err
+        if fn:
+            photo_id = f"web:{fn}"
     db = SessionLocal()
     try:
         cust = _get_customer_owned(db, user_id, cid)
@@ -177,8 +243,10 @@ def action_txn_add(user_id: int, cid: int, kind: str, amount_text: str, note_tex
             amount=amt,
             kind=kind,
             note=note_opt,
-            photo_file_id=None,
+            photo_file_id=photo_id,
         )
+        if created_at is not None:
+            t.created_at = created_at
         db.add(t)
         db.commit()
         db.refresh(t)
@@ -191,7 +259,16 @@ def action_txn_add(user_id: int, cid: int, kind: str, amount_text: str, note_tex
         db.close()
 
 
-def action_tx_update(user_id: int, tx_id: int, amount_text: str, note_text: str) -> str | None:
+def action_tx_update(
+    user_id: int,
+    tx_id: int,
+    amount_text: str,
+    note_text: str,
+    created_at: datetime | None = None,
+    photo_bytes: bytes | None = None,
+    photo_oriname: str | None = None,
+    remove_photo: bool = False,
+) -> str | None:
     amt = parse_amount_simple(amount_text)
     if amt is None:
         return "أدخل مبلغاً أكبر من صفر."
@@ -205,6 +282,17 @@ def action_tx_update(user_id: int, tx_id: int, amount_text: str, note_text: str)
         tx, _cust = got
         tx.amount = amt
         tx.note = note_val
+        if created_at is not None:
+            tx.created_at = created_at
+        if remove_photo:
+            unlink_web_photo(tx.photo_file_id)
+            tx.photo_file_id = None
+        elif photo_bytes and len(photo_bytes) > 0:
+            unlink_web_photo(tx.photo_file_id)
+            fn, err = save_web_photo_bytes(photo_bytes, photo_oriname or "")
+            if err:
+                return err
+            tx.photo_file_id = f"web:{fn}" if fn else None
         db.commit()
         return None
     except Exception as e:
@@ -240,6 +328,7 @@ def action_tx_delete(user_id: int, tx_id: int) -> tuple[str | None, int | None]:
             return ("المعاملة غير موجودة.", None)
         tx, _cust = got
         cid = tx.customer_id
+        unlink_web_photo(tx.photo_file_id)
         db.delete(tx)
         db.commit()
         return (None, cid)

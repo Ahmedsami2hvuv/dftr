@@ -209,6 +209,59 @@ form.login-form { margin-top: 8px; }
   font-weight: 700;
   border: 1px solid #a7f3d0;
 }
+.hidden { display: none !important; }
+.btn-outline {
+  background: #fff;
+  color: #0f766e;
+  border: 2px solid #0d9488;
+  box-shadow: none;
+}
+.btn-outline:hover {
+  background: #ecfdf5;
+}
+.btn-took {
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  color: #fff !important;
+}
+.btn-gave {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #fff !important;
+}
+.txn-kind-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 8px;
+}
+.txn-kind-row .btn {
+  margin-top: 0;
+  flex: 1 1 140px;
+  font-size: 1.05rem;
+  padding: 14px 16px;
+}
+.txn-panel {
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fafafa;
+}
+.txn-kind-hint {
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+.web-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #334155;
+  margin: 8px 0;
+}
+.web-check input { width: auto; }
+.cust-edit-toggle { margin-bottom: 10px; }
 @media (max-width: 560px) {
   .brand-header { flex-direction: column; align-items: stretch; }
   .brand { justify-content: center; }

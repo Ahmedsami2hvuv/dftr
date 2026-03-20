@@ -421,7 +421,12 @@ def render_owner_customer_page(
         phone_val = _html_escape((cust.phone or "").strip())
 
         edit_form = f"""
-        <div class='web-section'>
+        <div class='cust-edit-toggle'>
+          <button type='button' class='btn btn-outline' onclick="document.getElementById('cust-edit-panel').classList.toggle('hidden');">
+            ✏️ تعديل معلومات العميل
+          </button>
+        </div>
+        <div id='cust-edit-panel' class='hidden web-section'>
           <h3 class='web-h3'>✏️ بيانات العميل</h3>
           <form method='post' action='/creditbook/customer/{cust.id}/update' class='stack-form'>
             <input type='hidden' name='csrf' value='{_html_escape(csrf_u)}'/>
@@ -448,20 +453,43 @@ def render_owner_customer_page(
         txn_form = f"""
         <div class='web-section'>
           <h3 class='web-h3'>➕ معاملة جديدة</h3>
-          <form method='post' action='/creditbook/customer/{cust.id}/txn_add' class='stack-form'>
-            <input type='hidden' name='csrf' value='{_html_escape(csrf_t)}'/>
-            <label for='kind'>النوع</label>
-            <select id='kind' name='kind' class='web-select'>
-              <option value='gave'>🟢 أعطيت (سلّمت للعميل)</option>
-              <option value='took'>🔴 أخذت (استلمت من العميل)</option>
-            </select>
-            <label for='amt'>المبلغ (د.ع.)</label>
-            <input type='text' id='amt' name='amount' required placeholder='مثال: 775.25' dir='ltr'/>
-            <label for='tnote'>ملاحظة (اختياري)</label>
-            <textarea id='tnote' name='note' rows='2' placeholder='يمكنك وضع المبلغ والملاحظة في سطرين'></textarea>
-            <button type='submit' class='btn btn-primary'>تسجيل المعاملة</button>
-          </form>
+          <p class='hint'>اختر نوع المعاملة ثم املأ المبلغ والملاحظة والتاريخ (اختياري) ويمكنك إرفاق صورة.</p>
+          <div class='txn-kind-row'>
+            <button type='button' class='btn btn-took' onclick="showNewTxn('took')">🔴 أخذت</button>
+            <button type='button' class='btn btn-gave' onclick="showNewTxn('gave')">🟢 أعطيت</button>
+          </div>
+          <div id='new-txn-panel' class='hidden txn-panel'>
+            <form method='post' action='/creditbook/customer/{cust.id}/txn_add' class='stack-form' enctype='multipart/form-data'
+                  onsubmit="var k=document.getElementById('txn-kind-field'); if(!k||!k.value){{ alert('اضغط «أخذت» أو «أعطيت» أولاً'); return false; }} return true;">
+              <input type='hidden' name='csrf' value='{_html_escape(csrf_t)}'/>
+              <input type='hidden' name='kind' id='txn-kind-field' value=''/>
+              <p id='txn-kind-hint' class='txn-kind-hint'></p>
+              <label for='amt'>المبلغ (د.ع.)</label>
+              <input type='text' id='amt' name='amount' required placeholder='مثال: 775.25' dir='ltr' autocomplete='off'/>
+              <label for='tnote'>ملاحظة (اختياري)</label>
+              <textarea id='tnote' name='note' rows='2' placeholder='نص أو سطران (مبلغ ثم ملاحظة)'></textarea>
+              <label for='txn_dt'>تاريخ ووقت المعاملة (اختياري — إن تُرك فارغاً يُستخدم الوقت الحالي)</label>
+              <input type='datetime-local' id='txn_dt' name='txn_datetime' dir='ltr'/>
+              <label for='txphoto'>صورة مرفقة (اختياري)</label>
+              <input type='file' id='txphoto' name='photo' accept='image/*'/>
+              <button type='submit' class='btn btn-primary'>تسجيل المعاملة</button>
+            </form>
+          </div>
         </div>
+        <script>
+        function showNewTxn(kind) {{
+          var p = document.getElementById('new-txn-panel');
+          var f = document.getElementById('txn-kind-field');
+          var h = document.getElementById('txn-kind-hint');
+          if (!p || !f || !h) return;
+          p.classList.remove('hidden');
+          f.value = kind;
+          h.textContent = kind === 'took'
+            ? '🔴 أخذت — استلمت من العميل'
+            : '🟢 أعطيت — سلّمت للعميل';
+          p.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }});
+        }}
+        </script>
         """
 
         html_out = f"""
@@ -477,7 +505,7 @@ def render_owner_customer_page(
             <link href='https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap' rel='stylesheet'/>
             <title>{_html_escape(cust.name)} — دفتر الديون</title>
           </head>
-          <body>
+          <body class='page-cust'>
             <div class='card'>
               <div class='brand-header'>
                 <div class='brand'>
@@ -541,6 +569,20 @@ def render_tx_edit_page(
         owner_disp = _html_escape(user.full_name or user.username or "حسابي")
         flash_html = _flash_block(flash_key, err_msg)
 
+        dt = tx.created_at
+        if dt is not None and getattr(dt, "tzinfo", None):
+            dt = dt.replace(tzinfo=None)
+        dt_val = dt.strftime("%Y-%m-%dT%H:%M") if dt else ""
+
+        cur_photo = ""
+        if getattr(tx, "photo_file_id", None):
+            pf = quote(str(tx.photo_file_id), safe="")
+            cur_photo = (
+                f"<p class='hint'>📷 صورة مرفقة: "
+                f"<a href='/creditbook/photo-view/{pf}' target='_blank' rel='noopener'>عرض</a> "
+                f"— يمكنك استبدالها أو إزالتها أدناه.</p>"
+            )
+
         html_out = f"""
         <!doctype html>
         <html lang='ar' dir='rtl'>
@@ -568,14 +610,20 @@ def render_tx_edit_page(
               </div>
               {flash_html}
               <p class='hint'>👤 {owner_disp} — النوع الحالي: <strong>{kind_ar}</strong></p>
+              {cur_photo}
               <div class='web-section'>
-                <form method='post' action='/creditbook/tx/{tx_id}/update' class='stack-form'>
+                <form method='post' action='/creditbook/tx/{tx_id}/update' class='stack-form' enctype='multipart/form-data'>
                   <input type='hidden' name='csrf' value='{_html_escape(csrf_e)}'/>
                   <label for='txamt'>المبلغ (د.ع.)</label>
                   <input type='text' id='txamt' name='amount' required value='{_html_escape(amt_s)}' dir='ltr'/>
                   <label for='txnote'>الملاحظة (اكتب «حذف» لمسحها)</label>
                   <textarea id='txnote' name='note' rows='3'>{note_s}</textarea>
-                  <button type='submit' class='btn btn-primary'>حفظ المبلغ والملاحظة</button>
+                  <label for='txdt'>تاريخ ووقت المعاملة</label>
+                  <input type='datetime-local' id='txdt' name='txn_datetime' value='{_html_escape(dt_val)}' dir='ltr'/>
+                  <label for='txphoto2'>صورة جديدة (اختياري — تستبدل الصورة الحالية)</label>
+                  <input type='file' id='txphoto2' name='photo' accept='image/*'/>
+                  <label class='web-check'><input type='checkbox' name='remove_photo' value='1'/> إزالة الصورة من المعاملة</label>
+                  <button type='submit' class='btn btn-primary'>حفظ التعديلات</button>
                 </form>
               </div>
               <div class='web-section'>

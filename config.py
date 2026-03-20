@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """إعدادات البوت - كل القيم من متغيرات البيئة (Railway)"""
 import os
+from pathlib import Path
 
 def get_env(key: str, default: str = "") -> str:
     return os.environ.get(key, default).strip()
@@ -34,6 +35,10 @@ if _raw_base and not _raw_base.startswith(("http://", "https://")):
     _raw_base = "https://" + _raw_base.lstrip("/")
 
 WEB_BASE_URL = _raw_base.rstrip("/")
+
+# صور المعاملات المرفوعة من موقع الويب (ليست من تيليجرام)
+_ROOT_DIR = Path(__file__).resolve().parent
+WEB_TX_UPLOAD_DIR = _ROOT_DIR / "data" / "web_tx_photos"
 
 # شعار صفحة «مشاركة الديون» على الويب: صورة PNG بصيغة Base64 (الصق القيمة كاملة في Railway)
 # يمكن لصق النص كما هو من ملف .b64 أو بصيغة data:image/png;base64,.... — بدون رفع ملف للريبو

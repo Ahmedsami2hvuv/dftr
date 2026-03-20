@@ -1,0 +1,2 @@
+data/web_tx_photos/*
+!data/web_tx_photos/.gitkeep
