@@ -94,6 +94,26 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """القائمة الرئيسية للمستخدم المسجل"""
     query = update.callback_query
     await query.answer()
+
+    # حماية: إذا المستخدم غير مسجل (بعد تسجيل خروج أو من زر قديم) لا نعرض القائمة.
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.telegram_id == update.effective_user.id).first()
+        if not user:
+            context.user_data.clear()
+            keyboard = [
+                [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+                [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+                [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+            ]
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً. استخدم الأزرار أدناه.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+            return
+    finally:
+        db.close()
+
     context.user_data["last_menu"] = "main"
     keyboard = [
         [InlineKeyboardButton("📒 دفتر الديون", callback_data="menu_customers")],
@@ -113,6 +133,26 @@ async def usage_instructions(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """عرض شرح طريقة استخدام البوت بشكل مفصل ومنسق."""
     query = update.callback_query
     await query.answer()
+
+    # حماية: لا تعرض الشرح بدون تسجيل دخول.
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.telegram_id == update.effective_user.id).first()
+        if not user:
+            context.user_data.clear()
+            keyboard = [
+                [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+                [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+                [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+            ]
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً. استخدم الأزرار أدناه.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+            return
+    finally:
+        db.close()
+
     text = (
         "📘 طريقة الاستخدام (شرح مفصل)\n\n"
         "هذا البوت يساعدك على تتبع ديون العملاء وإدخال دخل/مصروف، مع إمكانية مشاركة التفاصيل.\n\n"
@@ -159,6 +199,7 @@ async def usage_instructions(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "5) تذكيرات مهمة ⚠️\n"
         "• إذا ظهر زر «◀ رجوع» استخدمه للعودة للخطوة السابقة.\n"
         "• إذا انتهت الجلسة سيظهر زر الرجوع.\n"
+        "• ضبط «تذكيرات التسديد» يتم من شاشة تعديل العميل عبر زر 🔔.\n"
         "• الحاسبة تساعدك في إدخال العمليات بسرعة بدون أخطاء.\n\n"
         "إذا تريد، جرّب خطوة كاملة: إضافة عميل ثم معاملة واحدة (أخذت أو أعطيت) مع ملاحظة.\n"
     )

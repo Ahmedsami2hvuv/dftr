@@ -1481,8 +1481,8 @@ async def _render_tx_detail(db, tx: CustomerTransaction):
         ],
         [
             InlineKeyboardButton("🖼الصورة", callback_data=f"cust_tx_edit_photo_{tx.id}"),
-            InlineKeyboardButton("النوع", callback_data=f"cust_tx_toggle_kind_{tx.id}"),
-            InlineKeyboardButton("حذف", callback_data=f"cust_tx_delete_req_{tx.id}"),
+            InlineKeyboardButton(f"🔁 النوع: {icon} {kind_text}", callback_data=f"cust_tx_toggle_kind_{tx.id}"),
+            InlineKeyboardButton("🗑 حذف", callback_data=f"cust_tx_delete_req_{tx.id}"),
         ],
         [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cust.id}")],
     ]
@@ -1606,9 +1606,11 @@ async def cust_tx_delete_click(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def cust_tx_toggle_kind_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """طلب تأكيد تغيير نوع المعاملة (أعطيت/أخذت)."""
     query = update.callback_query
     await query.answer()
-    tx_id = int(query.data.replace("cust_tx_toggle_kind_", ""))
+
+    tx_id = int((query.data or "").replace("cust_tx_toggle_kind_", "", 1))
     db = SessionLocal()
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
@@ -1618,6 +1620,7 @@ async def cust_tx_toggle_kind_click(update: Update, context: ContextTypes.DEFAUL
                 reply_markup=kb_menu_customers(),
             )
             return
+
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
@@ -1626,8 +1629,59 @@ async def cust_tx_toggle_kind_click(update: Update, context: ContextTypes.DEFAUL
                 reply_markup=kb_main_menu(),
             )
             return
+
+        current_kind_text = "أخذت" if tx.kind == "took" else "أعطيت"
+        current_icon = _tx_kind_ar(tx.kind)
+        new_kind = "gave" if tx.kind == "took" else "took"
+        new_kind_text = "أخذت" if new_kind == "took" else "أعطيت"
+        new_icon = _tx_kind_ar(new_kind)
+
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    f"✅ نعم: تغيير إلى {new_icon} {new_kind_text}",
+                    callback_data=f"cust_tx_toggle_kind_do_{tx_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "↩ تراجع",
+                    callback_data=f"cust_tx_{tx_id}",
+                )
+            ],
+        ]
+        await query.edit_message_text(
+            "تأكيد التغيير:\n"
+            f"هذه المعاملة: {current_icon} {current_kind_text}\n"
+            f"هل تريد تغييرها إلى: {new_icon} {new_kind_text}؟",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+    finally:
+        db.close()
+
+
+async def cust_tx_toggle_kind_do_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تنفيذ تغيير نوع المعاملة بعد التأكيد."""
+    query = update.callback_query
+    await query.answer()
+    tx_id = int((query.data or "").replace("cust_tx_toggle_kind_do_", "", 1))
+
+    db = SessionLocal()
+    try:
+        tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
+        if not tx:
+            await query.edit_message_text("المعاملة غير موجودة.", reply_markup=kb_menu_customers())
+            return
+
+        cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
+        user = get_current_user(db, update.effective_user.id)
+        if not user or cust.user_id != user.id:
+            await query.edit_message_text("غير مسموح.", reply_markup=kb_main_menu())
+            return
+
         tx.kind = "gave" if tx.kind == "took" else "took"
         db.commit()
+
         text, keyboard = await _render_tx_detail(db, tx)
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     finally:
@@ -2309,7 +2363,14 @@ async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYP
 async def cust_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    cid = int(query.data.replace("cust_edit_", ""))
+    data = query.data or ""
+    is_back = data.startswith("cust_edit_back_")
+    if is_back:
+        cid = int(data.replace("cust_edit_back_", "", 1))
+        prefix = "تم الرجوع ✅\n\n"
+    else:
+        cid = int(data.replace("cust_edit_", "", 1))
+        prefix = ""
     db = SessionLocal()
     try:
         cust = db.query(Customer).filter(Customer.id == cid).first()
@@ -2334,7 +2395,11 @@ async def cust_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             .first()
         )
-        text = f"تعديل: {cust.name}\n" + (f"الرقم: {cust.phone}" if cust.phone else "لا يوجد رقم")
+        text = (
+            prefix
+            + f"تعديل: {cust.name}\n"
+            + (f"الرقم: {cust.phone}" if cust.phone else "لا يوجد رقم")
+        )
         keyboard = [
             [InlineKeyboardButton("تغيير الاسم", callback_data=f"cust_editname_{cid}")],
             [InlineKeyboardButton("تغيير الرقم", callback_data=f"cust_editphone_{cid}")],
@@ -2364,7 +2429,7 @@ async def cust_edit_name_start(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.edit_message_text(
         "أرسل الاسم الجديد للعميل:",
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_{cid}")]]
+            [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_back_{cid}")]]
         ),
     )
     return CUST_EDIT_NAME
@@ -2379,7 +2444,7 @@ async def cust_edit_phone_start(update: Update, context: ContextTypes.DEFAULT_TY
     await query.edit_message_text(
         "أرسل رقم الهاتف الجديد (أو اكتب: حذف لإزالة الرقم):",
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_{cid}")]]
+            [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_back_{cid}")]]
         ),
     )
     return CUST_EDIT_PHONE
@@ -2693,6 +2758,9 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     if data.startswith("cust_tx_delete_do_"):
         await cust_tx_delete_click(update, context)
+        return
+    if data.startswith("cust_tx_toggle_kind_do_"):
+        await cust_tx_toggle_kind_do_click(update, context)
         return
     if data.startswith("cust_tx_toggle_kind_"):
         await cust_tx_toggle_kind_click(update, context)
