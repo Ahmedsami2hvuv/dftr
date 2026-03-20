@@ -31,6 +31,12 @@ from utils.phone import (
 ) = range(8)
 
 
+def _kb_main_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]
+    )
+
+
 def get_user_by_telegram(db, telegram_id: int):
     return db.query(User).filter(User.telegram_id == telegram_id).first()
 
@@ -62,7 +68,7 @@ async def auth_register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reg_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = (update.message.text or "").strip()
     if not name:
-        await update.message.reply_text("يرجى إرسال اسم صحيح.")
+        await update.message.reply_text("يرجى إرسال اسم صحيح.", reply_markup=_kb_main_menu())
         return REG_NAME
     context.user_data["reg_name"] = name
     await update.message.reply_text(
@@ -78,13 +84,17 @@ async def reg_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         phone_raw = update.message.text or ""
     phone = _normalize_phone(phone_raw)
     if not phone or not _is_plausible_phone(phone):
-        await update.message.reply_text("يرجى إرسال رقم هاتف صحيح (مثلاً 077… أو 7××× أو +964…).")
+        await update.message.reply_text(
+            "يرجى إرسال رقم هاتف صحيح (مثلاً 077… أو 7××× أو +964…).",
+            reply_markup=_kb_main_menu(),
+        )
         return REG_PHONE
     db = SessionLocal()
     try:
         if _find_user_by_phone(db, phone):
             await update.message.reply_text(
-                "هذا الرقم مسجل مسبقاً. استخدم «تسجيل الدخول» أو رقم آخر."
+                "هذا الرقم مسجل مسبقاً. استخدم «تسجيل الدخول» أو رقم آخر.",
+                reply_markup=_kb_main_menu(),
             )
             return REG_PHONE
         context.user_data["reg_phone"] = phone
@@ -99,7 +109,10 @@ async def reg_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reg_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     password = (update.message.text or "").strip()
     if not password or len(password) < 4:
-        await update.message.reply_text("كلمة المرور يجب أن تكون 4 أحرف على الأقل.")
+        await update.message.reply_text(
+            "كلمة المرور يجب أن تكون 4 أحرف على الأقل.",
+            reply_markup=_kb_main_menu(),
+        )
         return REG_PASSWORD
     db = SessionLocal()
     try:
@@ -142,10 +155,13 @@ async def login_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         phone_raw = update.message.text or ""
     phone = _normalize_phone(phone_raw)
     if not phone or not _is_plausible_phone(phone):
-        await update.message.reply_text("يرجى إرسال رقم هاتف صحيح كما سجّلته.")
+        await update.message.reply_text(
+            "يرجى إرسال رقم هاتف صحيح كما سجّلته.",
+            reply_markup=_kb_main_menu(),
+        )
         return LOGIN_PHONE
     context.user_data["login_phone"] = phone
-    await update.message.reply_text("أرسل كلمة المرور:")
+    await update.message.reply_text("أرسل كلمة المرور:", reply_markup=_kb_main_menu())
     return LOGIN_PASSWORD
 
 
@@ -157,13 +173,19 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user = _find_user_by_phone(db, phone)
             if not user:
-                await update.message.reply_text("لا يوجد حساب بهذا الرقم. أنشئ حساباً جديداً.")
+                await update.message.reply_text(
+                    "لا يوجد حساب بهذا الرقم. أنشئ حساباً جديداً.",
+                    reply_markup=_kb_main_menu(),
+                )
                 context.user_data.pop("login_phone", None)
                 return ConversationHandler.END
             if user.phone != phone:
                 user.phone = phone
             if user.password_hash and not check_password(password, user.password_hash):
-                await update.message.reply_text("كلمة المرور غير صحيحة.")
+                await update.message.reply_text(
+                    "كلمة المرور غير صحيحة.",
+                    reply_markup=_kb_main_menu(),
+                )
                 return LOGIN_PASSWORD
             if not user.password_hash:
                 user.password_hash = hash_password(password)
@@ -184,7 +206,8 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception:
             await update.message.reply_text(
-                "حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى أو استخدم /start."
+                "حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى أو استخدم /start.",
+                reply_markup=_kb_main_menu(),
             )
             return ConversationHandler.END
     finally:
@@ -212,13 +235,19 @@ async def forgot_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         phone_raw = update.message.text or ""
     phone = _normalize_phone(phone_raw)
     if not phone or not _is_plausible_phone(phone):
-        await update.message.reply_text("يرجى إرسال رقم هاتف صحيح كما في الحساب.")
+        await update.message.reply_text(
+            "يرجى إرسال رقم هاتف صحيح كما في الحساب.",
+            reply_markup=_kb_main_menu(),
+        )
         return FORGOT_PHONE
     db = SessionLocal()
     try:
         user = _find_user_by_phone(db, phone)
         if not user:
-            await update.message.reply_text("لا يوجد حساب مسجل بهذا الرقم.")
+            await update.message.reply_text(
+                "لا يوجد حساب مسجل بهذا الرقم.",
+                reply_markup=_kb_main_menu(),
+            )
             return FORGOT_PHONE
         code = "".join(random.choices(string.digits, k=6))
         user.reset_code = code
@@ -274,7 +303,10 @@ async def forgot_back_phone_click(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     # إرجاع المستخدم لإدخال رقم الهاتف من جديد
     context.user_data.pop("forgot_phone", None)
-    await query.edit_message_text("أرسل رقم هاتفك المسجل في الحساب:")
+    await query.edit_message_text(
+        "أرسل رقم هاتفك المسجل في الحساب:",
+        reply_markup=_kb_main_menu(),
+    )
     return FORGOT_PHONE
 
 
@@ -283,16 +315,25 @@ async def forgot_copy_code_click(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
     phone = context.user_data.get("forgot_phone")
     if not phone:
-        await query.edit_message_text("انتهت الجلسة. ابدأ من «نسيت كلمة المرور» مرة أخرى.")
+        await query.edit_message_text(
+            "انتهت الجلسة. ابدأ من «نسيت كلمة المرور» مرة أخرى.",
+            reply_markup=_kb_main_menu(),
+        )
         return FORGOT_PHONE
     db = SessionLocal()
     try:
         user = _find_user_by_phone(db, phone)
         if not user or not user.reset_code:
-            await query.edit_message_text("لم يتم العثور على رمز. استخدم «نسيت كلمة المرور» مرة أخرى.")
+            await query.edit_message_text(
+                "لم يتم العثور على رمز. استخدم «نسيت كلمة المرور» مرة أخرى.",
+                reply_markup=_kb_main_menu(),
+            )
             return ConversationHandler.END
         if user.reset_code_expires and user.reset_code_expires < datetime.utcnow():
-            await query.edit_message_text("انتهت صلاحية الرمز. استخدم «نسيت كلمة المرور» مرة أخرى.")
+            await query.edit_message_text(
+                "انتهت صلاحية الرمز. استخدم «نسيت كلمة المرور» مرة أخرى.",
+                reply_markup=_kb_main_menu(),
+            )
             return ConversationHandler.END
         code = user.reset_code
         # عرض الرمز داخل تليجرام (ليتم نسخه ولصقه)
@@ -317,20 +358,32 @@ async def forgot_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = (update.message.text or "").strip()
     phone = context.user_data.get("forgot_phone")
     if not phone:
-        await update.message.reply_text("انتهت الجلسة. ابدأ من «نسيت كلمة المرور» مرة أخرى.")
+        await update.message.reply_text(
+            "انتهت الجلسة. ابدأ من «نسيت كلمة المرور» مرة أخرى.",
+            reply_markup=_kb_main_menu(),
+        )
         return ConversationHandler.END
     db = SessionLocal()
     try:
         user = _find_user_by_phone(db, phone)
         if not user:
-            await update.message.reply_text("لا يوجد حساب بهذا الرقم.")
+            await update.message.reply_text(
+                "لا يوجد حساب بهذا الرقم.",
+                reply_markup=_kb_main_menu(),
+            )
             context.user_data.pop("forgot_phone", None)
             return ConversationHandler.END
         if not user.reset_code or user.reset_code != code:
-            await update.message.reply_text("الرمز غير صحيح. تحقق من الرمز وأعد المحاولة.")
+            await update.message.reply_text(
+                "الرمز غير صحيح. تحقق من الرمز وأعد المحاولة.",
+                reply_markup=_kb_main_menu(),
+            )
             return FORGOT_CODE
         if user.reset_code_expires and user.reset_code_expires < datetime.utcnow():
-            await update.message.reply_text("انتهت صلاحية الرمز. استخدم «نسيت كلمة المرور» مرة أخرى.")
+            await update.message.reply_text(
+                "انتهت صلاحية الرمز. استخدم «نسيت كلمة المرور» مرة أخرى.",
+                reply_markup=_kb_main_menu(),
+            )
             user.reset_code = None
             user.reset_code_expires = None
             db.commit()
@@ -356,7 +409,7 @@ async def forgot_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for k in ("reg_name", "reg_phone", "auth_action", "login_phone", "forgot_phone"):
         context.user_data.pop(k, None)
-    await update.message.reply_text("تم الرجوع.")
+    await update.message.reply_text("تم الرجوع.", reply_markup=_kb_main_menu())
     return ConversationHandler.END
 
 

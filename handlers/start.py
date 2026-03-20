@@ -23,7 +23,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             link = db.query(ShareLink).filter(ShareLink.token == token).first()
             if not link or (link.expires_at and link.expires_at < datetime.utcnow()):
-                await update.message.reply_text("رابط غير صالح أو منتهي الصلاحية.")
+                await update.message.reply_text(
+                    "رابط غير صالح أو منتهي الصلاحية.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]
+                    ),
+                )
                 return
             cust = link.customer
             gave = sum(t.amount for t in cust.transactions if t.kind == "gave")
@@ -36,7 +41,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 lines.append(f"{t.created_at.strftime('%Y-%m-%d %H:%M')} — {kind_ar}: {t.amount} {cur}" + (f" — {t.note}" if t.note else ""))
             if len(cust.transactions) > 50:
                 lines.append(f"\n... و {len(cust.transactions) - 50} معاملة أخرى")
-            await update.message.reply_text("\n".join(lines))
+            await update.message.reply_text(
+                "\n".join(lines),
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]
+                ),
+            )
         finally:
             db.close()
         return

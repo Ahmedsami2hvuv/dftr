@@ -386,7 +386,8 @@ async def ledger_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE, k
     context.user_data["ledger_category"] = category
     kind_ar = "دخل" if kind == "income" else "مصروف"
     await query.edit_message_text(
-        f"إضافة {kind_ar} 💵\n\nأرسل المبلغ (رقم فقط، مثال: 50000):"
+        f"إضافة {kind_ar} 💵\n\nأرسل المبلغ (رقم فقط، مثال: 50000):",
+        reply_markup=_kb_ledger_amount_errors(),
     )
     return ADD_AMOUNT
 

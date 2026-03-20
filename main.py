@@ -177,6 +177,7 @@ from handlers.customers import (
     cust_tx_edit_date_start,
     cust_tx_edit_date_pick,
     cust_tx_edit_date_back_click,
+    cust_tx_edit_back_to_detail,
     cust_tx_edit_photo_start,
     cust_tx_edit_photo_done,
     cust_tx_edit_photo_back_click,
@@ -558,8 +559,14 @@ def main():
             CallbackQueryHandler(cust_tx_edit_photo_start, pattern="^cust_tx_edit_photo_\\d+$"),
         ],
         states={
-            TX_EDIT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_amount_done)],
-            TX_EDIT_NOTE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_note_done)],
+            TX_EDIT_AMOUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_amount_done),
+                CallbackQueryHandler(cust_tx_edit_back_to_detail, pattern=r"^cust_tx_\d+$"),
+            ],
+            TX_EDIT_NOTE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_note_done),
+                CallbackQueryHandler(cust_tx_edit_back_to_detail, pattern=r"^cust_tx_\d+$"),
+            ],
             TX_EDIT_DATE: [
                 CallbackQueryHandler(handle_datetime_picker, pattern=r"^dt_"),
                 CallbackQueryHandler(cust_tx_edit_date_pick, pattern=r"^txdt_\d+_\d{8}$"),

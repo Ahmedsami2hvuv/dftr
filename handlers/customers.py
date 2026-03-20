@@ -15,6 +15,7 @@ from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerC
 from app_models.partner import PartnerLink
 from utils.phone import is_plausible_iraq_mobile, normalize_phone, wa_number
 from config import WEB_BASE_URL
+from handlers.inline_nav import kb_main_menu, kb_menu_customers, kb_tx_detail
 
 (
     CUST_NAME,
@@ -35,6 +36,27 @@ TX_PAGE_SIZE = 15
 
 def get_current_user(db, telegram_id: int):
     return db.query(User).filter(User.telegram_id == telegram_id).first()
+
+
+def _kb_cust_txn_flow(cid: int | None) -> InlineKeyboardMarkup:
+    """أزرار رجوع أثناء إدخال معاملة (مبلغ/ملاحظة)."""
+    if cid:
+        return InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
+                [InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit")],
+            ]
+        )
+    return kb_menu_customers()
+
+
+def _kb_cust_cat_back(context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
+    back_cid = context.user_data.get("cust_cat_back_customer_id")
+    if back_cid:
+        return InlineKeyboardMarkup(
+            [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_categories_menu_{back_cid}")]]
+        )
+    return kb_menu_customers()
 
 
 def _balance(customer):
@@ -134,7 +156,7 @@ async def _save_new_customer_from_add_flow(
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await update.message.reply_text("انتهت الجلسة. استخدم /start")
+            await update.message.reply_text("انتهت الجلسة. استخدم /start", reply_markup=kb_main_menu())
             return False
         c = Customer(user_id=user.id, name=name, phone=phone_norm)
         db.add(c)
@@ -263,7 +285,10 @@ async def menu_customer_categories(update: Update, context: ContextTypes.DEFAULT
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً. استخدم /start",
+                reply_markup=kb_main_menu(),
+            )
             return
 
         context.user_data["cust_cat_back_customer_id"] = back_customer_id
@@ -307,14 +332,20 @@ async def cust_cat_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
     context.user_data.pop("cust_cat_add_name", None)
     context.user_data.pop("cust_cat_add_kind", None)
-    await query.edit_message_text("أرسل اسم الصنف الجديد:")
+    await query.edit_message_text(
+        "أرسل اسم الصنف الجديد:",
+        reply_markup=_kb_cust_cat_back(context),
+    )
     return CAT_ADD_NAME
 
 
 async def cust_cat_name_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = (update.message.text or "").strip()
     if not name:
-        await update.message.reply_text("يرجى إرسال اسم صحيح للصنف.")
+        await update.message.reply_text(
+            "يرجى إرسال اسم صحيح للصنف.",
+            reply_markup=_kb_cust_cat_back(context),
+        )
         return CAT_ADD_NAME
     context.user_data["cust_cat_add_name"] = name
 
@@ -334,14 +365,17 @@ async def cust_cat_kind_took_click(update: Update, context: ContextTypes.DEFAULT
     back_cid = context.user_data.get("cust_cat_back_customer_id")
     name = context.user_data.get("cust_cat_add_name")
     if not back_cid or not name:
-        await query.edit_message_text("انتهت الجلسة. ابدأ من جديد.")
+        await query.edit_message_text(
+            "انتهت الجلسة. ابدأ من جديد.",
+            reply_markup=_kb_cust_cat_back(context),
+        )
         return ConversationHandler.END
 
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text("غير مسموح.", reply_markup=kb_main_menu())
             return ConversationHandler.END
         db.add(CustomerCategory(user_id=user.id, name=name, kind="took"))
         db.commit()
@@ -360,14 +394,17 @@ async def cust_cat_kind_gave_click(update: Update, context: ContextTypes.DEFAULT
     back_cid = context.user_data.get("cust_cat_back_customer_id")
     name = context.user_data.get("cust_cat_add_name")
     if not back_cid or not name:
-        await query.edit_message_text("انتهت الجلسة. ابدأ من جديد.")
+        await query.edit_message_text(
+            "انتهت الجلسة. ابدأ من جديد.",
+            reply_markup=_kb_cust_cat_back(context),
+        )
         return ConversationHandler.END
 
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text("غير مسموح.", reply_markup=kb_main_menu())
             return ConversationHandler.END
         db.add(CustomerCategory(user_id=user.id, name=name, kind="gave"))
         db.commit()
@@ -413,7 +450,7 @@ async def cust_cat_del_do_click(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text("غير مسموح.", reply_markup=kb_main_menu())
             return
         cat = (
             db.query(CustomerCategory)
@@ -477,13 +514,21 @@ async def reply_customer_search_results(
     if not msg:
         return
     if not q:
-        await msg.reply_text("اكتب نص بحث صحيح.")
+        await msg.reply_text(
+            "اكتب نص بحث صحيح.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ رجوع", callback_data="cust_search_back")]]
+            ),
+        )
         return
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await msg.reply_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            await msg.reply_text(
+                "يجب تسجيل الدخول أولاً. استخدم /start",
+                reply_markup=kb_main_menu(),
+            )
             return
         matches = _customers_ordered_by_usage_least_first(
             db, user.id, name_ilike=q, limit=25
@@ -569,7 +614,10 @@ async def qamt_kind_took_click(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     if context.user_data.get("quick_amount") is None:
-        await query.edit_message_text("انتهت الجلسة. أرسل الرقم من جديد.")
+        await query.edit_message_text(
+            "انتهت الجلسة. أرسل الرقم من جديد.",
+            reply_markup=kb_main_menu(),
+        )
         return
     context.user_data["quick_flow_kind"] = "took"
     await _edit_quick_customer_picker(query, context)
@@ -579,7 +627,10 @@ async def qamt_kind_gave_click(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     if context.user_data.get("quick_amount") is None:
-        await query.edit_message_text("انتهت الجلسة. أرسل الرقم من جديد.")
+        await query.edit_message_text(
+            "انتهت الجلسة. أرسل الرقم من جديد.",
+            reply_markup=kb_main_menu(),
+        )
         return
     context.user_data["quick_flow_kind"] = "gave"
     await _edit_quick_customer_picker(query, context)
@@ -594,7 +645,7 @@ async def qamt_cancel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     _clear_quick_amount_flow(context)
-    await query.edit_message_text("تم الإلغاء.")
+    await query.edit_message_text("تم الإلغاء.", reply_markup=kb_main_menu())
 
 
 async def _edit_quick_customer_picker(query, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -602,7 +653,10 @@ async def _edit_quick_customer_picker(query, context: ContextTypes.DEFAULT_TYPE)
     try:
         user = get_current_user(db, query.from_user.id)
         if not user:
-            await query.edit_message_text("يجب تسجيل الدخول أولاً.")
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً.",
+                reply_markup=kb_main_menu(),
+            )
             _clear_quick_amount_flow(context)
             return
         customers = _customers_ordered_by_usage_least_first(
@@ -611,7 +665,10 @@ async def _edit_quick_customer_picker(query, context: ContextTypes.DEFAULT_TYPE)
         amt = context.user_data.get("quick_amount")
         kind = context.user_data.get("quick_flow_kind")
         if amt is None or kind not in ("took", "gave"):
-            await query.edit_message_text("انتهت الجلسة.")
+            await query.edit_message_text(
+                "انتهت الجلسة.",
+                reply_markup=kb_main_menu(),
+            )
             _clear_quick_amount_flow(context)
             return
         if not customers:
@@ -649,12 +706,15 @@ async def quick_txn_pick_customer(update: Update, context: ContextTypes.DEFAULT_
     try:
         cid = int(query.data.replace("qamt_pick_", ""))
     except ValueError:
-        await query.edit_message_text("خطأ.")
+        await query.edit_message_text("خطأ.", reply_markup=kb_menu_customers())
         return ConversationHandler.END
     amt = context.user_data.pop("quick_amount", None)
     kind = context.user_data.pop("quick_flow_kind", None)
     if amt is None or kind not in ("took", "gave"):
-        await query.edit_message_text("انتهت الجلسة.")
+        await query.edit_message_text(
+            "انتهت الجلسة.",
+            reply_markup=kb_menu_customers(),
+        )
         return ConversationHandler.END
     db = SessionLocal()
     cust_name = ""
@@ -662,7 +722,10 @@ async def quick_txn_pick_customer(update: Update, context: ContextTypes.DEFAULT_
         cust = db.query(Customer).filter(Customer.id == cid).first()
         user = get_current_user(db, update.effective_user.id)
         if not cust or not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح أو العميل غير موجود.")
+            await query.edit_message_text(
+                "غير مسموح أو العميل غير موجود.",
+                reply_markup=kb_menu_customers(),
+            )
             return ConversationHandler.END
         cust_name = cust.name
     finally:
@@ -698,7 +761,8 @@ async def cust_add_from_search_start(update: Update, context: ContextTypes.DEFAU
     name = context.user_data.pop("pending_add_name", None)
     if not name or not str(name).strip():
         await query.edit_message_text(
-            "انتهت الجلسة. أعد البحث ثم اضغط «إضافة كعميل بهذا الاسم»."
+            "انتهت الجلسة. أعد البحث ثم اضغط «إضافة كعميل بهذا الاسم».",
+            reply_markup=kb_menu_customers(),
         )
         return ConversationHandler.END
     context.user_data["cust_name"] = name.strip()
@@ -722,7 +786,10 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً. استخدم /start",
+                reply_markup=kb_main_menu(),
+            )
             return
         customers = _customers_ordered_by_usage_least_first(db, user.id)
         keyboard: list[list[InlineKeyboardButton]] = []
@@ -769,7 +836,12 @@ async def cust_search_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cust_search_query_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = (update.message.text or "").strip()
     if not q:
-        await update.message.reply_text("اكتب نص بحث صحيح.")
+        await update.message.reply_text(
+            "اكتب نص بحث صحيح.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ رجوع", callback_data="cust_search_back")]]
+            ),
+        )
         return CUST_SEARCH_QUERY
     await reply_customer_search_results(update, context, q)
     return ConversationHandler.END
@@ -791,7 +863,8 @@ async def cust_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "يمكنك:\n"
         "• الاسم والرقم في سطر واحد (مثال: أحمد 07701234567)\n"
         "• أو سطرين: الاسم ثم الرقم تحته\n"
-        "• أو الاسم الآن والرقم في رسالة لاحقة"
+        "• أو الاسم الآن والرقم في رسالة لاحقة",
+        reply_markup=kb_menu_customers(),
     )
     return CUST_NAME
 
@@ -802,7 +875,8 @@ async def cust_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not name_part:
         await update.message.reply_text(
             "يرجى إرسال اسم العميل.\n"
-            "إذا أرسلت الرقم وحده، اكتب الاسم معه أو في الرسالة التالية."
+            "إذا أرسلت الرقم وحده، اكتب الاسم معه أو في الرسالة التالية.",
+            reply_markup=kb_menu_customers(),
         )
         return CUST_NAME
     context.user_data["cust_name"] = name_part
@@ -811,7 +885,8 @@ async def cust_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_plausible_iraq_mobile(phone_norm):
             await update.message.reply_text(
                 "الرقم بجانب الاسم غير صحيح.\n"
-                "جرّب: 077… أو 7××× أو +964… أو أرسل الاسم فقط ثم الرقم في رسالة أخرى."
+                "جرّب: 077… أو 7××× أو +964… أو أرسل الاسم فقط ثم الرقم في رسالة أخرى.",
+                reply_markup=kb_menu_customers(),
             )
             return CUST_NAME
         if await _save_new_customer_from_add_flow(update, context, name_part, phone_norm):
@@ -822,7 +897,10 @@ async def cust_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "تم ✅\n\nأرسل رقم هاتف العميل (اختياري).\n"
         "إذا تريد تخطي الرقم اضغط زر التخطي.",
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("⏭️ تخطي الرقم", callback_data="cust_phone_skip_btn")]]
+            [
+                [InlineKeyboardButton("⏭️ تخطي الرقم", callback_data="cust_phone_skip_btn")],
+                [InlineKeyboardButton("◀ دفتر الديون", callback_data="menu_customers")],
+            ]
         ),
     )
     return CUST_PHONE
@@ -839,12 +917,21 @@ async def cust_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = normalize_phone(raw)
     if not is_plausible_iraq_mobile(phone):
         await update.message.reply_text(
-            "رقم غير صحيح. جرّب: 077… أو 7××× أو +964… أو اضغط تخطي."
+            "رقم غير صحيح. جرّب: 077… أو 7××× أو +964… أو اضغط تخطي.",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("⏭️ تخطي الرقم", callback_data="cust_phone_skip_btn")],
+                    [InlineKeyboardButton("◀ دفتر الديون", callback_data="menu_customers")],
+                ]
+            ),
         )
         return CUST_PHONE
     name = context.user_data.get("cust_name")
     if not name:
-        await update.message.reply_text("انتهت الجلسة. ابدأ إضافة عميل من جديد.")
+        await update.message.reply_text(
+            "انتهت الجلسة. ابدأ إضافة عميل من جديد.",
+            reply_markup=kb_menu_customers(),
+        )
         return ConversationHandler.END
     if await _save_new_customer_from_add_flow(update, context, name, phone):
         context.user_data.pop("cust_name", None)
@@ -859,7 +946,10 @@ async def cust_phone_skip_click(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await query.edit_message_text("انتهت الجلسة. استخدم /start")
+            await query.edit_message_text(
+                "انتهت الجلسة. استخدم /start",
+                reply_markup=kb_main_menu(),
+            )
             return ConversationHandler.END
         c = Customer(user_id=user.id, name=context.user_data["cust_name"], phone=None)
         db.add(c)
@@ -1019,11 +1109,17 @@ async def customer_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, cu
     try:
         cust = db.query(Customer).filter(Customer.id == customer_id).first()
         if not cust:
-            await update.callback_query.edit_message_text("العميل غير موجود.")
+            await update.callback_query.edit_message_text(
+                "العميل غير موجود.",
+                reply_markup=kb_menu_customers(),
+            )
             return
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await update.callback_query.edit_message_text("غير مسموح.")
+            await update.callback_query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_main_menu(),
+            )
             return
         text, keyboard = await _build_customer_view(db, cust, offset)
         await _safe_edit_callback_text(update.callback_query, text, keyboard)
@@ -1080,12 +1176,18 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
         if not tx:
-            await query.edit_message_text("المعاملة غير موجودة.")
+            await query.edit_message_text(
+                "المعاملة غير موجودة.",
+                reply_markup=kb_menu_customers(),
+            )
             return
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_main_menu(),
+            )
             return
         text, keyboard = await _render_tx_detail(db, tx)
         # نعرض التفاصيل أولاً، ثم الأزرار برسالة منفصلة (حسب طلب المستخدم).
@@ -1108,9 +1210,12 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
 
-        # نخلي رسالة الزر القديمة قصيرة بدون أزرار
+        # نخلي رسالة الزر القديمة قصيرة مع زر رجوع للمعاملة
         try:
-            await query.edit_message_text("تم عرض تفاصيل المعاملة ✅")
+            await query.edit_message_text(
+                "تم عرض تفاصيل المعاملة ✅",
+                reply_markup=kb_tx_detail(tx_id),
+            )
         except Exception:
             pass
     finally:
@@ -1149,19 +1254,28 @@ async def cust_tx_delete_click(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     data = query.data or ""
     if not data.startswith("cust_tx_delete_do_"):
-        await query.edit_message_text("استخدم زر تأكيد الحذف من الشاشة السابقة.")
+        await query.edit_message_text(
+            "استخدم زر تأكيد الحذف من الشاشة السابقة.",
+            reply_markup=kb_main_menu(),
+        )
         return
     tx_id = int(data.replace("cust_tx_delete_do_", ""))
     db = SessionLocal()
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
         if not tx:
-            await query.edit_message_text("المعاملة غير موجودة.")
+            await query.edit_message_text(
+                "المعاملة غير موجودة.",
+                reply_markup=kb_menu_customers(),
+            )
             return
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_main_menu(),
+            )
             return
         db.delete(tx)
         db.commit()
@@ -1179,12 +1293,18 @@ async def cust_tx_toggle_kind_click(update: Update, context: ContextTypes.DEFAUL
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
         if not tx:
-            await query.edit_message_text("المعاملة غير موجودة.")
+            await query.edit_message_text(
+                "المعاملة غير موجودة.",
+                reply_markup=kb_menu_customers(),
+            )
             return
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_main_menu(),
+            )
             return
         tx.kind = "gave" if tx.kind == "took" else "took"
         db.commit()
@@ -1194,36 +1314,72 @@ async def cust_tx_toggle_kind_click(update: Update, context: ContextTypes.DEFAUL
         db.close()
 
 
+async def cust_tx_edit_back_to_detail(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رجوع من تعديل مبلغ/ملاحظة إلى صفحة تفاصيل المعاملة."""
+    query = update.callback_query
+    await query.answer()
+    try:
+        tx_id = int((query.data or "").replace("cust_tx_", "", 1))
+    except ValueError:
+        from telegram.ext import ConversationHandler
+
+        return ConversationHandler.END
+    stored = context.user_data.get("tx_edit_id")
+    if stored != tx_id:
+        await query.answer("استخدم زر الرجوع لنفس المعاملة.", show_alert=True)
+        return None
+    context.user_data.pop("tx_edit_id", None)
+    await cust_tx_detail(update, context, tx_id)
+    from telegram.ext import ConversationHandler
+
+    return ConversationHandler.END
+
+
 async def cust_tx_edit_amount_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     tx_id = int(query.data.replace("cust_tx_edit_amount_", ""))
     context.user_data["tx_edit_id"] = tx_id
-    await query.edit_message_text("أرسل المبلغ الجديد (رقم فقط مثال: 82.75):")
+    await query.edit_message_text(
+        "أرسل المبلغ الجديد (رقم فقط مثال: 82.75):",
+        reply_markup=kb_tx_detail(tx_id),
+    )
     return TX_EDIT_AMOUNT
 
 
 async def cust_tx_edit_amount_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    tx_id = context.user_data.get("tx_edit_id")
     try:
         amount = Decimal((update.message.text or "").replace(",", "").strip())
         if amount <= 0:
-            await update.message.reply_text("أدخل مبلغاً أكبر من صفر.")
+            await update.message.reply_text(
+                "أدخل مبلغاً أكبر من صفر.",
+                reply_markup=kb_tx_detail(tx_id) if tx_id else kb_menu_customers(),
+            )
             return TX_EDIT_AMOUNT
     except Exception:
-        await update.message.reply_text("أدخل رقماً صحيحاً.")
+        await update.message.reply_text(
+            "أدخل رقماً صحيحاً.",
+            reply_markup=kb_tx_detail(tx_id) if tx_id else kb_menu_customers(),
+        )
         return TX_EDIT_AMOUNT
 
     db = SessionLocal()
-    tx_id = context.user_data.get("tx_edit_id")
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
         if not tx:
-            await update.message.reply_text("المعاملة غير موجودة.")
+            await update.message.reply_text(
+                "المعاملة غير موجودة.",
+                reply_markup=kb_tx_detail(tx_id) if tx_id else kb_menu_customers(),
+            )
             return ConversationHandler.END
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await update.message.reply_text("غير مسموح.")
+            await update.message.reply_text(
+                "غير مسموح.",
+                reply_markup=kb_tx_detail(tx_id) if tx_id else kb_menu_customers(),
+            )
             return ConversationHandler.END
         tx.amount = amount
         db.commit()
@@ -1240,7 +1396,10 @@ async def cust_tx_edit_note_start(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     tx_id = int(query.data.replace("cust_tx_edit_note_", ""))
     context.user_data["tx_edit_id"] = tx_id
-    await query.edit_message_text("أرسل الملاحظة الجديدة (أو اكتب: حذف لحذفها):")
+    await query.edit_message_text(
+        "أرسل الملاحظة الجديدة (أو اكتب: حذف لحذفها):",
+        reply_markup=kb_tx_detail(tx_id),
+    )
     return TX_EDIT_NOTE
 
 
@@ -1253,12 +1412,18 @@ async def cust_tx_edit_note_done(update: Update, context: ContextTypes.DEFAULT_T
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
         if not tx:
-            await update.message.reply_text("المعاملة غير موجودة.")
+            await update.message.reply_text(
+                "المعاملة غير موجودة.",
+                reply_markup=kb_tx_detail(tx_id) if tx_id else kb_menu_customers(),
+            )
             return ConversationHandler.END
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await update.message.reply_text("غير مسموح.")
+            await update.message.reply_text(
+                "غير مسموح.",
+                reply_markup=kb_tx_detail(tx_id) if tx_id else kb_menu_customers(),
+            )
             return ConversationHandler.END
         tx.note = note
         db.commit()
@@ -1289,12 +1454,18 @@ async def apply_tx_datetime_from_picker(
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
         if not tx:
-            await query.edit_message_text("المعاملة غير موجودة.")
+            await query.edit_message_text(
+                "المعاملة غير موجودة.",
+                reply_markup=kb_menu_customers(),
+            )
             return ConversationHandler.END
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_main_menu(),
+            )
             return ConversationHandler.END
         tx.created_at = dt
         db.commit()
@@ -1319,17 +1490,29 @@ async def _apply_tx_new_date(
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
         if not tx:
             if update.message:
-                await update.message.reply_text("المعاملة غير موجودة.")
+                await update.message.reply_text(
+                    "المعاملة غير موجودة.",
+                    reply_markup=kb_tx_detail(tx_id),
+                )
             elif update.callback_query:
-                await update.callback_query.edit_message_text("المعاملة غير موجودة.")
+                await update.callback_query.edit_message_text(
+                    "المعاملة غير موجودة.",
+                    reply_markup=kb_tx_detail(tx_id),
+                )
             return ConversationHandler.END
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
             if update.message:
-                await update.message.reply_text("غير مسموح.")
+                await update.message.reply_text(
+                    "غير مسموح.",
+                    reply_markup=kb_tx_detail(tx_id),
+                )
             elif update.callback_query:
-                await update.callback_query.edit_message_text("غير مسموح.")
+                await update.callback_query.edit_message_text(
+                    "غير مسموح.",
+                    reply_markup=kb_tx_detail(tx_id),
+                )
             return ConversationHandler.END
         old = tx.created_at
         if old:
@@ -1355,7 +1538,7 @@ async def cust_tx_edit_date_back_click(update: Update, context: ContextTypes.DEF
 
     clear_dt_user_data(context)
     context.user_data.pop("tx_edit_id", None)
-    await query.edit_message_text("تم الرجوع.")
+    await query.edit_message_text("تم الرجوع.", reply_markup=kb_main_menu())
     return ConversationHandler.END
 
 
@@ -1371,10 +1554,12 @@ async def cust_tx_edit_date_pick(update: Update, context: ContextTypes.DEFAULT_T
     try:
         new_date = datetime.strptime(ymd, "%Y%m%d").date()
     except ValueError:
-        await query.edit_message_text("تاريخ غير صالح.")
+        await query.edit_message_text("تاريخ غير صالح.", reply_markup=kb_main_menu())
         return TX_EDIT_DATE
     if context.user_data.get("tx_edit_id") != tx_id:
-        await query.edit_message_text("انتهت الجلسة. ابدأ من جديد.")
+        await query.edit_message_text(
+            "انتهت الجلسة. ابدأ من جديد.", reply_markup=kb_main_menu()
+        )
         return ConversationHandler.END
     return await _apply_tx_new_date(update, context, tx_id, new_date)
 
@@ -1400,12 +1585,18 @@ async def cust_tx_edit_photo_back_click(update: Update, context: ContextTypes.DE
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
         if not tx:
-            await query.edit_message_text("المعاملة غير موجودة.")
+            await query.edit_message_text(
+                "المعاملة غير موجودة.",
+                reply_markup=kb_tx_detail(tx_id),
+            )
             return ConversationHandler.END
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_tx_detail(tx_id),
+            )
             return ConversationHandler.END
         text, keyboard = await _render_tx_detail(db, tx)
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1421,15 +1612,24 @@ async def cust_tx_edit_photo_done(update: Update, context: ContextTypes.DEFAULT_
     try:
         tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
         if not tx:
-            await update.message.reply_text("المعاملة غير موجودة.")
+            await update.message.reply_text(
+                "المعاملة غير موجودة.",
+                reply_markup=kb_tx_detail(tx_id) if tx_id else kb_menu_customers(),
+            )
             return ConversationHandler.END
         cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await update.message.reply_text("غير مسموح.")
+            await update.message.reply_text(
+                "غير مسموح.",
+                reply_markup=kb_tx_detail(tx_id) if tx_id else kb_menu_customers(),
+            )
             return ConversationHandler.END
         if not update.message.photo:
-            await update.message.reply_text("لم تصل صورة. حاول مرة أخرى.")
+            await update.message.reply_text(
+                "لم تصل صورة. حاول مرة أخرى.",
+                reply_markup=kb_tx_detail(tx_id) if tx_id else kb_menu_customers(),
+            )
             return TX_EDIT_PHOTO
         file_id = update.message.photo[-1].file_id
         tx.photo_file_id = file_id
@@ -1501,7 +1701,10 @@ async def cust_txn_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         cid = int(query.data.replace("cust_txn_back_", ""))
     except Exception:
-        await query.edit_message_text("غير قادر على الرجوع.")
+        await query.edit_message_text(
+            "غير قادر على الرجوع.",
+            reply_markup=kb_menu_customers(),
+        )
         return ConversationHandler.END
 
     for k in _CUST_TXN_KEYS:
@@ -1549,7 +1752,8 @@ async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "لم أستخرج مبلغاً صحيحاً.\n"
             "جرّب: 38  أو  38 الفيروز  أو سطرين (المبلغ ثم الملاحظة)\n"
-            "أو أرسل صورة والمبلغ في تعليق الصورة."
+            "أو أرسل صورة والمبلغ في تعليق الصورة.",
+            reply_markup=_kb_cust_txn_flow(context.user_data.get("cust_txn_cid")),
         )
         return CUST_AMOUNT
     context.user_data["cust_txn_amount"] = amount
@@ -1600,13 +1804,15 @@ async def cust_amount_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not caption:
         await update.message.reply_text(
             "أرسل الصورة مع تعليق يحتوي المبلغ.\n"
-            "أمثلة للتعليق: 38  أو  38 الفيروز  أو سطرين (المبلغ ثم الملاحظة)."
+            "أمثلة للتعليق: 38  أو  38 الفيروز  أو سطرين (المبلغ ثم الملاحظة).",
+            reply_markup=_kb_cust_txn_flow(context.user_data.get("cust_txn_cid")),
         )
         return CUST_AMOUNT
     amount, note_opt = _parse_amount_and_optional_note(caption)
     if amount is None:
         await update.message.reply_text(
-            "لم أستخرج مبلغاً من تعليق الصورة. جرّب: 38  أو  38 الفيروز"
+            "لم أستخرج مبلغاً من تعليق الصورة. جرّب: 38  أو  38 الفيروز",
+            reply_markup=_kb_cust_txn_flow(context.user_data.get("cust_txn_cid")),
         )
         return CUST_AMOUNT
     context.user_data["cust_txn_amount"] = amount
@@ -1665,11 +1871,17 @@ async def cust_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo_file_id = context.user_data.get("cust_txn_photo_file_id")
         cust = db.query(Customer).filter(Customer.id == cid).first()
         if not cust:
-            await update.message.reply_text("العميل غير موجود.")
+            await update.message.reply_text(
+                "العميل غير موجود.",
+                reply_markup=kb_menu_customers(),
+            )
             return ConversationHandler.END
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await update.message.reply_text("غير مسموح.")
+            await update.message.reply_text(
+                "غير مسموح.",
+                reply_markup=kb_menu_customers(),
+            )
             return ConversationHandler.END
         t = CustomerTransaction(
             customer_id=cid,
@@ -1742,11 +1954,17 @@ async def cust_note_skip_click(update: Update, context: ContextTypes.DEFAULT_TYP
         photo_file_id = context.user_data.get("cust_txn_photo_file_id")
         cust = db.query(Customer).filter(Customer.id == cid).first()
         if not cust:
-            await query.edit_message_text("العميل غير موجود.")
+            await query.edit_message_text(
+                "العميل غير موجود.",
+                reply_markup=kb_menu_customers(),
+            )
             return ConversationHandler.END
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_menu_customers(),
+            )
             return ConversationHandler.END
         note = context.user_data.get("cust_txn_note_text")
         t = CustomerTransaction(
@@ -1782,11 +2000,17 @@ async def cust_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         cust = db.query(Customer).filter(Customer.id == cid).first()
         if not cust:
-            await query.edit_message_text("العميل غير موجود.")
+            await query.edit_message_text(
+                "العميل غير موجود.",
+                reply_markup=kb_menu_customers(),
+            )
             return
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_main_menu(),
+            )
             return
         plink = (
             db.query(PartnerLink)
@@ -1823,7 +2047,12 @@ async def cust_edit_name_start(update: Update, context: ContextTypes.DEFAULT_TYP
     cid = int(query.data.replace("cust_editname_", ""))
     context.user_data["cust_edit_id"] = cid
     context.user_data["cust_edit_field"] = "name"
-    await query.edit_message_text("أرسل الاسم الجديد للعميل:")
+    await query.edit_message_text(
+        "أرسل الاسم الجديد للعميل:",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_{cid}")]]
+        ),
+    )
     return CUST_EDIT_NAME
 
 
@@ -1833,14 +2062,27 @@ async def cust_edit_phone_start(update: Update, context: ContextTypes.DEFAULT_TY
     cid = int(query.data.replace("cust_editphone_", ""))
     context.user_data["cust_edit_id"] = cid
     context.user_data["cust_edit_field"] = "phone"
-    await query.edit_message_text("أرسل رقم الهاتف الجديد (أو اكتب: حذف لإزالة الرقم):")
+    await query.edit_message_text(
+        "أرسل رقم الهاتف الجديد (أو اكتب: حذف لإزالة الرقم):",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_{cid}")]]
+        ),
+    )
     return CUST_EDIT_PHONE
 
 
 async def cust_edit_name_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = (update.message.text or "").strip()
     if not name:
-        await update.message.reply_text("أرسل اسماً صحيحاً.")
+        cid = context.user_data.get("cust_edit_id")
+        await update.message.reply_text(
+            "أرسل اسماً صحيحاً.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_{cid}")]]
+            )
+            if cid
+            else kb_menu_customers(),
+        )
         return CUST_EDIT_NAME
     cid = context.user_data.get("cust_edit_id")
     db = SessionLocal()
@@ -1865,7 +2107,15 @@ async def cust_edit_phone_done(update: Update, context: ContextTypes.DEFAULT_TYP
         raw = (update.message.text or "").strip()
     phone = None if raw.lower() in ("حذف", "delete", "") else normalize_phone(raw)
     if phone is not None and not is_plausible_iraq_mobile(phone):
-        await update.message.reply_text("رقم غير صحيح. أرسل الرقم أو اكتب: حذف")
+        cid = context.user_data.get("cust_edit_id")
+        await update.message.reply_text(
+            "رقم غير صحيح. أرسل الرقم أو اكتب: حذف",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_{cid}")]]
+            )
+            if cid
+            else kb_menu_customers(),
+        )
         return CUST_EDIT_PHONE
     cid = context.user_data.get("cust_edit_id")
     db = SessionLocal()
@@ -1892,11 +2142,17 @@ async def cust_delete_req_click(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         cust = db.query(Customer).filter(Customer.id == cid).first()
         if not cust:
-            await query.edit_message_text("العميل غير موجود.")
+            await query.edit_message_text(
+                "العميل غير موجود.",
+                reply_markup=kb_menu_customers(),
+            )
             return
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_main_menu(),
+            )
             return
         tx_count = db.query(CustomerTransaction).filter(CustomerTransaction.customer_id == cid).count()
         name = cust.name
@@ -1932,7 +2188,11 @@ async def cust_delete_do_click(update: Update, context: ContextTypes.DEFAULT_TYP
             return
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await _safe_edit_callback_text(query, "غير مسموح.", None)
+            await _safe_edit_callback_text(
+                query,
+                "غير مسموح.",
+                [[InlineKeyboardButton("◀ قائمة العملاء", callback_data="menu_customers")]],
+            )
             return
         name = cust.name
         # PostgreSQL يرفض حذف العميل طالما توجد معاملات أو روابط مشاركة — نحذفها أولاً
@@ -1978,11 +2238,17 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         cust = db.query(Customer).filter(Customer.id == cid).first()
         if not cust:
-            await query.edit_message_text("العميل غير موجود.")
+            await query.edit_message_text(
+                "العميل غير موجود.",
+                reply_markup=kb_menu_customers(),
+            )
             return
         user = get_current_user(db, update.effective_user.id)
         if not user or cust.user_id != user.id:
-            await query.edit_message_text("غير مسموح.")
+            await query.edit_message_text(
+                "غير مسموح.",
+                reply_markup=kb_main_menu(),
+            )
             return
         bal, gave, took = _balance(cust)
         cur = "د.ع."

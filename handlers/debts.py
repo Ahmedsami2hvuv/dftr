@@ -5,6 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from database import SessionLocal
 from app_models import User, Debt
+from handlers.inline_nav import kb_main_menu
 
 (DEBT_MENU, DEBT_WHO, DEBT_AMOUNT, DEBT_DIR, DEBT_DESC) = range(5)
 
@@ -31,7 +32,10 @@ async def menu_debts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً. استخدم /start",
+                reply_markup=kb_main_menu(),
+            )
             return
         keyboard = [
             [InlineKeyboardButton("➕ تسجيل دين (لصالحك)", callback_data="debt_add_they_owe")],
@@ -136,7 +140,10 @@ async def debt_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await update.message.reply_text("انتهت الجلسة. استخدم /start")
+            await update.message.reply_text(
+                "انتهت الجلسة. استخدم /start",
+                reply_markup=kb_main_menu(),
+            )
             return ConversationHandler.END
         debt = Debt(
             from_user_id=user.id,
@@ -173,7 +180,10 @@ async def debt_skip_desc_click(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً. استخدم /start",
+                reply_markup=kb_main_menu(),
+            )
             return ConversationHandler.END
         debt = Debt(
             from_user_id=user.id,
@@ -209,7 +219,10 @@ async def debt_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user = get_current_user(db, update.effective_user.id)
         if not user:
-            await query.edit_message_text("يجب تسجيل الدخول أولاً.")
+            await query.edit_message_text(
+                "يجب تسجيل الدخول أولاً.",
+                reply_markup=kb_main_menu(),
+            )
             return
         debts = (
             db.query(Debt)
