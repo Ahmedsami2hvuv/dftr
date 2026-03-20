@@ -319,8 +319,8 @@ async def cust_cat_name_done(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     keyboard = [
         [
-            InlineKeyboardButton("🔴 أخذت (took)", callback_data="cust_cat_kind_took"),
             InlineKeyboardButton("🟢 أعطيت (gave)", callback_data="cust_cat_kind_gave"),
+            InlineKeyboardButton("🔴 أخذت (took)", callback_data="cust_cat_kind_took"),
         ]
     ]
     await update.message.reply_text("حدد نوع الصنف:", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -530,8 +530,8 @@ async def cust_search_global_message(update: Update, context: ContextTypes.DEFAU
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [
-                            InlineKeyboardButton("🔴 أخذت", callback_data="qamt_k_took"),
                             InlineKeyboardButton("🟢 أعطيت", callback_data="qamt_k_gave"),
+                            InlineKeyboardButton("🔴 أخذت", callback_data="qamt_k_took"),
                         ],
                         [InlineKeyboardButton("❌ إلغاء", callback_data="qamt_cancel")],
                     ]
@@ -959,11 +959,11 @@ async def _build_customer_view(db, cust: Customer, offset: int):
             label = f"{icon} {amount_str} | {note_part} | 💰 {remain_str} | {dt}"
             keyboard.append([InlineKeyboardButton(label[:64], callback_data=f"cust_tx_{t.id}")])
 
-    # زر أخذت/أعطيت في آخر المعاملات
+    # زر أعطيت (يمين في RTL) ثم أخذت (يسار)
     keyboard.append(
         [
-            InlineKeyboardButton("🔴 أخذت", callback_data=f"cust_took_{cust.id}"),
             InlineKeyboardButton("🟢 أعطيت", callback_data=f"cust_gave_{cust.id}"),
+            InlineKeyboardButton("🔴 أخذت", callback_data=f"cust_took_{cust.id}"),
         ]
     )
 

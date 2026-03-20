@@ -209,8 +209,8 @@ async def ledger_cat_name_done(update: Update, context: ContextTypes.DEFAULT_TYP
 
     keyboard = [
         [
-            InlineKeyboardButton("🔴 أخذت", callback_data="ledger_cat_kind_took"),
             InlineKeyboardButton("🟢 أعطيت", callback_data="ledger_cat_kind_gave"),
+            InlineKeyboardButton("🔴 أخذت", callback_data="ledger_cat_kind_took"),
         ]
     ]
     await update.message.reply_text("حدد نوع الصنف:", reply_markup=InlineKeyboardMarkup(keyboard))
