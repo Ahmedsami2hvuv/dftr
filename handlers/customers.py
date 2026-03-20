@@ -2271,7 +2271,8 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if bal > 0:
             msg_balance = f"عليك رصيد {bal:.2f} {cur}"
         elif bal < 0:
-            msg_balance = f"لي رصيد {abs(bal):.2f} {cur}"
+            # النص يُرسل للطرف الآخر (العميل). استخدم صيغة "لك" بدل "لي".
+            msg_balance = f"لك رصيد {abs(bal):.2f} {cur}"
         else:
             msg_balance = "الرصيد صفر"
         link_hint = "⬇️ المس الرابط لمشاهدة كافة التفاصيل"
