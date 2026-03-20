@@ -72,6 +72,7 @@ async def auth_register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["auth_action"] = "register"
+    context.user_data.pop("force_login", None)
     _clear_quick_amount_state(context)
     await query.edit_message_text(
         "إنشاء حساب جديد 📝\n\nأرسل اسمك الكامل (أو ما تريد أن يظهر في الدفتر):"
@@ -156,6 +157,7 @@ async def auth_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["auth_action"] = "login"
+    context.user_data.pop("force_login", None)
     _clear_quick_amount_state(context)
     await query.edit_message_text(
         "تسجيل الدخول 🔐\n\nأرسل رقم هاتفك المسجل (مثال: +9647733921468):"
@@ -237,6 +239,7 @@ async def auth_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["auth_action"] = "forgot"
+    context.user_data.pop("force_login", None)
     _clear_quick_amount_state(context)
     await query.edit_message_text(
         "نسيت كلمة المرور 🔑\n\nأرسل رقم هاتفك المسجل في الحساب:"
@@ -714,7 +717,10 @@ async def auth_logout_do(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         db.close()
 
+    # منع أي "زر قديم" في نفس جهاز المستخدم من إعادة فتح الحساب مباشرة بعد تسجيل الخروج.
+    context.user_data["force_login"] = True
     context.user_data.clear()
+    context.user_data["force_login"] = True
 
     # رسالة واحدة واضحة؛ وإذا تعذر تعديل الرسالة نرسل رسالة جديدة.
     if query:

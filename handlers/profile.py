@@ -14,6 +14,16 @@ async def menu_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["last_menu"] = "profile"
+    if context.user_data.get("force_login"):
+        keyboard = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+                [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+                [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+            ]
+        )
+        await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم الأزرار أدناه.", reply_markup=keyboard)
+        return
     db = SessionLocal()
     try:
         user = get_current_user(db, update.effective_user.id)

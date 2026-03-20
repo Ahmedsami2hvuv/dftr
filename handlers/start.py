@@ -9,6 +9,18 @@ from config import ADMIN_ID
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args or []
+    # إذا تم تسجيل الخروج من هذا الجهاز للتو، امنع أي أزرار قديمة من إعادة فتح الحساب.
+    if context.user_data.get("force_login"):
+        keyboard = [
+            [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+            [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+            [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+        ]
+        await update.message.reply_text(
+            "يجب تسجيل الدخول أولاً. استخدم الأزرار أدناه.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
     # ربط مستخدمين: /start plink_TOKEN
     if args and args[0].startswith("plink_"):
         token = args[0].replace("plink_", "", 1)
@@ -96,6 +108,17 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     # حماية: إذا المستخدم غير مسجل (بعد تسجيل خروج أو من زر قديم) لا نعرض القائمة.
+    if context.user_data.get("force_login"):
+        keyboard = [
+            [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+            [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+            [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+        ]
+        await query.edit_message_text(
+            "يجب تسجيل الدخول أولاً. استخدم الأزرار أدناه.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.telegram_id == update.effective_user.id).first()
@@ -135,6 +158,17 @@ async def usage_instructions(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     # حماية: لا تعرض الشرح بدون تسجيل دخول.
+    if context.user_data.get("force_login"):
+        keyboard = [
+            [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+            [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+            [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+        ]
+        await query.edit_message_text(
+            "يجب تسجيل الدخول أولاً. استخدم الأزرار أدناه.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.telegram_id == update.effective_user.id).first()
