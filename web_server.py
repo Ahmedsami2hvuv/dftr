@@ -354,7 +354,7 @@ def _render_page(token: str, offset: int) -> str:
                 z-index: 1;
               }}
               .owner-name {{
-                font-size: clamp(0.92rem, 3.6vw, 1.12rem);
+                font-size: clamp(1rem, 4vw, 1.22rem);
                 font-weight: 800;
                 line-height: 1.25;
                 margin: 0;
