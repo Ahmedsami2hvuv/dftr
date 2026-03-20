@@ -149,9 +149,14 @@ def _kb_cust_amount_calc(cid: int | None, expr_display: str):
 
     return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("🧹 مسح", callback_data="calc_amt_clear"),
-             InlineKeyboardButton("⌫", callback_data="calc_amt_backspace"),
-             InlineKeyboardButton("÷", callback_data="calc_amt_op_div")],
+            [
+                InlineKeyboardButton("🧮 إخفاء الحاسبة", callback_data="calc_amt_hide"),
+                InlineKeyboardButton("🧹 مسح", callback_data="calc_amt_clear"),
+            ],
+            [
+                InlineKeyboardButton("⌫", callback_data="calc_amt_backspace"),
+                InlineKeyboardButton("÷", callback_data="calc_amt_op_div"),
+            ],
             [
                 InlineKeyboardButton("7", callback_data="calc_amt_digit_7"),
                 InlineKeyboardButton("8", callback_data="calc_amt_digit_8"),
@@ -192,6 +197,25 @@ async def cust_calc_amount_click(update: Update, context: ContextTypes.DEFAULT_T
     # cid مستخدم في أزرار الرجوع فقط.
     cid = context.user_data.get("cust_txn_cid")
     cid = int(cid) if cid else None
+
+    if data == "calc_amt_hide":
+        kind = context.user_data.get("cust_txn_kind")
+        kind_label = "أخذت 🔴" if kind == "took" else "أعطيت 🟢"
+        back_row = (
+            [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}"), InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit")]
+            if cid
+            else None
+        )
+        kb = [([InlineKeyboardButton("🧮 إظهار الحاسبة", callback_data="calc_amt_open")])]
+        if back_row:
+            kb.append(back_row)
+        await query.edit_message_text(
+            f"({kind_label})\n\n"
+            "ارسل المبلغ\n"
+            "وبعدها انقر على ✅ إدخال المبلغ",
+            reply_markup=InlineKeyboardMarkup(kb),
+        )
+        return CUST_AMOUNT
 
     if data == "calc_amt_open" or data == "calc_amt_clear" or "calc_amt_clear" == data:
         context.user_data["cust_calc_expr"] = "0"
@@ -2059,12 +2083,21 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # افتح الحاسبة تلقائياً مباشرة عند اختيار النوع.
     context.user_data["cust_calc_expr"] = "0"
     context.user_data["cust_calc_last_was_equals"] = False
+    kb = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🧮 إظهار الحاسبة", callback_data="calc_amt_open")],
+            [
+                InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}"),
+                InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit"),
+            ],
+        ]
+    )
     await query.edit_message_text(
         "(أخذت 🔴)\n\n"
         "ارسل المبلغ\n"
-        "او استخدم 🧮 الحاسبة\n"
+        "او اضغط 🧮 الحاسبة لإظهارها\n"
         "وبعدها انقر على ✅ إدخال المبلغ",
-        reply_markup=_kb_cust_amount_calc(cid, "0.00"),
+        reply_markup=kb,
     )
     return CUST_AMOUNT
 
@@ -2093,12 +2126,21 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # افتح الحاسبة تلقائياً مباشرة عند اختيار النوع.
     context.user_data["cust_calc_expr"] = "0"
     context.user_data["cust_calc_last_was_equals"] = False
+    kb = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🧮 إظهار الحاسبة", callback_data="calc_amt_open")],
+            [
+                InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}"),
+                InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit"),
+            ],
+        ]
+    )
     await query.edit_message_text(
         "(أعطيت 🟢)\n\n"
         "ارسل المبلغ\n"
-        "او استخدم 🧮 الحاسبة\n"
+        "او اضغط 🧮 الحاسبة لإظهارها\n"
         "وبعدها انقر على ✅ إدخال المبلغ",
-        reply_markup=_kb_cust_amount_calc(cid, "0.00"),
+        reply_markup=kb,
     )
     return CUST_AMOUNT
 
