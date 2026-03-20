@@ -306,9 +306,10 @@ def _render_page(token: str, offset: int) -> str:
                 box-shadow: 0 8px 24px rgba(13, 148, 136, 0.35);
                 border: 3px solid rgba(255,255,255,0.95);
               }}
+              /* افتراضي = موبايل: صف واحد للاسم + الرقم، صندوق مضغوط */
               .owner-showcase {{
                 flex: 0 1 auto;
-                max-width: min(260px, 92vw);
+                max-width: min(100%, 92vw);
                 min-width: 0;
                 background: linear-gradient(145deg, #0d9488 0%, #0f766e 55%, #115e59 100%);
                 color: #fff;
@@ -338,34 +339,53 @@ def _render_page(token: str, offset: int) -> str:
                 font-weight: 800;
                 letter-spacing: 0.06em;
                 opacity: 0.9;
-                margin-bottom: 4px;
+                margin-bottom: 6px;
+                position: relative;
+                z-index: 1;
+              }}
+              .owner-name-row {{
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                flex-wrap: nowrap;
                 position: relative;
                 z-index: 1;
               }}
               .owner-name {{
-                font-size: clamp(0.9rem, 2.8vw, 1.1rem);
+                font-size: clamp(0.82rem, 3.2vw, 1rem);
                 font-weight: 800;
-                line-height: 1.2;
-                margin-bottom: 6px;
+                line-height: 1.25;
+                margin: 0;
                 text-shadow: 0 1px 6px rgba(0,0,0,0.12);
-                position: relative;
-                z-index: 1;
+                flex: 1 1 auto;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
               }}
               .owner-phone {{
                 display: inline-flex;
                 align-items: center;
-                gap: 8px;
-                font-size: 0.85rem;
+                gap: 6px;
+                font-size: 0.78rem;
                 font-weight: 700;
                 color: #ecfdf5 !important;
                 text-decoration: none;
-                padding: 5px 10px;
-                background: rgba(0,0,0,0.15);
+                padding: 5px 9px;
+                background: rgba(0,0,0,0.22);
                 border-radius: 999px;
-                border: 1px solid rgba(255,255,255,0.25);
-                transition: transform .15s ease, background .15s ease;
+                border: 1px solid rgba(254, 202, 202, 0.55);
+                flex-shrink: 0;
+                white-space: nowrap;
+                transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
                 position: relative;
                 z-index: 1;
+                box-shadow:
+                  0 0 10px rgba(239, 68, 68, 0.95),
+                  0 0 22px rgba(220, 38, 38, 0.65),
+                  0 2px 8px rgba(127, 29, 29, 0.45);
               }}
               .owner-phone:hover {{
                 background: rgba(0,0,0,0.25);
@@ -423,6 +443,35 @@ def _render_page(token: str, offset: int) -> str:
               .meta {{ margin-bottom: 10px; line-height: 1.5; }}
               .customer-line {{ font-size: 15px; color: #334155; font-weight: 600; }}
               .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }}
+              /* حاسوب: بطاقة أكبر، الاسم فوق والرقم تحت */
+              @media (min-width: 561px) {{
+                .owner-showcase {{
+                  max-width: min(420px, 42vw);
+                  padding: 16px 20px;
+                  border-radius: 16px;
+                }}
+                .owner-badge {{
+                  font-size: 0.72rem;
+                  margin-bottom: 10px;
+                }}
+                .owner-name-row {{
+                  flex-direction: column;
+                  align-items: stretch;
+                  gap: 14px;
+                  flex-wrap: nowrap;
+                }}
+                .owner-name {{
+                  font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+                  white-space: normal;
+                  overflow: visible;
+                  text-overflow: clip;
+                }}
+                .owner-phone {{
+                  font-size: 1rem;
+                  padding: 8px 14px;
+                  align-self: flex-start;
+                }}
+              }}
               @media (max-width: 560px) {{
                 .brand-header {{ flex-direction: column; align-items: stretch; }}
                 .owner-showcase {{ order: -1; max-width: 100%; }}
@@ -439,8 +488,10 @@ def _render_page(token: str, offset: int) -> str:
                 </div>
                 <div class='owner-showcase'>
                   <div class='owner-badge'>صنع بواسطة</div>
-                  <div class='owner-name'>{owner_name_esc}</div>
-                  {owner_phone_html}
+                  <div class='owner-name-row'>
+                    <div class='owner-name'>{owner_name_esc}</div>
+                    {owner_phone_html}
+                  </div>
                 </div>
               </div>
               <div class='meta customer-line'>👤 {cust_meta}</div>
