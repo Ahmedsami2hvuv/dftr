@@ -108,16 +108,16 @@ from handlers.admin import (
     admin_feedback_toggle_status,
     admin_feedback_search_start,
     admin_feedback_search_do,
-    admin_feedback_search_cancel,
+    admin_feedback_search_back,
     admin_broadcast_start,
     admin_broadcast_receive_content,
     admin_broadcast_toggle_buttons,
-    admin_broadcast_cancel,
+    admin_broadcast_back,
     admin_broadcast_send,
     admin_brand_logo_start,
     admin_brand_logo_on_message,
-    admin_brand_logo_cancel,
-    admin_brand_logo_cancel_cmd,
+    admin_brand_logo_back,
+    admin_brand_logo_back_cmd,
     bc_start_click,
     bc_update_click,
     ADMIN_BROADCAST_CONTENT,
@@ -130,7 +130,7 @@ from handlers.feedback import (
     feedback_from_broadcast_comment,
     feedback_from_broadcast_suggest,
     feedback_receive,
-    feedback_cancel_click,
+    feedback_back_click,
     FEEDBACK_WAIT,
 )
 from web_server import start_web_server
@@ -142,7 +142,7 @@ from handlers.customers import (
     cust_phone_skip_click,
     cust_search_start,
     cust_search_query_done,
-    cust_search_cancel_click,
+    cust_search_back_click,
     cust_took,
     cust_gave,
     cust_amount,
@@ -152,7 +152,7 @@ from handlers.customers import (
     cust_note_skip_click,
     cust_txn_back_click,
     cust_txn_back_amount_click,
-    cust_txn_cancel_click,
+    cust_txn_exit_click,
     cust_edit_name_start,
     cust_edit_phone_start,
     cust_edit_name_done,
@@ -168,7 +168,7 @@ from handlers.customers import (
     cust_tx_edit_date_start,
     cust_tx_edit_date_done,
     cust_tx_edit_date_pick,
-    cust_tx_edit_date_cancel_click,
+    cust_tx_edit_date_back_click,
     cust_tx_edit_photo_start,
     cust_tx_edit_photo_done,
     cust_tx_edit_photo_back_click,
@@ -197,7 +197,7 @@ from handlers.reminder import (
     cust_reminder_start,
     cust_reminder_due_date,
     cust_reminder_offset,
-    cust_reminder_cancel,
+    cust_reminder_back_click,
     reminder_job,
     REMIND_DUE_DATE,
     REMIND_OFFSET,
@@ -344,12 +344,12 @@ def main():
         states={
             ADMIN_BROADCAST_CONTENT: [
                 MessageHandler(~filters.COMMAND, admin_broadcast_receive_content),
-                CallbackQueryHandler(admin_broadcast_cancel, pattern="^admin_broadcast_cancel$"),
+                CallbackQueryHandler(admin_broadcast_back, pattern="^admin_broadcast_back$"),
             ],
             ADMIN_BROADCAST_BUTTONS: [
                 CallbackQueryHandler(admin_broadcast_toggle_buttons, pattern="^admin_bc_toggle_"),
                 CallbackQueryHandler(admin_broadcast_send, pattern="^admin_bc_send$"),
-                CallbackQueryHandler(admin_broadcast_cancel, pattern="^admin_broadcast_cancel$"),
+                CallbackQueryHandler(admin_broadcast_back, pattern="^admin_broadcast_back$"),
             ],
         },
         fallbacks=[],
@@ -363,11 +363,11 @@ def main():
         entry_points=[CallbackQueryHandler(admin_brand_logo_start, pattern="^admin_brand_logo$")],
         states={
             ADMIN_BRAND_LOGO: [
-                CallbackQueryHandler(admin_brand_logo_cancel, pattern="^admin_brand_logo_cancel$"),
+                CallbackQueryHandler(admin_brand_logo_back, pattern="^admin_brand_logo_back$"),
                 MessageHandler(~filters.COMMAND, admin_brand_logo_on_message),
             ],
         },
-        fallbacks=[CommandHandler("cancel", admin_brand_logo_cancel_cmd)],
+        fallbacks=[CommandHandler("cancel", admin_brand_logo_back_cmd)],
         allow_reentry=True,
         per_chat=True,
         per_message=False,
@@ -381,7 +381,7 @@ def main():
         states={
             ADMIN_FEEDBACK_SEARCH: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_feedback_search_do),
-                CallbackQueryHandler(admin_feedback_search_cancel, pattern="^admin_feedback_search_cancel$"),
+                CallbackQueryHandler(admin_feedback_search_back, pattern="^admin_feedback_search_back$"),
             ]
         },
         fallbacks=[],
@@ -401,7 +401,7 @@ def main():
         states={
             FEEDBACK_WAIT: [
                 MessageHandler(~filters.COMMAND, feedback_receive),
-                CallbackQueryHandler(feedback_cancel_click, pattern="^feedback_cancel$"),
+                CallbackQueryHandler(feedback_back_click, pattern="^feedback_back$"),
             ]
         },
         fallbacks=[],
@@ -463,7 +463,7 @@ def main():
         states={
             CUST_SEARCH_QUERY: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, cust_search_query_done),
-                CallbackQueryHandler(cust_search_cancel_click, pattern="^cust_search_cancel$"),
+                CallbackQueryHandler(cust_search_back_click, pattern="^cust_search_back$"),
             ],
         },
         fallbacks=[],
@@ -483,7 +483,7 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, cust_amount),
                 MessageHandler(filters.PHOTO, cust_amount_photo),
                 CallbackQueryHandler(cust_txn_back_click, pattern="^cust_txn_back_\\d+$"),
-                CallbackQueryHandler(cust_txn_cancel_click, pattern="^cust_txn_cancel$"),
+                CallbackQueryHandler(cust_txn_exit_click, pattern="^cust_txn_exit$"),
                 CallbackQueryHandler(cust_callback_router, pattern="^cust_"),
             ],
             CUST_NOTE: [
@@ -492,7 +492,7 @@ def main():
                 CallbackQueryHandler(cust_note_skip_click, pattern="^cust_note_skip_btn$"),
                 CallbackQueryHandler(cust_txn_back_amount_click, pattern="^cust_txn_back_amount$"),
                 CallbackQueryHandler(cust_txn_back_click, pattern="^cust_txn_back_\\d+$"),
-                CallbackQueryHandler(cust_txn_cancel_click, pattern="^cust_txn_cancel$"),
+                CallbackQueryHandler(cust_txn_exit_click, pattern="^cust_txn_exit$"),
                 CallbackQueryHandler(cust_callback_router, pattern="^cust_"),
             ],
         },
@@ -532,7 +532,7 @@ def main():
             TX_EDIT_DATE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_date_done),
                 CallbackQueryHandler(cust_tx_edit_date_pick, pattern=r"^txdt_\d+_\d{8}$"),
-                CallbackQueryHandler(cust_tx_edit_date_cancel_click, pattern=r"^tx_edit_date_cancel$"),
+                CallbackQueryHandler(cust_tx_edit_date_back_click, pattern=r"^tx_edit_date_back$"),
             ],
             TX_EDIT_PHOTO: [
                 MessageHandler(filters.PHOTO, cust_tx_edit_photo_done),
@@ -567,13 +567,14 @@ def main():
         states={
             REMIND_DUE_DATE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, cust_reminder_due_date),
-                CommandHandler("cancel", cust_reminder_cancel),
+                CallbackQueryHandler(cust_reminder_back_click, pattern=r"^reminder_flow_back$"),
             ],
             REMIND_OFFSET: [
+                CallbackQueryHandler(cust_reminder_back_click, pattern=r"^reminder_flow_back$"),
                 CallbackQueryHandler(cust_reminder_offset, pattern=r"^remind_off_\d+_[0-5]$"),
             ],
         },
-        fallbacks=[CommandHandler("cancel", cust_reminder_cancel)],
+        fallbacks=[],
         allow_reentry=True,
         per_chat=True,
         per_message=False,

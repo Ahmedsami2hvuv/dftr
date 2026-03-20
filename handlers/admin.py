@@ -296,7 +296,7 @@ async def admin_feedback_search_start(update: Update, context: ContextTypes.DEFA
     await query.answer()
     if not is_admin(update.effective_user.id):
         return ConversationHandler.END
-    keyboard = [[InlineKeyboardButton("❌ إلغاء ورجوع", callback_data="admin_feedback_search_cancel")]]
+    keyboard = [[InlineKeyboardButton("◀ رجوع", callback_data="admin_feedback_search_back")]]
     await query.edit_message_text(
         "ابحث باسم المستخدم أو رقمه أو نص من الرسالة:",
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -338,11 +338,11 @@ async def admin_feedback_search_do(update: Update, context: ContextTypes.DEFAULT
     return ConversationHandler.END
 
 
-async def admin_feedback_search_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_feedback_search_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.edit_message_text(
-        "تم الإلغاء ✅",
+        "تم الرجوع ✅",
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("◀ المشاكل والاقتراحات", callback_data="admin_feedbacks")]]
         ),
@@ -357,7 +357,7 @@ async def admin_broadcast_start(update: Update, context: ContextTypes.DEFAULT_TY
         return ConversationHandler.END
     context.user_data["admin_bc_payload"] = None
     context.user_data["admin_bc_buttons"] = {"update"}
-    keyboard = [[InlineKeyboardButton("❌ إلغاء ورجوع", callback_data="admin_broadcast_cancel")]]
+    keyboard = [[InlineKeyboardButton("◀ رجوع", callback_data="admin_broadcast_back")]]
     await query.edit_message_text(
         "إذاعة / بث 📢\n\n"
         "أرسل الآن محتوى البث: نص، صورة، فيديو، صوت، ملف أو أي وسائط.",
@@ -366,13 +366,13 @@ async def admin_broadcast_start(update: Update, context: ContextTypes.DEFAULT_TY
     return ADMIN_BROADCAST_CONTENT
 
 
-async def admin_broadcast_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_broadcast_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data.pop("admin_bc_payload", None)
     context.user_data.pop("admin_bc_buttons", None)
     await query.edit_message_text(
-        "تم الإلغاء ✅",
+        "تم الرجوع ✅",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀ لوحة الأدمن", callback_data="admin_panel")]]),
     )
     return ConversationHandler.END
@@ -395,13 +395,13 @@ async def admin_broadcast_receive_content(update: Update, context: ContextTypes.
         ],
         [
             InlineKeyboardButton("✅ إرسال البث", callback_data="admin_bc_send"),
-            InlineKeyboardButton("❌ إلغاء ورجوع", callback_data="admin_broadcast_cancel"),
+            InlineKeyboardButton("◀ رجوع", callback_data="admin_broadcast_back"),
         ],
     ]
     await update.message.reply_text(
         "تم استلام محتوى البث ✅\n"
         f"الأزرار المختارة: {_broadcast_buttons_summary(selected)}\n\n"
-        "يمكنك تفعيل/إلغاء الأزرار ثم اضغط (إرسال البث).",
+        "يمكنك تفعيل أو تعطيل الأزرار ثم اضغط (إرسال البث).",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return ADMIN_BROADCAST_BUTTONS
@@ -436,7 +436,7 @@ async def admin_broadcast_toggle_buttons(update: Update, context: ContextTypes.D
         ],
         [
             InlineKeyboardButton("✅ إرسال البث", callback_data="admin_bc_send"),
-            InlineKeyboardButton("❌ إلغاء ورجوع", callback_data="admin_broadcast_cancel"),
+            InlineKeyboardButton("◀ رجوع", callback_data="admin_broadcast_back"),
         ],
     ]
     await query.edit_message_text(
@@ -540,17 +540,17 @@ async def admin_brand_logo_start(update: Update, context: ContextTypes.DEFAULT_T
         "تُحفظ الصورة في قاعدة البيانات وتظهر بجانب «دفتر الديون» في صفحة روابط المشاركة فوراً.\n\n"
         f"أرسل صورة (أو ملف صورة). الحد الأقصى ≈ {MAX_BRAND_LOGO_BYTES // 1_000_000} ميجا.",
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("❌ إلغاء", callback_data="admin_brand_logo_cancel")]]
+            [[InlineKeyboardButton("◀ رجوع", callback_data="admin_brand_logo_back")]]
         ),
     )
     return ADMIN_BRAND_LOGO
 
 
-async def admin_brand_logo_cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_brand_logo_back_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return ConversationHandler.END
     await update.message.reply_text(
-        "تم الإلغاء.",
+        "تم الرجوع.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀ لوحة الأدمن", callback_data="admin_panel")]]),
     )
     return ConversationHandler.END
@@ -630,13 +630,13 @@ async def admin_brand_logo_on_message(update: Update, context: ContextTypes.DEFA
     return ConversationHandler.END
 
 
-async def admin_brand_logo_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_brand_logo_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if not is_admin(update.effective_user.id):
         return ConversationHandler.END
     await query.edit_message_text(
-        "تم الإلغاء.",
+        "تم الرجوع.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀ لوحة الأدمن", callback_data="admin_panel")]]),
     )
     return ConversationHandler.END

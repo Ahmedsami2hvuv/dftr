@@ -19,7 +19,7 @@ async def _start_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE, so
     query = update.callback_query
     await query.answer()
     context.user_data["feedback_source"] = source
-    keyboard = [[InlineKeyboardButton("❌ إلغاء ورجوع", callback_data="feedback_cancel")]]
+    keyboard = [[InlineKeyboardButton("◀ رجوع", callback_data="feedback_back")]]
     await query.edit_message_text(
         "أرسل الآن رسالتك / ملاحظتك / المشكلة.\n"
         "يمكنك إرسال نص، صورة، فيديو، بصمة صوت، ملف أو أي وسائط.",
@@ -40,12 +40,12 @@ async def feedback_from_broadcast_suggest(update: Update, context: ContextTypes.
     return await _start_feedback(update, context, "broadcast_suggest")
 
 
-async def feedback_cancel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def feedback_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data.pop("feedback_source", None)
     await query.edit_message_text(
-        "تم الإلغاء ✅",
+        "تم الرجوع ✅",
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]
         ),

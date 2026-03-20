@@ -64,12 +64,15 @@ async def cust_reminder_start(update: Update, context: ContextTypes.DEFAULT_TYPE
     finally:
         db.close()
     context.user_data["reminder_cid"] = cid
+    kb = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("◀ رجوع", callback_data="reminder_flow_back")]]
+    )
     await query.edit_message_text(
         "🔔 تذكيرات التسديد\n\n"
         "أرسل تاريخ الاستحقاق بصيغة:\n"
         "YYYY-MM-DD\n\n"
-        "مثال: 2026-04-01\n\n"
-        "أو أرسل /cancel للإلغاء."
+        "مثال: 2026-04-01",
+        reply_markup=kb,
     )
     return REMIND_DUE_DATE
 
@@ -100,6 +103,7 @@ async def cust_reminder_due_date(update: Update, context: ContextTypes.DEFAULT_T
                 InlineKeyboardButton("قبل يوم", callback_data=f"remind_off_{cid}_1"),
                 InlineKeyboardButton("يوم الاستحقاق", callback_data=f"remind_off_{cid}_0"),
             ],
+            [InlineKeyboardButton("◀ رجوع", callback_data="reminder_flow_back")],
         ]
     )
     await update.message.reply_text(
@@ -197,10 +201,18 @@ async def cust_reminder_offset(update: Update, context: ContextTypes.DEFAULT_TYP
     return ConversationHandler.END
 
 
-async def cust_reminder_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.pop("reminder_cid", None)
-    context.user_data.pop("reminder_due", None)
-    await update.message.reply_text("تم الإلغاء.")
+async def cust_reminder_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إنهاء خطوة التذكير والعودة (زر رجوع)."""
+    query = update.callback_query
+    if query:
+        await query.answer()
+        context.user_data.pop("reminder_cid", None)
+        context.user_data.pop("reminder_due", None)
+        await query.edit_message_text("تم الرجوع.")
+    else:
+        context.user_data.pop("reminder_cid", None)
+        context.user_data.pop("reminder_due", None)
+        await update.message.reply_text("تم الرجوع.")
     return ConversationHandler.END
 
 

@@ -117,7 +117,7 @@ async def partner_link_invite_start(update: Update, context: ContextTypes.DEFAUL
         if existing:
             await query.edit_message_text(
                 "هذا العميل مربوط مسبقاً مع مستخدم آخر.\n"
-                "لإلغاء الربط تواصل مع الدعم لاحقاً (قريباً).",
+                "لإزالة الربط تواصل مع الدعم لاحقاً (قريباً).",
                 reply_markup=InlineKeyboardMarkup(
                     [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_{cid}")]]
                 ),

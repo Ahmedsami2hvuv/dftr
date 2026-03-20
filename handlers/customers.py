@@ -394,7 +394,7 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cust_search_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    keyboard = [[InlineKeyboardButton("❌ إلغاء ورجوع", callback_data="cust_search_cancel")]]
+    keyboard = [[InlineKeyboardButton("◀ رجوع", callback_data="cust_search_back")]]
     await query.edit_message_text(
         "بحث العملاء 🔎\n\n"
         "اكتب اسم العميل أو جزء من الاسم:",
@@ -448,7 +448,7 @@ async def cust_search_query_done(update: Update, context: ContextTypes.DEFAULT_T
     return ConversationHandler.END
 
 
-async def cust_search_cancel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cust_search_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await menu_customers(update, context)
@@ -989,11 +989,11 @@ async def _apply_tx_new_date(
     return ConversationHandler.END
 
 
-async def cust_tx_edit_date_cancel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cust_tx_edit_date_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data.pop("tx_edit_id", None)
-    await query.edit_message_text("تم الإلغاء.")
+    await query.edit_message_text("تم الرجوع.")
     return ConversationHandler.END
 
 
@@ -1034,7 +1034,7 @@ async def cust_tx_edit_date_done(update: Update, context: ContextTypes.DEFAULT_T
                 row = []
         if row:
             rows.append(row)
-        rows.append([InlineKeyboardButton("❌ إلغاء", callback_data="tx_edit_date_cancel")])
+        rows.append([InlineKeyboardButton("◀ رجوع", callback_data="tx_edit_date_back")])
         await update.message.reply_text(
             "لم أستطع فهم التاريخ من النص.\n\n"
             "اختر تاريخاً من الأزرار (قريبة مما كتبت) أو أعد المحاولة بنص أوضح:",
@@ -1123,7 +1123,7 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["cust_txn_cid"] = cid
     keyboard = [
         [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
-        [InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel")],
+        [InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit")],
     ]
     await query.edit_message_text(
         "أخذت 🔴\n\n"
@@ -1146,7 +1146,7 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["cust_txn_cid"] = cid
     keyboard = [
         [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
-        [InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel")],
+        [InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit")],
     ]
     await query.edit_message_text(
         "أعطيت 🟢\n\n"
@@ -1161,7 +1161,7 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cust_txn_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رجوع للعميل وإلغاء حالة إدخال المعاملة."""
+    """رجوع لصفحة العميل وإنهاء إدخال المعاملة."""
     query = update.callback_query
     await query.answer()
     try:
@@ -1177,8 +1177,8 @@ async def cust_txn_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ConversationHandler.END
 
 
-async def cust_txn_cancel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إلغاء العملية والعودة لقائمة العملاء."""
+async def cust_txn_exit_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """الخروج من إدخال المعاملة والعودة لقائمة العملاء."""
     query = update.callback_query
     await query.answer()
     for k in _CUST_TXN_KEYS:
@@ -1197,7 +1197,7 @@ async def cust_txn_back_amount_click(update: Update, context: ContextTypes.DEFAU
         return ConversationHandler.END
     keyboard = [
         [InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_txn_back_{cid}")],
-        [InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel")],
+        [InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit")],
     ]
     await _safe_edit_callback_text(
         query,
@@ -1232,7 +1232,7 @@ async def cust_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
-            InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
+            InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit"),
         ],
     ]
     if note_opt:
@@ -1290,7 +1290,7 @@ async def cust_amount_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
-            InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
+            InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit"),
         ],
     ]
     kind_label = "أخذت 🔴" if context.user_data.get("cust_txn_kind") == "took" else "أعطيت 🟢"
@@ -1386,7 +1386,7 @@ async def cust_note_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⏭️ سكيب الملاحظة", callback_data="cust_note_skip_btn")],
         [
             InlineKeyboardButton("↩ رجوع لتعديل السعر", callback_data="cust_txn_back_amount"),
-            InlineKeyboardButton("❌ إلغاء وخروج", callback_data="cust_txn_cancel"),
+            InlineKeyboardButton("◀ رجوع لقائمة العملاء", callback_data="cust_txn_exit"),
         ],
     ]
     await update.message.reply_text(
@@ -1739,7 +1739,7 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
         await partner_send_updates_click(update, context)
         return
     if data.startswith("cust_reminder_"):
-        await query.answer("أنهِ إضافة المعاملة الحالية أولاً أو اضغط إلغاء.", show_alert=True)
+        await query.answer("أنهِ إضافة المعاملة الحالية أولاً أو استخدم زر الرجوع.", show_alert=True)
         return
 
     # --- أصناف الصنف ---

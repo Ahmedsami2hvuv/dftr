@@ -356,7 +356,7 @@ async def forgot_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for k in ("reg_name", "reg_phone", "auth_action", "login_phone", "forgot_phone"):
         context.user_data.pop(k, None)
-    await update.message.reply_text("تم الإلغاء.")
+    await update.message.reply_text("تم الرجوع.")
     return ConversationHandler.END
 
 
