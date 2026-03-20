@@ -146,12 +146,11 @@ async def partner_link_invite_start(update: Update, context: ContextTypes.DEFAUL
         me = await context.bot.get_me()
         link_url = f"https://t.me/{me.username}?start=plink_{token}"
         inviter_name = user.full_name or user.username or "مستخدم"
-        cust_name = cust.name
         text = (
             f"🔗 ربط مع مستخدم آخر\n\n"
-            f"العميل: {cust_name}\n\n"
+            f"سيُنشأ عند الطرف الآخر عميل باسم: {inviter_name}\n\n"
             "أرسل الرابط أدناه للمستخدم الآخر (واتساب/تليجرام).\n"
-            "عند قبوله يُنشأ عنده عميل بنفس الاسم، وتُرسل معاملاتك له للموافقة "
+            "عند قبوله يُنشأ عنده عميل باسم المرسل، وتُرسل معاملاتك له للموافقة "
             "(تظهر عنده معكوسة: أعطيتك ← أخذته).\n\n"
             f"{link_url}"
         )
@@ -400,7 +399,6 @@ async def handle_start_partner_link(
             await update.message.reply_text("لا يمكنك قبول دعوتك لنفسك 🙂")
             return True
         inviter_name = inviter.full_name or inviter.username or "مستخدم"
-        cust_name = cust.name
         kb = InlineKeyboardMarkup(
             [
                 [
@@ -415,8 +413,7 @@ async def handle_start_partner_link(
         await update.message.reply_text(
             f"🔗 دعوة ربط دفتر\n\n"
             f"المستخدم: {inviter_name}\n"
-            f"يريد ربط عميل: «{cust_name}» مع حسابك.\n\n"
-            f"بعد القبول يُنشأ عندك عميل بنفس الاسم، وستصلك معاملاته للموافقة (معكوسة).\n"
+            f"بعد القبول سيُنشأ عندك عميل باسم هذا المستخدم، وستصلك معاملاته للموافقة (معكوسة).\n"
             f"هل توافق؟",
             reply_markup=kb,
         )
@@ -444,10 +441,14 @@ async def partner_link_accept_click(update: Update, context: ContextTypes.DEFAUL
         if not src_cust:
             await query.edit_message_text("العميل الأصلي غير موجود.")
             return
+        # عند قبول الدعوة: الطرف الثاني يجب أن يرى “المُرسِل” كعميل، وليس اسم العميل الذي اختاره المُرسِل.
+        # لذلك ننشئ Customer جديد باسم بيانات المُرسِل + رقم المُرسِل.
+        mirrored_name = inviter.full_name or inviter.username or "مستخدم"
+        mirrored_phone = inviter.phone or src_cust.phone
         new_c = Customer(
             user_id=invitee.id,
-            name=src_cust.name,
-            phone=src_cust.phone,
+            name=mirrored_name,
+            phone=mirrored_phone,
         )
         db.add(new_c)
         db.flush()
@@ -473,7 +474,7 @@ async def partner_link_accept_click(update: Update, context: ContextTypes.DEFAUL
                 nm = invitee.full_name or invitee.username or "مستخدم"
                 await context.bot.send_message(
                     chat_id=int(inviter.telegram_id),
-                    text=f"✅ {nm} قبل دعوة الربط للعميل «{src_cust.name}».",
+                    text=f"✅ {nm} قبل دعوة الربط.",
                 )
             except Exception:
                 pass
