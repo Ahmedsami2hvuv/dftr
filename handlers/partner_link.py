@@ -401,9 +401,17 @@ async def handle_start_partner_link(
         tid = update.effective_user.id
         invitee = db.query(User).filter(User.telegram_id == tid).first()
         if not invitee:
+            # إذا الطرف الثاني ليس مسجلاً/مرتبطاً: نخزّن التوكن ونكمل بعد تسجيل الدخول.
+            context.user_data["pending_partner_invite_token"] = token
             await update.message.reply_text(
-                "يجب تسجيل الدخول أولاً في البوت، ثم اضغط الرابط مرة أخرى.\n\n"
-                "استخدم /start ثم تسجيل الدخول."
+                "يجب تسجيل الدخول أولاً في البوت، وبعدها سنكمل شاشة قبول/رفض الربط تلقائياً.\n\n"
+                "اختر خيار تسجيل الدخول أو إنشاء حساب.",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+                        [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+                    ]
+                ),
             )
             return True
         if invitee.id == inviter.id:

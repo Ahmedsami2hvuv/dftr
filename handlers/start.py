@@ -10,7 +10,9 @@ from config import ADMIN_ID
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args or []
     # إذا تم تسجيل الخروج من هذا الجهاز للتو، امنع أي أزرار قديمة من إعادة فتح الحساب.
-    if context.user_data.get("force_login"):
+    if context.user_data.get("force_login") and not (
+        args and (args[0].startswith("plink_") or args[0].startswith("view_"))
+    ):
         keyboard = [
             [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
             [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],

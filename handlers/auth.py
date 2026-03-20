@@ -140,11 +140,19 @@ async def reg_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         db.add(user)
         db.commit()
-        keyboard = [[InlineKeyboardButton("القائمة الرئيسية", callback_data="main_menu")]]
-        await update.message.reply_text(
-            "تم إنشاء حسابك بنجاح ✅\n\nاستخدم القائمة لإدارة دفترك.",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
+        pending_token = context.user_data.get("pending_partner_invite_token")
+        if pending_token:
+            from handlers.partner_link import handle_start_partner_link
+
+            # لا نعرض القائمة الرئيسية قبل شاشة الربط إذا كان هناك توكن دعوة معلّق.
+            await handle_start_partner_link(update, context, pending_token)
+            context.user_data.pop("pending_partner_invite_token", None)
+        else:
+            keyboard = [[InlineKeyboardButton("القائمة الرئيسية", callback_data="main_menu")]]
+            await update.message.reply_text(
+                "تم إنشاء حسابك بنجاح ✅\n\nاستخدم القائمة لإدارة دفترك.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
     finally:
         db.close()
     for k in ("reg_name", "reg_phone", "auth_action"):
@@ -216,11 +224,18 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user.telegram_id = update.effective_user.id
             user.username = update.effective_user.username
             db.commit()
-            keyboard = [[InlineKeyboardButton("القائمة الرئيسية", callback_data="main_menu")]]
-            await update.message.reply_text(
-                f"تم تسجيل الدخول بنجاح ✅ مرحباً {user.full_name or user.username or 'بك'}.",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-            )
+            pending_token = context.user_data.get("pending_partner_invite_token")
+            if pending_token:
+                from handlers.partner_link import handle_start_partner_link
+
+                await handle_start_partner_link(update, context, pending_token)
+                context.user_data.pop("pending_partner_invite_token", None)
+            else:
+                keyboard = [[InlineKeyboardButton("القائمة الرئيسية", callback_data="main_menu")]]
+                await update.message.reply_text(
+                    f"تم تسجيل الدخول بنجاح ✅ مرحباً {user.full_name or user.username or 'بك'}.",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                )
         except Exception:
             await update.message.reply_text(
                 "حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى أو استخدم /start.",
@@ -484,11 +499,18 @@ async def forgot_new_password_confirm(update: Update, context: ContextTypes.DEFA
         user.telegram_id = update.effective_user.id
         user.username = update.effective_user.username
         db.commit()
-        keyboard = [[InlineKeyboardButton("القائمة الرئيسية", callback_data="main_menu")]]
-        await update.message.reply_text(
-            f"تم تعيين كلمة المرور وتسجيل الدخول ✅ مرحباً {user.full_name or user.username or 'بك'}.",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
+        pending_token = context.user_data.get("pending_partner_invite_token")
+        if pending_token:
+            from handlers.partner_link import handle_start_partner_link
+
+            await handle_start_partner_link(update, context, pending_token)
+            context.user_data.pop("pending_partner_invite_token", None)
+        else:
+            keyboard = [[InlineKeyboardButton("القائمة الرئيسية", callback_data="main_menu")]]
+            await update.message.reply_text(
+                f"تم تعيين كلمة المرور وتسجيل الدخول ✅ مرحباً {user.full_name or user.username or 'بك'}.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
     finally:
         db.close()
     for k in (
@@ -510,6 +532,7 @@ async def cancel_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "forgot_phone",
         "forgot_reset_user_id",
         "forgot_new_pwd",
+        "pending_partner_invite_token",
         "chpwd_old_ok",
         "chpwd_new",
     ):
