@@ -166,7 +166,6 @@ from handlers.customers import (
     cust_tx_edit_note_start,
     cust_tx_edit_note_done,
     cust_tx_edit_date_start,
-    cust_tx_edit_date_done,
     cust_tx_edit_date_pick,
     cust_tx_edit_date_back_click,
     cust_tx_edit_photo_start,
@@ -195,13 +194,13 @@ from handlers.customers import (
 )
 from handlers.reminder import (
     cust_reminder_start,
-    cust_reminder_due_date,
     cust_reminder_offset,
     cust_reminder_back_click,
     reminder_job,
     REMIND_DUE_DATE,
     REMIND_OFFSET,
 )
+from handlers.datetime_picker import handle_datetime_picker
 from handlers.partner_link import (
     partner_link_invite_start,
     partner_send_updates_click,
@@ -530,7 +529,7 @@ def main():
             TX_EDIT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_amount_done)],
             TX_EDIT_NOTE: [MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_note_done)],
             TX_EDIT_DATE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_tx_edit_date_done),
+                CallbackQueryHandler(handle_datetime_picker, pattern=r"^dt_"),
                 CallbackQueryHandler(cust_tx_edit_date_pick, pattern=r"^txdt_\d+_\d{8}$"),
                 CallbackQueryHandler(cust_tx_edit_date_back_click, pattern=r"^tx_edit_date_back$"),
             ],
@@ -566,7 +565,7 @@ def main():
         ],
         states={
             REMIND_DUE_DATE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, cust_reminder_due_date),
+                CallbackQueryHandler(handle_datetime_picker, pattern=r"^dt_"),
                 CallbackQueryHandler(cust_reminder_back_click, pattern=r"^reminder_flow_back$"),
             ],
             REMIND_OFFSET: [

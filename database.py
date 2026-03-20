@@ -82,3 +82,24 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+
+        # وقت استحقاق كامل لتذكيرات التسديد
+        try:
+            conn.execute(
+                text(
+                    "ALTER TABLE customer_payment_reminders ADD COLUMN IF NOT EXISTS due_at TIMESTAMP"
+                )
+            )
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(
+                text(
+                    "UPDATE customer_payment_reminders SET due_at = due_date::timestamp "
+                    "WHERE due_at IS NULL AND due_date IS NOT NULL"
+                )
+            )
+            conn.commit()
+        except Exception:
+            pass

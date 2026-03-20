@@ -14,7 +14,6 @@ from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerC
 from app_models.partner import PartnerLink
 from utils.phone import is_plausible_iraq_mobile, normalize_phone, wa_number
 from config import WEB_BASE_URL
-from utils.date_flexible import parse_flexible_date, suggest_dates_near_input
 
 (
     CUST_NAME,
@@ -937,14 +936,35 @@ async def cust_tx_edit_date_start(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     tx_id = int(query.data.replace("cust_tx_edit_date_", ""))
     context.user_data["tx_edit_id"] = tx_id
-    await query.edit_message_text(
-        "أرسل التاريخ الجديد بأي صيغة تعرفها، مثلاً:\n"
-        "• 2026-2-4 أو 2026/02/04\n"
-        "• 2 8 2025 أو 2-8-2025\n"
-        "• 2025\\6\\5\n\n"
-        "إذا لم يُفهم التاريخ ستظهر لك أزرار بتواريخ قريبة."
-    )
-    return TX_EDIT_DATE
+    from handlers.datetime_picker import start_tx_datetime_pick
+
+    return await start_tx_datetime_pick(update, context, tx_id)
+
+
+async def apply_tx_datetime_from_picker(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, tx_id: int, dt: datetime
+) -> int:
+    """يُستدعى بعد اختيار التاريخ والوقت من لوحة الأزرار."""
+    query = update.callback_query
+    db = SessionLocal()
+    try:
+        tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
+        if not tx:
+            await query.edit_message_text("المعاملة غير موجودة.")
+            return ConversationHandler.END
+        cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
+        user = get_current_user(db, update.effective_user.id)
+        if not user or cust.user_id != user.id:
+            await query.edit_message_text("غير مسموح.")
+            return ConversationHandler.END
+        tx.created_at = dt
+        db.commit()
+        text, keyboard = await _render_tx_detail(db, tx)
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    finally:
+        db.close()
+    context.user_data.pop("tx_edit_id", None)
+    return ConversationHandler.END
 
 
 def _tx_date_cb(tx_id: int, d: date) -> str:
@@ -992,6 +1012,9 @@ async def _apply_tx_new_date(
 async def cust_tx_edit_date_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    from handlers.datetime_picker import clear_dt_user_data
+
+    clear_dt_user_data(context)
     context.user_data.pop("tx_edit_id", None)
     await query.edit_message_text("تم الرجوع.")
     return ConversationHandler.END
@@ -1015,34 +1038,6 @@ async def cust_tx_edit_date_pick(update: Update, context: ContextTypes.DEFAULT_T
         await query.edit_message_text("انتهت الجلسة. ابدأ من جديد.")
         return ConversationHandler.END
     return await _apply_tx_new_date(update, context, tx_id, new_date)
-
-
-async def cust_tx_edit_date_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    raw = (update.message.text or "").strip()
-    parsed = parse_flexible_date(raw)
-    tx_id = context.user_data.get("tx_edit_id")
-
-    if parsed is None:
-        sugg = suggest_dates_near_input(raw)
-        rows = []
-        row = []
-        for d in sugg:
-            label = d.strftime("%d/%m/%Y")
-            row.append(InlineKeyboardButton(label, callback_data=_tx_date_cb(tx_id, d)))
-            if len(row) == 2:
-                rows.append(row)
-                row = []
-        if row:
-            rows.append(row)
-        rows.append([InlineKeyboardButton("◀ رجوع", callback_data="tx_edit_date_back")])
-        await update.message.reply_text(
-            "لم أستطع فهم التاريخ من النص.\n\n"
-            "اختر تاريخاً من الأزرار (قريبة مما كتبت) أو أعد المحاولة بنص أوضح:",
-            reply_markup=InlineKeyboardMarkup(rows),
-        )
-        return TX_EDIT_DATE
-
-    return await _apply_tx_new_date(update, context, tx_id, parsed)
 
 
 async def cust_tx_edit_photo_start(update: Update, context: ContextTypes.DEFAULT_TYPE):

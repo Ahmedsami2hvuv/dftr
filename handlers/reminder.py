@@ -64,31 +64,18 @@ async def cust_reminder_start(update: Update, context: ContextTypes.DEFAULT_TYPE
     finally:
         db.close()
     context.user_data["reminder_cid"] = cid
-    kb = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("◀ رجوع", callback_data="reminder_flow_back")]]
-    )
-    await query.edit_message_text(
-        "🔔 تذكيرات التسديد\n\n"
-        "أرسل تاريخ الاستحقاق بصيغة:\n"
-        "YYYY-MM-DD\n\n"
-        "مثال: 2026-04-01",
-        reply_markup=kb,
-    )
-    return REMIND_DUE_DATE
+    from handlers.datetime_picker import start_reminder_datetime_pick
+
+    return await start_reminder_datetime_pick(update, context, cid)
 
 
-async def cust_reminder_due_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    raw = (update.message.text or "").strip()
-    if raw.startswith("/"):
-        return REMIND_DUE_DATE
-    try:
-        y, m, d = raw.replace("/", "-").split("-")[:3]
-        due = date(int(y), int(m), int(d))
-    except Exception:
-        await update.message.reply_text("صيغة غير صحيحة. أرسل التاريخ مثل: 2026-04-01")
-        return REMIND_DUE_DATE
-    context.user_data["reminder_due"] = due
-    cid = context.user_data.get("reminder_cid")
+async def show_reminder_offset_after_datetime(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, cid: int, due_dt: datetime
+) -> int:
+    """بعد اختيار التاريخ والوقت من لوحة الأزرار — اختيار نطاق التذكير."""
+    query = update.callback_query
+    context.user_data["reminder_cid"] = cid
+    context.user_data["reminder_due_dt"] = due_dt
     kb = InlineKeyboardMarkup(
         [
             [
@@ -106,9 +93,10 @@ async def cust_reminder_due_date(update: Update, context: ContextTypes.DEFAULT_T
             [InlineKeyboardButton("◀ رجوع", callback_data="reminder_flow_back")],
         ]
     )
-    await update.message.reply_text(
-        f"تاريخ الاستحقاق: {due.isoformat()}\n\n"
-        "متى تريد أن أبدأ بتذكيرك؟ (تذكير يومي منذ ذلك اليوم حتى يوم الاستحقاق)",
+    when_str = due_dt.strftime("%Y-%m-%d %H:%M")
+    await query.edit_message_text(
+        f"⏰ وقت الاستحقاق: {when_str}\n\n"
+        "متى تريد أن أبدأ بتذكيرك؟ (تذكير يومي منذ ذلك اليوم حتى موعد الاستحقاق)",
         reply_markup=kb,
     )
     return REMIND_OFFSET
@@ -131,10 +119,11 @@ async def cust_reminder_offset(update: Update, context: ContextTypes.DEFAULT_TYP
     if days_before not in range(0, 6):
         await query.edit_message_text("خيار غير صالح.")
         return ConversationHandler.END
-    due = context.user_data.get("reminder_due")
-    if not due or context.user_data.get("reminder_cid") != cid:
+    due_dt = context.user_data.get("reminder_due_dt")
+    if not due_dt or context.user_data.get("reminder_cid") != cid:
         await query.edit_message_text("انتهت الجلسة. أعد المحاولة من تعديل العميل.")
         return ConversationHandler.END
+    due_date = due_dt.date() if isinstance(due_dt, datetime) else due_dt
     db = SessionLocal()
     try:
         cust = db.query(Customer).filter(Customer.id == cid).first()
@@ -150,7 +139,8 @@ async def cust_reminder_offset(update: Update, context: ContextTypes.DEFAULT_TYP
             CustomerPaymentReminder(
                 customer_id=cid,
                 user_id=user.id,
-                due_date=due,
+                due_date=due_date,
+                due_at=due_dt if isinstance(due_dt, datetime) else None,
                 remind_before_days=days_before,
                 last_notified_at=None,
             )
@@ -161,14 +151,27 @@ async def cust_reminder_offset(update: Update, context: ContextTypes.DEFAULT_TYP
             if days_before == 0
             else f"منذ {days_before} يوم قبل الاستحقاق وحتى يومه"
         )
+        when_str = (
+            due_dt.strftime("%Y-%m-%d %H:%M")
+            if isinstance(due_dt, datetime)
+            else str(due_date)
+        )
+        nav_kb = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("◀ العميل", callback_data=f"cust_{cid}"),
+                    InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu"),
+                ],
+            ]
+        )
         await query.edit_message_text(
             f"✅ تم حفظ التذكير.\n\n"
             f"العميل: {cust.name}\n"
-            f"الاستحقاق: {due.isoformat()}\n"
+            f"الاستحقاق: {when_str}\n"
             f"النطاق: {label}\n\n"
-            "سنرسل تذكيراً مرة واحدة يومياً خلال هذه الفترة."
+            "سنرسل تذكيراً مرة واحدة يومياً خلال هذه الفترة.",
+            reply_markup=nav_kb,
         )
-        # إشعار الطرف المربوط إن وُجد
         extra = (
             db.query(PartnerLink)
             .filter(
@@ -182,7 +185,7 @@ async def cust_reminder_offset(update: Update, context: ContextTypes.DEFAULT_TYP
             me_tid = int(user.telegram_id)
             note = (
                 f"🔔 تم ضبط تذكير تسديد للعميل «{cust.name}» — "
-                f"الاستحقاق {due.isoformat()} ({label})."
+                f"الاستحقاق {when_str} ({label})."
             )
             for chat_id in targets:
                 if chat_id != me_tid:
@@ -197,21 +200,25 @@ async def cust_reminder_offset(update: Update, context: ContextTypes.DEFAULT_TYP
     finally:
         db.close()
     context.user_data.pop("reminder_cid", None)
-    context.user_data.pop("reminder_due", None)
+    context.user_data.pop("reminder_due_dt", None)
     return ConversationHandler.END
 
 
 async def cust_reminder_back_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إنهاء خطوة التذكير والعودة (زر رجوع)."""
+    from handlers.datetime_picker import clear_dt_user_data
+
     query = update.callback_query
     if query:
         await query.answer()
+        clear_dt_user_data(context)
         context.user_data.pop("reminder_cid", None)
-        context.user_data.pop("reminder_due", None)
+        context.user_data.pop("reminder_due_dt", None)
         await query.edit_message_text("تم الرجوع.")
     else:
+        clear_dt_user_data(context)
         context.user_data.pop("reminder_cid", None)
-        context.user_data.pop("reminder_due", None)
+        context.user_data.pop("reminder_due_dt", None)
         await update.message.reply_text("تم الرجوع.")
     return ConversationHandler.END
 
@@ -224,22 +231,27 @@ async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
         now = datetime.utcnow()
         rows = db.query(CustomerPaymentReminder).all()
         for r in rows:
-            due = r.due_date
-            if hasattr(due, "date"):
-                due = due.date()
-            start = due - timedelta(days=int(r.remind_before_days or 0))
-            if today < start or today > due:
+            if r.due_at is not None:
+                due_d = r.due_at.date()
+            else:
+                due = r.due_date
+                due_d = due.date() if hasattr(due, "date") else due
+            start = due_d - timedelta(days=int(r.remind_before_days or 0))
+            if today < start or today > due_d:
                 continue
             if r.last_notified_at and r.last_notified_at.date() == today:
                 continue
             cust = db.query(Customer).filter(Customer.id == r.customer_id).first()
             if not cust:
                 continue
-            days_left = (due - today).days
+            days_left = (due_d - today).days
+            when_line = (
+                r.due_at.strftime("%Y-%m-%d %H:%M") if r.due_at else due_d.isoformat()
+            )
             text = (
                 f"🔔 تذكير تسديد\n\n"
                 f"العميل: {cust.name}\n"
-                f"يوم الاستحقاق: {due.isoformat()}\n"
+                f"موعد الاستحقاق: {when_line}\n"
                 f"{'اليوم هو الاستحقاق!' if days_left == 0 else f'متبقي {days_left} يوم.'}"
             )
             bot = context.application.bot

@@ -45,6 +45,8 @@ class CustomerPaymentReminder(Base):
     customer_id = Column(Integer, ForeignKey("customers.id"), unique=True, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     due_date = Column(Date, nullable=False)
+    # وقت الاستحقاق الكامل (اختياري ترحيلاً من due_date فقط)
+    due_at = Column(DateTime, nullable=True)
     remind_before_days = Column(Integer, nullable=False, default=1)  # 0..5
     last_notified_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
