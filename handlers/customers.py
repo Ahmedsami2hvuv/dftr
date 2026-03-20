@@ -2367,7 +2367,7 @@ async def cust_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_back = data.startswith("cust_edit_back_")
     if is_back:
         cid = int(data.replace("cust_edit_back_", "", 1))
-        prefix = "تم الرجوع ✅\n\n"
+        prefix = "تم الرجوع.\n\n"
     else:
         cid = int(data.replace("cust_edit_", "", 1))
         prefix = ""
@@ -2457,7 +2457,7 @@ async def cust_edit_name_done(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             "أرسل اسماً صحيحاً.",
             reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_{cid}")]]
+                [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_back_{cid}")]]
             )
             if cid
             else kb_menu_customers(),
@@ -2466,12 +2466,25 @@ async def cust_edit_name_done(update: Update, context: ContextTypes.DEFAULT_TYPE
     cid = context.user_data.get("cust_edit_id")
     db = SessionLocal()
     try:
+        user = get_current_user(db, update.effective_user.id)
         cust = db.query(Customer).filter(Customer.id == cid).first()
-        if cust:
-            cust.name = name
-            db.commit()
+        if not user or not cust or cust.user_id != user.id:
+            keyboard = [
+                [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+                [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+                [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+            ]
+            await update.message.reply_text(
+                "يجب تسجيل الدخول أولاً.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+            return ConversationHandler.END
+        cust.name = name
+        db.commit()
         keyboard = [[InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")]]
-        await update.message.reply_text("تم تحديث الاسم ✅", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(
+            "تم تحديث الاسم ✅", reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     finally:
         db.close()
     context.user_data.pop("cust_edit_id", None)
@@ -2490,7 +2503,7 @@ async def cust_edit_phone_done(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(
             "رقم غير صحيح. أرسل الرقم أو اكتب: حذف",
             reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_{cid}")]]
+                [[InlineKeyboardButton("◀ رجوع", callback_data=f"cust_edit_back_{cid}")]]
             )
             if cid
             else kb_menu_customers(),
@@ -2499,12 +2512,26 @@ async def cust_edit_phone_done(update: Update, context: ContextTypes.DEFAULT_TYP
     cid = context.user_data.get("cust_edit_id")
     db = SessionLocal()
     try:
+        user = get_current_user(db, update.effective_user.id)
         cust = db.query(Customer).filter(Customer.id == cid).first()
-        if cust:
-            cust.phone = phone
-            db.commit()
+        if not user or not cust or cust.user_id != user.id:
+            keyboard = [
+                [InlineKeyboardButton("📝 إنشاء حساب", callback_data="auth_register")],
+                [InlineKeyboardButton("🔐 تسجيل الدخول", callback_data="auth_login")],
+                [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
+            ]
+            await update.message.reply_text(
+                "يجب تسجيل الدخول أولاً.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+            return ConversationHandler.END
+        cust.phone = phone
+        db.commit()
         keyboard = [[InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")]]
-        await update.message.reply_text("تم تحديث الرقم ✅" if phone else "تم حذف الرقم ✅", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(
+            "تم تحديث الرقم ✅" if phone else "تم حذف الرقم ✅",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
     finally:
         db.close()
     context.user_data.pop("cust_edit_id", None)
