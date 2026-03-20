@@ -2,6 +2,7 @@
 """ربط مستخدمين لعميل واحد + إرسال معاملات للموافقة (معكوسة)."""
 import logging
 from decimal import Decimal
+from urllib.parse import quote
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -154,10 +155,12 @@ async def partner_link_invite_start(update: Update, context: ContextTypes.DEFAUL
             "(تظهر عنده معكوسة: أعطيتك ← أخذته).\n\n"
             f"{link_url}"
         )
+        wa_url = f"https://api.whatsapp.com/send?text={quote(text)}"
         await query.edit_message_text(
             text,
             reply_markup=InlineKeyboardMarkup(
                 [
+                    [InlineKeyboardButton("📤 مشاركة", url=wa_url)],
                     [InlineKeyboardButton("◀ رجوع لتعديل العميل", callback_data=f"cust_edit_{cid}")],
                 ]
             ),
@@ -311,7 +314,12 @@ async def partner_batch_approve(update: Update, context: ContextTypes.DEFAULT_TY
             p.mirrored_tx_id = new_tx.id
             approved += 1
         db.commit()
-        await query.edit_message_text(f"✅ تمت الموافقة وأُضيفت {approved} معاملة لدفترك.")
+        await query.edit_message_text(
+            f"✅ تمت الموافقة وأُضيفت {approved} معاملة لدفترك.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]
+            ),
+        )
         accepter_name = user.full_name or user.username or "المستخدم"
         sender_id = batch.get("sender_user_id")
         if sender_id and sender_id != user.id:
@@ -321,6 +329,9 @@ async def partner_batch_approve(update: Update, context: ContextTypes.DEFAULT_TY
                     await context.bot.send_message(
                         chat_id=int(sender_u.telegram_id),
                         text=f"✅ {accepter_name} وافق على المعاملات وأُضيفت في دفتره.",
+                        reply_markup=InlineKeyboardMarkup(
+                            [[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]
+                        ),
                     )
                 except Exception:
                     pass
@@ -410,6 +421,11 @@ async def handle_start_partner_link(
                 [InlineKeyboardButton("❌ رفض", callback_data=f"plink_no_{token}")],
             ]
         )
+        me = await context.bot.get_me()
+        link_url = f"https://t.me/{me.username}?start=plink_{token}"
+        wa_text = f"دعوة ربط دفتر من {inviter_name}:\n{link_url}"
+        wa_url = f"https://api.whatsapp.com/send?text={quote(wa_text)}"
+        kb.inline_keyboard.append([InlineKeyboardButton("📤 مشاركة", url=wa_url)])
         await update.message.reply_text(
             f"🔗 دعوة ربط دفتر\n\n"
             f"المستخدم: {inviter_name}\n"
@@ -475,6 +491,9 @@ async def partner_link_accept_click(update: Update, context: ContextTypes.DEFAUL
                 await context.bot.send_message(
                     chat_id=int(inviter.telegram_id),
                     text=f"✅ {nm} قبل دعوة الربط.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]
+                    ),
                 )
             except Exception:
                 pass

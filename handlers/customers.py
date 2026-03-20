@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from sqlalchemy import func
 from database import SessionLocal
 from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerCategory
-from app_models.partner import PartnerLink
+from app_models.partner import PartnerLink, PartnerPendingTx, CustomerPaymentReminder
 from utils.phone import is_plausible_iraq_mobile, normalize_phone, wa_number
 from config import WEB_BASE_URL
 from handlers.inline_nav import kb_main_menu, kb_menu_customers, kb_tx_detail
@@ -2412,6 +2412,9 @@ async def cust_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append(
                 [InlineKeyboardButton("📤 إرسال التحديثات", callback_data=f"cust_partner_send_{cid}")]
             )
+            keyboard.append(
+                [InlineKeyboardButton("🔗 فصل الربط مع عميل آخر", callback_data=f"cust_detach_link_{cid}")]
+            )
         else:
             keyboard.append(
                 [InlineKeyboardButton("🔗 ربط مع مستخدم آخر", callback_data=f"cust_partner_invite_{cid}")]
@@ -2420,6 +2423,54 @@ async def cust_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("🗑 حذف العميل", callback_data=f"cust_del_req_{cid}")])
         keyboard.append([InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")])
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    finally:
+        db.close()
+
+
+async def cust_detach_link_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """فصل الربط المقبول لهذا العميل عن الطرف الآخر."""
+    query = update.callback_query
+    await query.answer()
+    cid = int((query.data or "").replace("cust_detach_link_", "", 1))
+    db = SessionLocal()
+    try:
+        cust = db.query(Customer).filter(Customer.id == cid).first()
+        user = get_current_user(db, update.effective_user.id)
+        if not cust or not user or cust.user_id != user.id:
+            await _safe_edit_callback_text(
+                query,
+                "غير مسموح.",
+                [[InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")]],
+            )
+            return
+
+        link = (
+            db.query(PartnerLink)
+            .filter(
+                PartnerLink.status == "accepted",
+                (PartnerLink.inviter_customer_id == cid) | (PartnerLink.invitee_customer_id == cid),
+            )
+            .first()
+        )
+        if not link:
+            await _safe_edit_callback_text(
+                query,
+                "لا يوجد ربط مفعّل لهذا العميل.",
+                [[InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")]],
+            )
+            return
+
+        link.status = "cancelled"
+        db.query(PartnerPendingTx).filter(
+            PartnerPendingTx.partner_link_id == link.id, PartnerPendingTx.status == "pending"
+        ).delete(synchronize_session=False)
+        db.commit()
+
+        await _safe_edit_callback_text(
+            query,
+            "تم فصل الربط ✅",
+            [[InlineKeyboardButton("◀ رجوع للعميل", callback_data=f"cust_{cid}")]],
+        )
     finally:
         db.close()
 
@@ -2606,6 +2657,38 @@ async def cust_delete_do_click(update: Update, context: ContextTypes.DEFAULT_TYP
             return
         name = cust.name
         # PostgreSQL يرفض حذف العميل طالما توجد معاملات أو روابط مشاركة — نحذفها أولاً
+        # إصلاح حذف العميل المرتبط: نفك أي روابط/انتظار/تذكيرات مرتبطة بهذا العميل.
+        tx_ids = [r[0] for r in db.query(CustomerTransaction.id).filter(CustomerTransaction.customer_id == cid).all()]
+        links = (
+            db.query(PartnerLink)
+            .filter((PartnerLink.inviter_customer_id == cid) | (PartnerLink.invitee_customer_id == cid))
+            .all()
+        )
+        link_ids = [l.id for l in links]
+
+        if link_ids:
+            db.query(PartnerPendingTx).filter(
+                PartnerPendingTx.partner_link_id.in_(link_ids)
+            ).delete(synchronize_session=False)
+
+        if tx_ids:
+            db.query(PartnerPendingTx).filter(
+                PartnerPendingTx.source_tx_id.in_(tx_ids)
+            ).delete(synchronize_session=False)
+            db.query(PartnerPendingTx).filter(
+                PartnerPendingTx.mirrored_tx_id.in_(tx_ids)
+            ).delete(synchronize_session=False)
+
+        db.query(CustomerPaymentReminder).filter(
+            CustomerPaymentReminder.customer_id == cid
+        ).delete(synchronize_session=False)
+
+        db.query(PartnerLink).filter(
+            (PartnerLink.inviter_customer_id == cid) | (PartnerLink.invitee_customer_id == cid)
+        ).delete(synchronize_session=False)
+
+        db.commit()
+
         db.query(CustomerTransaction).filter(CustomerTransaction.customer_id == cid).delete(
             synchronize_session=False
         )
@@ -2752,6 +2835,10 @@ async def cust_callback_router(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     if data.startswith("cust_reminder_"):
         await query.answer("أنهِ إضافة المعاملة الحالية أولاً أو استخدم زر الرجوع.", show_alert=True)
+        return
+
+    if data.startswith("cust_detach_link_"):
+        await cust_detach_link_click(update, context)
         return
 
     # --- أصناف الصنف ---

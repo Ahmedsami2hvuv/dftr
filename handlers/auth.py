@@ -242,7 +242,8 @@ async def auth_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("force_login", None)
     _clear_quick_amount_state(context)
     await query.edit_message_text(
-        "نسيت كلمة المرور 🔑\n\nأرسل رقم هاتفك المسجل في الحساب:"
+        "نسيت كلمة المرور 🔑\n\nأرسل رقم هاتفك المسجل في الحساب:",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]),
     )
     return FORGOT_PHONE
 
@@ -290,6 +291,7 @@ async def forgot_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         keyboard = [
             [InlineKeyboardButton("بعد استلام الرمز انقر هنا", callback_data="forgot_enter_code")],
+            [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
         ]
         await update.message.reply_text(
             "تم التحقق من رقمك ✅\n\nسنرسل لك الرمز عبر واتساب. عند وصول الرسالة انقر على الزر الظاهر أسفل هذه الرسالة ثم أدخل الرمز.",
@@ -306,12 +308,12 @@ async def forgot_enter_code_click(update: Update, context: ContextTypes.DEFAULT_
     keyboard = [
         [
             InlineKeyboardButton("↩ رجوع", callback_data="forgot_back_phone"),
-            InlineKeyboardButton("📋 نسخ الرمز", callback_data="forgot_copy_code"),
-        ]
+        ],
+        [InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")],
     ]
     await query.edit_message_text(
         "أرسل الرمز المرسل لك عبر الواتساب:\n\n"
-        "يمكنك نسخ الرمز من الزر أو الرجوع لإدخال رقم الهاتف مرة أخرى.",
+        "الرجاء كتابة الرمز بعد وصوله عبر واتساب، أو رجوع لإدخال رقم الهاتف مرة أخرى.",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return FORGOT_CODE
@@ -417,7 +419,6 @@ async def forgot_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "تم التحقق من الرمز ✅\n\n"
             "لم يُكمل النظام تسجيل الدخول بعد؛ يجب أن تضع الآن كلمة مرور جديدة للحساب (4 أحرف على الأقل).\n\n"
             "أرسل كلمة المرور الجديدة:",
-            reply_markup=_kb_main_menu(),
         )
     finally:
         db.close()
