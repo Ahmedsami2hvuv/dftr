@@ -1979,9 +1979,10 @@ async def cust_took(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["cust_calc_expr"] = "0"
     context.user_data["cust_calc_last_was_equals"] = False
     await query.edit_message_text(
-        "🧮 حاسبة مبلغ المعاملة (أخذت 🔴)\n\n"
-        "استخدم الأزرار لإدخال عملية حسابية (مثال: `775.25+50-10`).\n"
-        "ثم اضغط `✅ إدخال المبلغ` تحت الأزرار.",
+        "(أخذت 🔴)\n\n"
+        "ارسل المبلغ\n"
+        "او استخدم 🧮 الحاسبة\n"
+        "وبعدها انقر على ✅ إدخال المبلغ",
         reply_markup=_kb_cust_amount_calc(cid, "0.00"),
     )
     return CUST_AMOUNT
@@ -1998,9 +1999,10 @@ async def cust_gave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["cust_calc_expr"] = "0"
     context.user_data["cust_calc_last_was_equals"] = False
     await query.edit_message_text(
-        "🧮 حاسبة مبلغ المعاملة (أعطيت 🟢)\n\n"
-        "استخدم الأزرار لإدخال عملية حسابية (مثال: `775.25+50/2`).\n"
-        "ثم اضغط `✅ إدخال المبلغ` تحت الأزرار.",
+        "(أعطيت 🟢)\n\n"
+        "ارسل المبلغ\n"
+        "او استخدم 🧮 الحاسبة\n"
+        "وبعدها انقر على ✅ إدخال المبلغ",
         reply_markup=_kb_cust_amount_calc(cid, "0.00"),
     )
     return CUST_AMOUNT
