@@ -59,6 +59,12 @@ def _find_user_by_phone(db, phone_normalized: str):
     return None
 
 
+def _clear_quick_amount_state(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """تفريغ مسار المبلغ السريع حتى لا يتداخل مع مسارات المصادقة."""
+    context.user_data.pop("quick_amount", None)
+    context.user_data.pop("quick_flow_kind", None)
+
+
 
 
 # --- التسجيل ---
@@ -66,6 +72,7 @@ async def auth_register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["auth_action"] = "register"
+    _clear_quick_amount_state(context)
     await query.edit_message_text(
         "إنشاء حساب جديد 📝\n\nأرسل اسمك الكامل (أو ما تريد أن يظهر في الدفتر):"
     )
@@ -149,6 +156,7 @@ async def auth_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["auth_action"] = "login"
+    _clear_quick_amount_state(context)
     await query.edit_message_text(
         "تسجيل الدخول 🔐\n\nأرسل رقم هاتفك المسجل (مثال: +9647733921468):"
     )
@@ -229,6 +237,7 @@ async def auth_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["auth_action"] = "forgot"
+    _clear_quick_amount_state(context)
     await query.edit_message_text(
         "نسيت كلمة المرور 🔑\n\nأرسل رقم هاتفك المسجل في الحساب:"
     )
@@ -686,7 +695,7 @@ async def auth_logout_do(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         # تحميل الصف عبر ORM ثم التفريغ — أوثق من UPDATE خام + rowcount على PostgreSQL
-        row = db.query(User).filter(User.telegram_id == tid).one_or_none()
+        row = db.query(User).filter(User.telegram_id == tid).first()
         if row:
             inner_id = row.id
             row.telegram_id = None

@@ -888,6 +888,10 @@ async def cust_search_global_message(update: Update, context: ContextTypes.DEFAU
     # حتى لا تظهر رسائل بحث/إضافة كعميل أثناء إدخال اسم الصنف.
     if context.user_data.get("in_cust_cat_add_flow"):
         return
+    # أثناء أي محادثة مصادقة (تسجيل/دخول/نسيت كلمة المرور) لا نتعامل
+    # مع النص العام حتى لا يُفسَّر رمز التحقق كمبلغ سريع.
+    if context.user_data.get("auth_action") in {"register", "login", "forgot"}:
+        return
     if context.user_data.get("last_menu") == "ledger":
         await update.message.reply_text(
             "لتسجيل مبلغ (مثل الراتب):\n"
