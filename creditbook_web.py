@@ -121,6 +121,53 @@ def _clear_cookie_headers(secure: bool) -> list[tuple[str, str]]:
     return [("Set-Cookie", f"{SESSION_COOKIE}=; {flags}")]
 
 
+def csrf_token(uid: int, action: str) -> str:
+    """رمز بسيط مرتبط بالجلسة والساعة لحماية النماذج."""
+    tb = int(time.time()) // 3600
+    msg = f"{uid}:{action}:{tb}".encode("utf-8")
+    sig = hmac.new(web_session_secret().encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return f"{tb}.{sig}"
+
+
+def csrf_verify(uid: int, action: str, token: str) -> bool:
+    if not token or "." not in token:
+        return False
+    parts = token.split(".", 1)
+    if len(parts) != 2:
+        return False
+    tb_s, sig = parts
+    try:
+        tb = int(tb_s)
+    except ValueError:
+        return False
+    now_b = int(time.time()) // 3600
+    if tb not in (now_b, now_b - 1, now_b + 1):
+        return False
+    msg = f"{uid}:{action}:{tb}".encode("utf-8")
+    expected = hmac.new(web_session_secret().encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, sig)
+
+
+FLASH_LABELS = {
+    "cust_new": "تمت إضافة العميل ✅",
+    "cust_upd": "تم حفظ بيانات العميل ✅",
+    "cust_del": "تم حذف العميل ✅",
+    "txn_ok": "تمت إضافة المعاملة ✅",
+    "tx_upd": "تم حفظ المعاملة ✅",
+    "tx_kind": "تم تغيير نوع المعاملة ✅",
+    "tx_del": "تم حذف المعاملة ✅",
+}
+
+
+def _flash_block(flash_key: str | None, err_msg: str | None) -> str:
+    out = []
+    if flash_key and flash_key in FLASH_LABELS:
+        out.append(f"<div class='flash-ok'>{_html_escape(FLASH_LABELS[flash_key])}</div>")
+    if err_msg:
+        out.append(f"<div class='err'>{_html_escape(err_msg)}</div>")
+    return "".join(out)
+
+
 def _amount_to_str(x) -> str:
     try:
         return f"{float(x):.2f}"
@@ -169,7 +216,16 @@ def render_login_page(error: str | None, favicon_href: str, brand_img: str) -> s
     """
 
 
-def render_dashboard_html(user: User, customers: list[tuple[Customer, float]], favicon_href: str, brand_img: str) -> str:
+def render_dashboard_html(
+    user: User,
+    customers: list[tuple[Customer, float]],
+    favicon_href: str,
+    brand_img: str,
+    flash_key: str | None = None,
+    err_msg: str | None = None,
+) -> str:
+    uid = user.id
+    csrf_c = csrf_token(uid, "cust_create")
     rows = []
     for c, bal in customers:
         phone_disp = format_phone_iq_local_display((c.phone or "").strip()) if c.phone else ""
@@ -184,8 +240,22 @@ def render_dashboard_html(user: User, customers: list[tuple[Customer, float]], f
             </a>
             """
         )
-    body = "".join(rows) if rows else "<p>لا يوجد عملاء بعد. أضف عملاء من البوت.</p>"
+    body = "".join(rows) if rows else "<p class='hint'>لا يوجد عملاء بعد — أضف عميلاً بالنموذج أدناه.</p>"
     disp = _html_escape(user.full_name or user.username or "حسابي")
+    flash_html = _flash_block(flash_key, err_msg)
+    add_form = f"""
+    <div class='web-section'>
+      <h3 class='web-h3'>➕ عميل جديد</h3>
+      <form method='post' action='/creditbook/customer/create' class='stack-form'>
+        <input type='hidden' name='csrf' value='{_html_escape(csrf_c)}'/>
+        <label for='cname'>الاسم</label>
+        <input type='text' id='cname' name='name' required maxlength='255' placeholder='اسم العميل'/>
+        <label for='cphone'>الهاتف (اختياري)</label>
+        <input type='tel' id='cphone' name='phone' placeholder='+9647… أو 077…' dir='ltr'/>
+        <button type='submit' class='btn btn-primary'>حفظ العميل</button>
+      </form>
+    </div>
+    """
     return f"""
     <!doctype html>
     <html lang='ar' dir='rtl'>
@@ -214,7 +284,10 @@ def render_dashboard_html(user: User, customers: list[tuple[Customer, float]], f
             </form>
             {f"<a class='btn btn-bot' style='margin-top:0' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>البوت</a>" if BOT_USERNAME else ""}
           </div>
-          <p class='hint'>قائمة العملاء والرصيد (عرض فقط — الإضافة والتعديل من البوت).</p>
+          {flash_html}
+          <p class='hint'>إدارة العملاء والمعاملات من المتصفح أو من البوت.</p>
+          {add_form}
+          <h3 class='web-h3' style='margin-top:8px'>📋 عملائي</h3>
           {body}
         </div>
       </body>
@@ -237,8 +310,10 @@ def render_owner_customer_page(
     offset: int,
     favicon_href: str,
     brand_img: str,
+    flash_key: str | None = None,
+    err_msg: str | None = None,
 ) -> str | None:
-    """صفحة عميل من منظور صاحب الدفتر (مثل تقرير المشاركة لكن بأعطيت/أخذت للمالك)."""
+    """صفحة عميل من منظور صاحب الدفتر + نماذج التعديل."""
     db = SessionLocal()
     try:
         cust = (
@@ -248,6 +323,11 @@ def render_owner_customer_page(
         )
         if not cust:
             return None
+
+        uid = owner_user_id
+        csrf_u = csrf_token(uid, f"cust_upd_{customer_id}")
+        csrf_d = csrf_token(uid, f"cust_del_{customer_id}")
+        csrf_t = csrf_token(uid, f"cust_txn_{customer_id}")
 
         gave = sum(float(t.amount or 0) for t in cust.transactions if t.kind == "gave")
         took = sum(float(t.amount or 0) for t in cust.transactions if t.kind == "took")
@@ -305,7 +385,7 @@ def render_owner_customer_page(
             tx_rows.append(
                 f"""
                 <div class='tx'>
-                  <div class='top'>{dt}</div>
+                  <div class='top'>{dt} — <a href='/creditbook/tx/{t.id}'>✏️ تعديل هذه المعاملة</a></div>
                   <div class='tx-content'>
                     <div class='tx-text'>
                       <div class='remain {remain_class}'>الرصيد بعد المعاملة: {_amount_to_str(remain)} د.ع.</div>
@@ -335,6 +415,54 @@ def render_owner_customer_page(
         cust_meta = _html_escape(cust.name) + (f" — {_html_escape(cust_disp_phone)}" if cust_disp_phone else "")
 
         owner_disp = _html_escape(user.full_name or user.username or "حسابي")
+        flash_html = _flash_block(flash_key, err_msg)
+
+        name_val = _html_escape(cust.name)
+        phone_val = _html_escape((cust.phone or "").strip())
+
+        edit_form = f"""
+        <div class='web-section'>
+          <h3 class='web-h3'>✏️ بيانات العميل</h3>
+          <form method='post' action='/creditbook/customer/{cust.id}/update' class='stack-form'>
+            <input type='hidden' name='csrf' value='{_html_escape(csrf_u)}'/>
+            <label for='edit_name'>الاسم</label>
+            <input type='text' id='edit_name' name='name' required maxlength='255' value="{name_val}"/>
+            <label for='edit_phone'>الهاتف (اكتب «حذف» لإزالة الرقم)</label>
+            <input type='text' id='edit_phone' name='phone' value="{phone_val}" placeholder='+964 أو 077' dir='ltr'/>
+            <button type='submit' class='btn btn-primary'>حفظ التعديلات</button>
+          </form>
+        </div>
+        """
+
+        del_form = f"""
+        <div class='web-section web-danger'>
+          <h3 class='web-h3'>⚠️ حذف العميل نهائياً</h3>
+          <form method='post' action='/creditbook/customer/{cust.id}/delete' class='stack-form'
+                onsubmit="return confirm('حذف العميل وجميع معاملاته؟ لا يمكن التراجع.');">
+            <input type='hidden' name='csrf' value='{_html_escape(csrf_d)}'/>
+            <button type='submit' class='btn btn-danger'>حذف العميل</button>
+          </form>
+        </div>
+        """
+
+        txn_form = f"""
+        <div class='web-section'>
+          <h3 class='web-h3'>➕ معاملة جديدة</h3>
+          <form method='post' action='/creditbook/customer/{cust.id}/txn_add' class='stack-form'>
+            <input type='hidden' name='csrf' value='{_html_escape(csrf_t)}'/>
+            <label for='kind'>النوع</label>
+            <select id='kind' name='kind' class='web-select'>
+              <option value='gave'>🟢 أعطيت (سلّمت للعميل)</option>
+              <option value='took'>🔴 أخذت (استلمت من العميل)</option>
+            </select>
+            <label for='amt'>المبلغ (د.ع.)</label>
+            <input type='text' id='amt' name='amount' required placeholder='مثال: 775.25' dir='ltr'/>
+            <label for='tnote'>ملاحظة (اختياري)</label>
+            <textarea id='tnote' name='note' rows='2' placeholder='يمكنك وضع المبلغ والملاحظة في سطرين'></textarea>
+            <button type='submit' class='btn btn-primary'>تسجيل المعاملة</button>
+          </form>
+        </div>
+        """
 
         html_out = f"""
         <!doctype html>
@@ -363,11 +491,107 @@ def render_owner_customer_page(
                   <button type='submit' class='btn btn-secondary' style='margin-top:0'>تسجيل الخروج</button>
                 </form>
               </div>
+              {flash_html}
               <p style='margin:6px 0 4px;font-weight:700;color:#475569'>👤 {owner_disp}</p>
               <div class='cust-meta' style='margin-bottom:8px;font-size:1.05rem;font-weight:700;color:#0f172a'>👤 {cust_meta}</div>
               <div class='cust-bal {balance_class}' style='font-size:1.25rem;margin-bottom:12px'>{balance_text} د.ع.</div>
-              {''.join(tx_rows) if tx_rows else '<p>لا توجد معاملات.</p>'}
+              {edit_form}
+              {txn_form}
+              <h3 class='web-h3'>📜 المعاملات</h3>
+              {''.join(tx_rows) if tx_rows else '<p class="hint">لا توجد معاملات بعد.</p>'}
               {more_btn}
+              {del_form}
+            </div>
+          </body>
+        </html>
+        """
+        return html_out
+    finally:
+        db.close()
+
+
+def render_tx_edit_page(
+    user: User,
+    tx_id: int,
+    owner_user_id: int,
+    favicon_href: str,
+    brand_img: str,
+    flash_key: str | None = None,
+    err_msg: str | None = None,
+) -> str | None:
+    """تعديل / حذف معاملة واحدة."""
+    db = SessionLocal()
+    try:
+        tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == tx_id).first()
+        if not tx:
+            return None
+        cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
+        if not cust or cust.user_id != owner_user_id:
+            return None
+
+        uid = owner_user_id
+        csrf_e = csrf_token(uid, f"tx_edit_{tx_id}")
+        csrf_k = csrf_token(uid, f"tx_kind_{tx_id}")
+        csrf_x = csrf_token(uid, f"tx_del_{tx_id}")
+
+        amt_s = _amount_to_str(tx.amount)
+        note_s = _html_escape((tx.note or "").strip())
+        kind_ar = "أعطيت 🟢" if tx.kind == "gave" else "أخذت 🔴"
+        cust_link = f"/creditbook/customer/{cust.id}"
+        owner_disp = _html_escape(user.full_name or user.username or "حسابي")
+        flash_html = _flash_block(flash_key, err_msg)
+
+        html_out = f"""
+        <!doctype html>
+        <html lang='ar' dir='rtl'>
+          <head>
+            <meta charset='utf-8'/>
+            <meta name='viewport' content='width=device-width, initial-scale=1'/>
+            <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
+            <link rel='stylesheet' href='/creditbook/static/creditbook_app.css'/>
+            <link rel='preconnect' href='https://fonts.googleapis.com'/>
+            <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin/>
+            <link href='https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap' rel='stylesheet'/>
+            <title>معاملة #{tx_id}</title>
+          </head>
+          <body>
+            <div class='card'>
+              <div class='brand-header'>
+                <div class='brand'>
+                  <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
+                  <h2>تعديل معاملة</h2>
+                </div>
+              </div>
+              <div class='toolbar'>
+                <a class='btn btn-secondary' href='{cust_link}'>◀ {_html_escape(cust.name)}</a>
+                <a class='btn btn-secondary' href='/creditbook/dashboard'>العملاء</a>
+              </div>
+              {flash_html}
+              <p class='hint'>👤 {owner_disp} — النوع الحالي: <strong>{kind_ar}</strong></p>
+              <div class='web-section'>
+                <form method='post' action='/creditbook/tx/{tx_id}/update' class='stack-form'>
+                  <input type='hidden' name='csrf' value='{_html_escape(csrf_e)}'/>
+                  <label for='txamt'>المبلغ (د.ع.)</label>
+                  <input type='text' id='txamt' name='amount' required value='{_html_escape(amt_s)}' dir='ltr'/>
+                  <label for='txnote'>الملاحظة (اكتب «حذف» لمسحها)</label>
+                  <textarea id='txnote' name='note' rows='3'>{note_s}</textarea>
+                  <button type='submit' class='btn btn-primary'>حفظ المبلغ والملاحظة</button>
+                </form>
+              </div>
+              <div class='web-section'>
+                <form method='post' action='/creditbook/tx/{tx_id}/toggle_kind' class='stack-form'
+                      onsubmit="return confirm('تأكيد عكس نوع المعاملة (أعطيت ↔ أخذت)؟');">
+                  <input type='hidden' name='csrf' value='{_html_escape(csrf_k)}'/>
+                  <button type='submit' class='btn btn-secondary'>🔁 عكس النوع (أعطيت / أخذت)</button>
+                </form>
+              </div>
+              <div class='web-section web-danger'>
+                <form method='post' action='/creditbook/tx/{tx_id}/delete' class='stack-form'
+                      onsubmit="return confirm('حذف هذه المعاملة نهائياً؟');">
+                  <input type='hidden' name='csrf' value='{_html_escape(csrf_x)}'/>
+                  <button type='submit' class='btn btn-danger'>🗑 حذف المعاملة</button>
+                </form>
+              </div>
             </div>
           </body>
         </html>

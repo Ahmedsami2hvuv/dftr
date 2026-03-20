@@ -24,12 +24,23 @@ from config import WEB_BASE_URL
 from creditbook_web import (
     _clear_cookie_headers,
     _set_cookie_headers,
+    csrf_verify,
     get_user_from_cookie_header,
     load_dashboard_rows,
     render_dashboard_html,
     render_login_page,
     render_owner_customer_page,
+    render_tx_edit_page,
     try_login,
+)
+from creditbook_web_actions import (
+    action_customer_create,
+    action_customer_delete,
+    action_customer_update,
+    action_tx_delete,
+    action_tx_toggle_kind,
+    action_tx_update,
+    action_txn_add,
 )
 from utils.phone import format_phone_iq_local_display, wa_number as _wa_number
 
@@ -633,7 +644,46 @@ class Handler(BaseHTTPRequestHandler):
                 _redirect(self, "/creditbook/login")
                 return
             rows = load_dashboard_rows(web_user.id)
-            page = render_dashboard_html(web_user, rows, favicon_href, brand_img_src)
+            flash_key = (qs.get("flash") or [None])[0]
+            err_msg = (qs.get("err") or [None])[0]
+            if err_msg:
+                err_msg = unquote(err_msg)
+            page = render_dashboard_html(
+                web_user,
+                rows,
+                favicon_href,
+                brand_img_src,
+                flash_key=flash_key,
+                err_msg=err_msg,
+            )
+            _send_html_page(self, 200, page)
+            return
+
+        tx_get = re.match(r"^/creditbook/tx/(?P<tid>\d+)$", path)
+        if tx_get:
+            if not web_user:
+                _redirect(self, "/creditbook/login")
+                return
+            tid = int(tx_get.group("tid"))
+            flash_key = (qs.get("flash") or [None])[0]
+            err_msg = (qs.get("err") or [None])[0]
+            if err_msg:
+                err_msg = unquote(err_msg)
+            page = render_tx_edit_page(
+                web_user,
+                tid,
+                web_user.id,
+                favicon_href,
+                brand_img_src,
+                flash_key=flash_key,
+                err_msg=err_msg,
+            )
+            if page is None:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"Not found")
+                return
             _send_html_page(self, 200, page)
             return
 
@@ -643,6 +693,10 @@ class Handler(BaseHTTPRequestHandler):
                 _redirect(self, "/creditbook/login")
                 return
             cid = int(cust_m.group("cid"))
+            flash_key = (qs.get("flash") or [None])[0]
+            err_msg = (qs.get("err") or [None])[0]
+            if err_msg:
+                err_msg = unquote(err_msg)
             page = render_owner_customer_page(
                 web_user,
                 cid,
@@ -650,6 +704,8 @@ class Handler(BaseHTTPRequestHandler):
                 offset,
                 favicon_href,
                 brand_img_src,
+                flash_key=flash_key,
+                err_msg=err_msg,
             )
             if page is None:
                 self.send_response(404)
@@ -755,6 +811,8 @@ class Handler(BaseHTTPRequestHandler):
         body_qs = parse_qs(body, keep_blank_values=True)
         secure = _request_is_secure(self)
         brand_img_src, favicon_href = _brand_visual_for_page()
+        cookie_header = self.headers.get("Cookie")
+        web_user = get_user_from_cookie_header(cookie_header)
 
         if path == "/creditbook/login":
             phone = (body_qs.get("phone") or [""])[0]
@@ -771,6 +829,133 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/creditbook/logout":
             extra = _clear_cookie_headers(secure)
             _redirect(self, "/creditbook/login", extra)
+            return
+
+        if not web_user:
+            _redirect(self, "/creditbook/login")
+            return
+
+        uid = web_user.id
+
+        def _e(msg: str) -> str:
+            return quote(msg[:400], safe="")
+
+        if path == "/creditbook/customer/create":
+            csrf = (body_qs.get("csrf") or [""])[0]
+            if not csrf_verify(uid, "cust_create", csrf):
+                _redirect(self, "/creditbook/dashboard?err=" + _e("انتهت صلاحية النموذج. حدّث الصفحة."))
+                return
+            name = (body_qs.get("name") or [""])[0]
+            phone = (body_qs.get("phone") or [""])[0]
+            err, cid = action_customer_create(uid, name, phone)
+            if err:
+                _redirect(self, "/creditbook/dashboard?err=" + _e(err))
+                return
+            _redirect(self, f"/creditbook/customer/{cid}?flash=cust_new")
+            return
+
+        m_up = re.match(r"^/creditbook/customer/(?P<cid>\d+)/update$", path)
+        if m_up:
+            cid = int(m_up.group("cid"))
+            csrf = (body_qs.get("csrf") or [""])[0]
+            if not csrf_verify(uid, f"cust_upd_{cid}", csrf):
+                _redirect(self, f"/creditbook/customer/{cid}?err=" + _e("انتهت صلاحية النموذج."))
+                return
+            err = action_customer_update(
+                uid,
+                cid,
+                (body_qs.get("name") or [""])[0],
+                (body_qs.get("phone") or [""])[0],
+            )
+            if err:
+                _redirect(self, f"/creditbook/customer/{cid}?err=" + _e(err))
+                return
+            _redirect(self, f"/creditbook/customer/{cid}?flash=cust_upd")
+            return
+
+        m_del = re.match(r"^/creditbook/customer/(?P<cid>\d+)/delete$", path)
+        if m_del:
+            cid = int(m_del.group("cid"))
+            csrf = (body_qs.get("csrf") or [""])[0]
+            if not csrf_verify(uid, f"cust_del_{cid}", csrf):
+                _redirect(self, f"/creditbook/customer/{cid}?err=" + _e("انتهت صلاحية النموذج."))
+                return
+            err = action_customer_delete(uid, cid)
+            if err:
+                _redirect(self, f"/creditbook/customer/{cid}?err=" + _e(err))
+                return
+            _redirect(self, "/creditbook/dashboard?flash=cust_del")
+            return
+
+        m_txn = re.match(r"^/creditbook/customer/(?P<cid>\d+)/txn_add$", path)
+        if m_txn:
+            cid = int(m_txn.group("cid"))
+            csrf = (body_qs.get("csrf") or [""])[0]
+            if not csrf_verify(uid, f"cust_txn_{cid}", csrf):
+                _redirect(self, f"/creditbook/customer/{cid}?err=" + _e("انتهت صلاحية النموذج."))
+                return
+            kind = (body_qs.get("kind") or [""])[0].strip()
+            err = action_txn_add(
+                uid,
+                cid,
+                kind,
+                (body_qs.get("amount") or [""])[0],
+                (body_qs.get("note") or [""])[0],
+            )
+            if err:
+                _redirect(self, f"/creditbook/customer/{cid}?err=" + _e(err))
+                return
+            _redirect(self, f"/creditbook/customer/{cid}?flash=txn_ok")
+            return
+
+        m_tu = re.match(r"^/creditbook/tx/(?P<tid>\d+)/update$", path)
+        if m_tu:
+            tid = int(m_tu.group("tid"))
+            csrf = (body_qs.get("csrf") or [""])[0]
+            if not csrf_verify(uid, f"tx_edit_{tid}", csrf):
+                _redirect(self, f"/creditbook/tx/{tid}?err=" + _e("انتهت صلاحية النموذج."))
+                return
+            err = action_tx_update(
+                uid,
+                tid,
+                (body_qs.get("amount") or [""])[0],
+                (body_qs.get("note") or [""])[0],
+            )
+            if err:
+                _redirect(self, f"/creditbook/tx/{tid}?err=" + _e(err))
+                return
+            _redirect(self, f"/creditbook/tx/{tid}?flash=tx_upd")
+            return
+
+        m_tk = re.match(r"^/creditbook/tx/(?P<tid>\d+)/toggle_kind$", path)
+        if m_tk:
+            tid = int(m_tk.group("tid"))
+            csrf = (body_qs.get("csrf") or [""])[0]
+            if not csrf_verify(uid, f"tx_kind_{tid}", csrf):
+                _redirect(self, f"/creditbook/tx/{tid}?err=" + _e("انتهت صلاحية النموذج."))
+                return
+            err = action_tx_toggle_kind(uid, tid)
+            if err:
+                _redirect(self, f"/creditbook/tx/{tid}?err=" + _e(err))
+                return
+            _redirect(self, f"/creditbook/tx/{tid}?flash=tx_kind")
+            return
+
+        m_td = re.match(r"^/creditbook/tx/(?P<tid>\d+)/delete$", path)
+        if m_td:
+            tid = int(m_td.group("tid"))
+            csrf = (body_qs.get("csrf") or [""])[0]
+            if not csrf_verify(uid, f"tx_del_{tid}", csrf):
+                _redirect(self, f"/creditbook/tx/{tid}?err=" + _e("انتهت صلاحية النموذج."))
+                return
+            err, cid = action_tx_delete(uid, tid)
+            if err:
+                _redirect(self, f"/creditbook/tx/{tid}?err=" + _e(err))
+                return
+            if cid:
+                _redirect(self, f"/creditbook/customer/{cid}?flash=tx_del")
+            else:
+                _redirect(self, "/creditbook/dashboard?flash=tx_del")
             return
 
         self.send_response(404)

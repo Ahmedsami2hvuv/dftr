@@ -156,6 +156,59 @@ form.login-form { margin-top: 8px; }
   margin: 8px 0 14px;
   line-height: 1.5;
 }
+.web-section {
+  margin: 18px 0;
+  padding: 14px 0;
+  border-top: 1px solid #e2e8f0;
+}
+.web-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+.web-h3 {
+  margin: 0 0 10px 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+.web-danger {
+  border-top-color: #fecaca;
+}
+.stack-form label { margin-top: 6px; }
+.stack-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  font-size: 15px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 64px;
+}
+.web-select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  font-size: 16px;
+  font-family: inherit;
+  background: #fff;
+}
+.btn-danger {
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+}
+.flash-ok {
+  background: #ecfdf5;
+  color: #047857;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  font-weight: 700;
+  border: 1px solid #a7f3d0;
+}
 @media (max-width: 560px) {
   .brand-header { flex-direction: column; align-items: stretch; }
   .brand { justify-content: center; }
