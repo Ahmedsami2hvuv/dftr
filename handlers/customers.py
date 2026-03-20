@@ -198,6 +198,27 @@ async def cust_calc_amount_click(update: Update, context: ContextTypes.DEFAULT_T
     cid = context.user_data.get("cust_txn_cid")
     cid = int(cid) if cid else None
 
+    # تحقق ملكية العميل حتى لا تعمل أزرار الحاسبة القديمة من جلسات/رسائل سابقة.
+    # هذا يمنع أن تضغط زر مثل "✅ إدخال المبلغ" وما زال البوت داخل تدفق خاطئ.
+    if cid:
+        db = SessionLocal()
+        try:
+            user = get_current_user(db, update.effective_user.id)
+            cust = db.query(Customer).filter(Customer.id == cid).first()
+            if not user or not cust or cust.user_id != user.id:
+                await query.edit_message_text(
+                    "يجب تسجيل الدخول أولاً (أو هذه العملية غير مسموحة).",
+                    reply_markup=kb_main_menu(),
+                )
+                context.user_data.pop("cust_calc_expr", None)
+                context.user_data.pop("cust_calc_last_was_equals", None)
+                context.user_data.pop("cust_txn_amount", None)
+                context.user_data.pop("cust_txn_kind", None)
+                context.user_data.pop("cust_txn_cid", None)
+                return ConversationHandler.END
+        finally:
+            db.close()
+
     if data == "calc_amt_hide":
         kind = context.user_data.get("cust_txn_kind")
         kind_label = "أخذت 🔴" if kind == "took" else "أعطيت 🟢"
