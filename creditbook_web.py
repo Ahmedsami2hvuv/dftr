@@ -295,8 +295,9 @@ def render_dashboard_html(
     """
 
 
-def _owner_kind_label(kind: str) -> str:
-    return "🟢 أعطيت" if kind == "gave" else "🔴 أخذت"
+def _owner_kind_word(kind: str) -> str:
+    """نص النوع بدون الرمز (الرمز يُعرض في سطر منفصل أعلى/أسفل حسب الحالة)."""
+    return "أعطيت" if kind == "gave" else "أخذت"
 
 
 def _owner_kind_class(kind: str) -> str:
@@ -371,29 +372,41 @@ def render_owner_customer_page(
         for t in txs:
             dt = t.created_at.strftime("%Y-%m-%d %H:%M")
             note = (t.note or "").strip()
-            note_html = f"<div class='note'>ملاحظة: {_html_escape(note)}</div>" if note else "<div class='note'>ملاحظة: —</div>"
+            note_html = (
+                f"<div class='tx-note-line'><span class='tx-note-label'>ملاحظة:</span> {_html_escape(note)}</div>"
+                if note
+                else ""
+            )
             photo_html = ""
             if getattr(t, "photo_file_id", None):
                 fid = quote(str(t.photo_file_id), safe="")
                 photo_html = (
-                    f"<div class='photo-wrap'><a href='/creditbook/photo-view/{fid}' target='_blank' rel='noopener'>"
-                    f"<img class='photo' src='/creditbook/photo/{fid}' alt='صورة'/></a></div>"
+                    f"<a class='tx-inline-photo' href='/creditbook/photo-view/{fid}' target='_blank' rel='noopener' title='صورة'>"
+                    f"<img class='photo' src='/creditbook/photo/{fid}' alt=''/></a>"
                 )
             remain = running_after_by_tx.get(t.id, bal)
             remain_class = "bal-red" if remain > 0 else ("bal-green" if remain < 0 else "")
             kc = _owner_kind_class(t.kind)
+            kind_word = _owner_kind_word(t.kind)
+            # أعطيت: الدائرة الخضراء فوق السطر | أخذت: الدائرة الحمراء تحت السطر (فوق الملاحظة إن وُجدت)
+            dot_top = "<div class='tx-emoji-row tx-emoji-above' aria-hidden='true'><span class='tx-emoji-dot'>🟢</span></div>" if t.kind == "gave" else ""
+            dot_bottom = "<div class='tx-emoji-row tx-emoji-below' aria-hidden='true'><span class='tx-emoji-dot'>🔴</span></div>" if t.kind == "took" else ""
             tx_rows.append(
                 f"""
-                <div class='tx'>
-                  <div class='top'>{dt} — <a href='/creditbook/tx/{t.id}'>✏️ تعديل هذه المعاملة</a></div>
-                  <div class='tx-content'>
-                    <div class='tx-text'>
-                      <div class='remain {remain_class}'>الرصيد بعد المعاملة: {_amount_to_str(remain)} د.ع.</div>
-                      <div class='main {kc}'>{_owner_kind_label(t.kind)} — {_amount_to_str(t.amount)} د.ع.</div>
-                      {note_html}
-                    </div>
+                <div class='tx tx-row-{t.kind}'>
+                  {dot_top}
+                  <div class='tx-line-one'>
+                    <span class='tx-date' dir='ltr'>{dt}</span>
+                    <span class='tx-sep' aria-hidden='true'>·</span>
+                    <a class='tx-edit-btn' href='/creditbook/tx/{t.id}'><span class='tx-edit-ico'>✎</span> تعديل</a>
+                    <span class='tx-sep' aria-hidden='true'>·</span>
+                    <span class='tx-remain {remain_class}'>بعدها {_amount_to_str(remain)} د.ع.</span>
+                    <span class='tx-sep' aria-hidden='true'>·</span>
+                    <span class='tx-kind-amt {kc}'><span class='tx-kind-txt'>{kind_word}</span> {_amount_to_str(t.amount)} د.ع.</span>
                     {photo_html}
                   </div>
+                  {dot_bottom}
+                  {note_html}
                 </div>
                 """
             )
