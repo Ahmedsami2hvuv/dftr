@@ -694,43 +694,39 @@ async def auth_logout_do(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
         ]
 
-        # تحميل الصف عبر ORM ثم التفريغ — أوثق من UPDATE خام + rowcount على PostgreSQL
-        row = db.query(User).filter(User.telegram_id == tid).first()
-        if row:
-            inner_id = row.id
-            row.telegram_id = None
-            row.username = None
-            db.commit()
-            logger.info("تسجيل خروج: فُك ربط telegram للمستخدم id=%s", inner_id)
-            affected = 1
-        else:
-            logger.warning("تسجيل خروج: لا صف للمستخدم telegram_id=%s (ربما مفكوك مسبقاً)", tid)
-            affected = 0
+        affected = (
+            db.query(User)
+            .filter(User.telegram_id == tid)
+            .update({User.telegram_id: None, User.username: None}, synchronize_session=False)
+        )
+        db.commit()
+        logger.info("تسجيل خروج: telegram_id=%s affected=%s", tid, affected)
 
         out_text = (
             "تم تسجيل الخروج ✅\n\nللوصول إلى حسابك مرة أخرى استخدم تسجيل الدخول أو إنشاء حساب أو نسيت كلمة المرور."
             if affected > 0
             else "أنت غير مسجل حالياً. اختر خيار تسجيل الدخول."
         )
-
-        if query and query.message:
-            await query.message.reply_text(out_text, reply_markup=InlineKeyboardMarkup(keyboard))
-            try:
-                await query.edit_message_text("تم تسجيل الخروج.", reply_markup=None)
-            except Exception:
-                try:
-                    await query.edit_message_reply_markup(reply_markup=None)
-                except Exception:
-                    pass
-        else:
-            await context.bot.send_message(
-                chat_id=tid,
-                text=out_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-            )
-
-        context.user_data.clear()
+    except Exception as e:
+        db.rollback()
+        logger.exception("فشل تسجيل الخروج telegram_id=%s: %s", tid, e)
+        out_text = "تعذر إكمال تسجيل الخروج حالياً. حاول مرة أخرى."
     finally:
         db.close()
+
+    context.user_data.clear()
+
+    # رسالة واحدة واضحة؛ وإذا تعذر تعديل الرسالة نرسل رسالة جديدة.
+    if query:
+        try:
+            await query.edit_message_text(out_text, reply_markup=InlineKeyboardMarkup(keyboard))
+            return ConversationHandler.END
+        except Exception:
+            pass
+    await context.bot.send_message(
+        chat_id=tid,
+        text=out_text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
 
     return ConversationHandler.END
