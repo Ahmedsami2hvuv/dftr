@@ -1036,9 +1036,7 @@ async def _build_customer_view(db, cust: Customer, offset: int):
         f"📒 {cust.name}\n"
         + (f"📞 {cust.phone}\n" if cust.phone else "")
         + f"\n{balance_text}\n"
-        + f"🟢 أعطيت: {gave:.2f} {cur}\n"
-        + f"🔴 أخذت: {took:.2f} {cur}\n\n"
-        + "آخر المعاملات:"
+        + "\nآخر المعاملات:"
     )
 
     has_more = offset + TX_PAGE_SIZE < total
