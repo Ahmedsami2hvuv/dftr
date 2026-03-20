@@ -357,9 +357,7 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("يجب تسجيل الدخول أولاً. استخدم /start")
             return
         customers = db.query(Customer).filter(Customer.user_id == user.id).order_by(Customer.created_at.desc()).all()
-        keyboard = [
-            [InlineKeyboardButton("➕ إضافة عميل", callback_data="cust_add")],
-        ]
+        keyboard: list[list[InlineKeyboardButton]] = []
         total_out = 0.0  # الصادر الكلي (أعطيت)
         total_in = 0.0   # الوارد الكلي (أخذت)
         for c in customers:
@@ -379,6 +377,7 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     InlineKeyboardButton(amount_label, callback_data=f"cust_{c.id}"),
                 ]
             )
+        keyboard.append([InlineKeyboardButton("➕ إضافة عميل", callback_data="cust_add")])
         keyboard.append([InlineKeyboardButton("🔎 بحث", callback_data="cust_search_start")])
         keyboard.append([InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")])
         remain = total_out - total_in

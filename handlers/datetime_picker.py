@@ -13,21 +13,6 @@ from telegram.ext import ContextTypes, ConversationHandler
 MODE_TX = "tx"
 MODE_RM = "rm"
 
-MONTHS_AR = (
-    "يناير",
-    "فبراير",
-    "مارس",
-    "أبريل",
-    "مايو",
-    "يونيو",
-    "يوليو",
-    "أغسطس",
-    "سبتمبر",
-    "أكتوبر",
-    "نوفمبر",
-    "ديسمبر",
-)
-
 # 24 ساعة حسب تخطيط المستخدم: صفوف من 3
 HOUR_ROWS = (
     ((1, "1ف"), (2, "2ف"), (3, "3ف")),
@@ -85,7 +70,7 @@ def kb_months(mode: str, eid: int, year: int) -> InlineKeyboardMarkup:
             if m <= 12:
                 row.append(
                     InlineKeyboardButton(
-                        MONTHS_AR[m - 1], callback_data=f"{pref}_m_{m}"
+                        str(m), callback_data=f"{pref}_m_{m}"
                     )
                 )
         rows.append(row)
@@ -220,7 +205,7 @@ async def handle_datetime_picker(
             context.user_data.pop("dt_d", None)
             y, mo = context.user_data["dt_y"], context.user_data["dt_m"]
             await query.edit_message_text(
-                f"📅 اليوم — {MONTHS_AR[mo - 1]} {y}",
+                f"📅 اليوم — الشهر {mo} — {y}",
                 reply_markup=kb_days(mode, eid, y, mo),
             )
             return None
@@ -292,7 +277,7 @@ async def handle_datetime_picker(
         context.user_data.pop("dt_d", None)
         context.user_data.pop("dt_h", None)
         await query.edit_message_text(
-            f"📅 اليوم — {MONTHS_AR[mo - 1]} {y}",
+            f"📅 اليوم — الشهر {mo} — {y}",
             reply_markup=kb_days(mode, eid, y, mo),
         )
         return None
