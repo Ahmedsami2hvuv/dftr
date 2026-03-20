@@ -176,9 +176,10 @@ def _render_page(token: str, offset: int) -> str:
                     f"<img class='photo' src='/creditbook/photo/{fid}' alt='صورة المعاملة'/></a></div>"
                 )
             remain = running_after_by_tx.get(t.id, bal)
-            # موجب = لصالحك (أخضر) كما في البوت
-            remain_class = "bal-green" if remain > 0 else ("bal-red" if remain < 0 else "")
-            tx_kind_class = "bal-red" if t.kind == "took" else "bal-green"
+            # منظور العميل: رصيد موجب = عليه دين → أحمر؛ سالب = لصالحه → أخضر
+            remain_class = "bal-red" if remain > 0 else ("bal-green" if remain < 0 else "")
+            # أعطيت(صاحب الدفتر)=took → للعميل «أعطيت» أخضر | أخذت=gave → للعميل «أخذت» أحمر (ذمة/مسؤولية)
+            tx_kind_class = "bal-red" if t.kind == "gave" else "bal-green"
             tx_rows.append(
                 f"""
                 <div class='tx'>
@@ -207,7 +208,8 @@ def _render_page(token: str, offset: int) -> str:
             balance_text += f"{abs(bal):.2f}"
         else:
             balance_text += "0"
-        balance_class = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
+        # منظور العميل في الصفحة: موجب = مديون لصاحب الدفتر → أحمر
+        balance_class = "bal-red" if bal > 0 else ("bal-green" if bal < 0 else "")
 
         owner = cust.user
         owner_name = (owner.full_name or owner.username or "صاحب الحساب") if owner else "صاحب الحساب"

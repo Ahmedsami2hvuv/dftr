@@ -1556,17 +1556,19 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg_balance = f"لي رصيد {abs(bal):.2f} {cur}"
         else:
             msg_balance = "الرصيد صفر"
+        link_hint = "⬇️ المس الرابط لمشاهدة كافة التفاصيل"
         share_text = (
             f"{msg_balance}\n"
             "ــــــــــــــــــــــــ\n"
-            f"رؤية جميع المعاملات:\n{view_url}"
+            f"{link_hint}\n"
+            f"{view_url}"
         )
         # زر يفتح واتساب على محادثة رقم العميل مع النص جاهز
         # نخلي رابط الصفحة بسطر لوحده حتى واتساب يتعامل معه كرابط تلقائي.
         wa_text = (
-            f"{msg_balance}\n\n{view_url}"
+            f"{msg_balance}\n\n{link_hint}\n{view_url}"
             if bal != 0
-            else f"الرصيد صفر\n\n{view_url}"
+            else f"الرصيد صفر\n\n{link_hint}\n{view_url}"
         )
         wa_num = cust.phone and wa_number(cust.phone)
         # زر واتساب يظهر دائمًا:
