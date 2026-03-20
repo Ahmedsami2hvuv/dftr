@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """تسجيل، دخول، نسيت كلمة المرور"""
+import logging
 import random
 import string
 from datetime import datetime, timedelta
@@ -7,7 +8,6 @@ from urllib.parse import quote
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from sqlalchemy import text
 from database import SessionLocal
 from app_models import User
 from config import ADMIN_ID
@@ -18,6 +18,8 @@ from utils.phone import (
     same_phone as _same_phone,
     wa_number as _wa_number,
 )
+
+logger = logging.getLogger(__name__)
 
 (
     REG_NAME,
@@ -668,7 +670,7 @@ async def auth_logout_do(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not update.effective_user:
         return ConversationHandler.END
-    uid = int(update.effective_user.id)
+    tid = int(update.effective_user.id)
     if query:
         try:
             await query.answer("جاري تسجيل الخروج...")
@@ -683,29 +685,18 @@ async def auth_logout_do(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔑 نسيت كلمة المرور", callback_data="auth_forgot")],
         ]
 
-        affected = 0
-        try:
-            result = db.execute(
-                text(
-                    "UPDATE users SET telegram_id = NULL, username = NULL "
-                    "WHERE telegram_id = :tid"
-                ),
-                {"tid": uid},
-            )
+        # تحميل الصف عبر ORM ثم التفريغ — أوثق من UPDATE خام + rowcount على PostgreSQL
+        row = db.query(User).filter(User.telegram_id == tid).one_or_none()
+        if row:
+            inner_id = row.id
+            row.telegram_id = None
+            row.username = None
             db.commit()
-            affected = getattr(result, "rowcount", 0) or 0
-        except Exception:
-            db.rollback()
-            try:
-                affected = (
-                    db.query(User)
-                    .filter(User.telegram_id == uid)
-                    .update({User.telegram_id: None, User.username: None}, synchronize_session=False)
-                )
-                db.commit()
-            except Exception:
-                db.rollback()
-                affected = 0
+            logger.info("تسجيل خروج: فُك ربط telegram للمستخدم id=%s", inner_id)
+            affected = 1
+        else:
+            logger.warning("تسجيل خروج: لا صف للمستخدم telegram_id=%s (ربما مفكوك مسبقاً)", tid)
+            affected = 0
 
         out_text = (
             "تم تسجيل الخروج ✅\n\nللوصول إلى حسابك مرة أخرى استخدم تسجيل الدخول أو إنشاء حساب أو نسيت كلمة المرور."
@@ -724,7 +715,7 @@ async def auth_logout_do(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pass
         else:
             await context.bot.send_message(
-                chat_id=uid,
+                chat_id=tid,
                 text=out_text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
             )

@@ -26,6 +26,7 @@ except Exception:
     pass
 
 from telegram import Update
+from telegram.error import Conflict
 from datetime import timedelta
 
 from telegram.ext import (
@@ -35,6 +36,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
     ConversationHandler,
+    ContextTypes,
 )
 
 from config import BOT_TOKEN
@@ -241,10 +243,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def _telegram_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    err = context.error
+    if isinstance(err, Conflict):
+        logger.warning(
+            "تعارض getUpdates: يعمل أكثر من نسخة من البوت بنفس التوكن. "
+            "عطّل النسخ الزائدة في Railway (خدمة مكررة أو Webhook + Polling معاً)."
+        )
+        return
+    logger.error("خطأ غير معالج في البوت", exc_info=err)
+
+
 def main():
     init_db()
 
     app = Application.builder().token(BOT_TOKEN).build()
+    app.add_error_handler(_telegram_error_handler)
 
     # تشغيل الموقع البسيط الذي يعرض معاملات العميل من خلال رابط المشاركة
     try:
