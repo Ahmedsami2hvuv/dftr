@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=9"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=10"
 
 
 def _html_escape(s: str) -> str:
@@ -233,6 +233,30 @@ def _brand_home_block(brand_img: str, user_name_display_esc: str) -> str:
         f"<div class='brand-text-wrap'>"
         f"<h2>{_html_escape('دفتر الديون')}</h2>"
         f"<p class='brand-user-name'>{user_name_display_esc}</p>"
+        f"</div></a>"
+    )
+
+
+def _brand_customer_block(
+    brand_img: str,
+    owner_disp_esc: str,
+    cust_name_esc: str,
+    phone_local_display: str,
+) -> str:
+    """صفحة عميل: دفتر الديون + اسم العميل في السطر نفسه، ثم صاحب الحساب، ثم الهاتف فقط إن وُجد."""
+    phone_html = ""
+    if (phone_local_display or "").strip():
+        phone_html = (
+            f"<p class='brand-cust-phone' dir='ltr'>📞 {_html_escape(phone_local_display.strip())}</p>"
+        )
+    return (
+        f"<a class='brand-home-link' href='/creditbook/dashboard'>"
+        f"<img class='brand-logo' src=\"{_html_escape(brand_img)}\" width='64' height='64' alt=''/>"
+        f"<div class='brand-text-wrap'>"
+        f"<h2 class='brand-h2-with-cust'>{_html_escape('دفتر الديون')}"
+        f"<span class='brand-cust-inline'> — {cust_name_esc}</span></h2>"
+        f"<p class='brand-user-name'>{owner_disp_esc}</p>"
+        f"{phone_html}"
         f"</div></a>"
     )
 
@@ -547,10 +571,14 @@ def render_dashboard_html(
     flash_key: str | None = None,
     err_msg: str | None = None,
     search_q: str | None = None,
+    search_scope: str | None = None,
 ) -> str:
     uid = user.id
     csrf_c = csrf_token(uid, "cust_create")
-    body = render_dashboard_customer_rows_html(uid, search_q)
+    sc = (search_scope or "all").lower()
+    if sc not in ("all", "cust", "txn"):
+        sc = "all"
+    body = render_dashboard_customer_rows_html(uid, search_q, sc)
     flash_html = _flash_block(flash_key, err_msg)
     add_form = f"""
     <div class='new-cust-block'>
@@ -577,6 +605,7 @@ def render_dashboard_html(
     net_class = "bal-green" if tot_net > 0 else ("bal-red" if tot_net < 0 else "")
     uname = _html_escape(owner_display_name_for_user(user))
     q_esc = _html_escape(search_q or "")
+    sel = lambda v: " selected" if sc == v else ""
     q_hint = "<p class='hint search-hint' id='search-hint-line' hidden>بحث فوري أثناء الكتابة.</p>"
     clear_search = (
         "<button type='button' class='btn btn-secondary btn-search-clear' id='dash-q-clear' hidden>مسح</button>"
@@ -599,16 +628,21 @@ def render_dashboard_html(
           </div>
           {flash_html}
           <p class='hint'>إدارة العملاء والمعاملات من المتصفح أو من البوت.</p>
-          <div class='dashboard-tools'>
-            <div class='dashboard-search' role='search'>
+          {q_hint}
+          {add_form}
+          <div class='dashboard-cust-heading-row'>
+            <h3 class='web-h3 dashboard-cust-title'>📋 عملائي</h3>
+            <div class='dashboard-search-inline' role='search'>
               <label class='visually-hidden' for='dash-q'>بحث في العملاء والمعاملات</label>
-              <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='بحث فوري: اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
+              <select id='dash-scope' class='dash-scope-select' aria-label='نطاق البحث'>
+                <option value='all'{sel("all")}>الكل</option>
+                <option value='cust'{sel("cust")}>أسماء فقط</option>
+                <option value='txn'{sel("txn")}>معاملات فقط</option>
+              </select>
+              <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='بحث: اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
               {clear_search}
             </div>
           </div>
-          {q_hint}
-          {add_form}
-          <h3 class='web-h3' style='margin-top:8px'>📋 عملائي</h3>
           <div id='cust-list'>{body}</div>
           <script>
           (function() {{
@@ -616,8 +650,10 @@ def render_dashboard_html(
             var list = document.getElementById('cust-list');
             var clr = document.getElementById('dash-q-clear');
             var hint = document.getElementById('search-hint-line');
+            var scopeEl = document.getElementById('dash-scope');
             if (!inp || !list) return;
             var t = null;
+            function scopeVal() {{ return (scopeEl && scopeEl.value) ? scopeEl.value : 'all'; }}
             function showClear() {{
               var v = (inp.value || '').trim();
               if (clr) clr.hidden = !v;
@@ -625,7 +661,8 @@ def render_dashboard_html(
             }}
             function load() {{
               var q = (inp.value || '').trim();
-              fetch('/creditbook/search_customers?q=' + encodeURIComponent(q), {{ credentials: 'same-origin' }})
+              var sc = scopeVal();
+              fetch('/creditbook/search_customers?q=' + encodeURIComponent(q) + '&scope=' + encodeURIComponent(sc), {{ credentials: 'same-origin' }})
                 .then(function(r) {{ return r.json(); }})
                 .then(function(data) {{
                   if (data && data.html !== undefined) list.innerHTML = data.html;
@@ -638,6 +675,7 @@ def render_dashboard_html(
             }}
             inp.addEventListener('input', debounce);
             inp.addEventListener('search', debounce);
+            if (scopeEl) scopeEl.addEventListener('change', debounce);
             if (clr) clr.addEventListener('click', function() {{
               inp.value = '';
               debounce();
@@ -660,6 +698,7 @@ def render_report_all_transactions_page(
     time_order: str = "all",
     amount_filter: str = "all",
     on_date: str = "",
+    search_sq: str = "",
 ) -> str:
     """جميع معاملات كل العملاء مع فلاتر وترقيم صفحات."""
     tot_gave, tot_took, tot_net = load_dashboard_aggregate_totals(user.id)
@@ -709,17 +748,21 @@ def render_report_all_transactions_page(
         af = "all"
     ds_raw = (on_date or "").strip()[:10]
     date_val = _html_escape(ds_raw) if ds_raw else ""
+    sq_raw = (search_sq or "").strip()
+    sq_esc = _html_escape(sq_raw)
     chk = lambda cur, val: " checked" if cur == val else ""
 
     more_btn = ""
     if has_more:
         next_off = offset + REPORT_PAGE_SIZE
-        nq = report_filters_query_string(next_off, to, af, on_date or "")
+        nq = report_filters_query_string(next_off, to, af, on_date or "", sq_raw)
         more_btn = f"<a class='btn btn-primary' href='/creditbook/report?{nq}'>➕ عرض المزيد</a>"
     count_note = f"<p class='hint'>عرض {offset + 1}–{offset + len(rows)}</p>" if rows else ""
     filter_hint = []
     if ds_raw:
         filter_hint.append(f"يوم {_html_escape(ds_raw)}")
+    if sq_raw:
+        filter_hint.append(f"بحث: {_html_escape(sq_raw)}")
     if af == "high":
         filter_hint.append("ترتيب: المبلغ الأكبر أولاً")
     elif af == "low":
@@ -769,10 +812,15 @@ def render_report_all_transactions_page(
                 <label class='report-opt'><input type='radio' name='amt' value='high'{chk(af, "high")}/> المبلغ الأكبر أولاً</label>
                 <label class='report-opt'><input type='radio' name='amt' value='low'{chk(af, "low")}/> المبلغ الأصغر أولاً</label>
               </fieldset>
-              <div class='report-date-wrap'>
+              <div class='report-date-wrap report-date-ltr' dir='ltr' lang='en'>
                 <label for='rep-date'>تاريخ محدد (اختياري)</label>
-                <input type='date' id='rep-date' name='date' value='{date_val}' dir='ltr'/>
-                <p class='hint report-date-hint'>إظهار معاملات هذا اليوم فقط (حسب وقت التسجيل في الدفتر).</p>
+                <input type='date' id='rep-date' name='date' value='{date_val}'/>
+                <p class='hint report-date-hint' dir='rtl'>إظهار معاملات هذا اليوم فقط (حسب وقت التسجيل في الدفتر).</p>
+              </div>
+              <div class='report-search-wrap'>
+                <label for='rep-sq'>بحث في التقرير</label>
+                <input type='search' id='rep-sq' name='sq' value='{sq_esc}' placeholder='اسم عميل، ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
+                <p class='hint'>تصفية الصفوف المعروضة حسب الاسم أو الملاحظة أو المبلغ.</p>
               </div>
             </div>
             <div class='report-filters-actions'>
@@ -965,7 +1013,6 @@ def render_owner_customer_page(
         balance_class = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
 
         cust_disp_phone = format_phone_iq_local_display((cust.phone or "").strip()) if cust.phone else ""
-        cust_meta = _html_escape(cust.name) + (f" — {_html_escape(cust_disp_phone)}" if cust_disp_phone else "")
 
         owner_disp = _html_escape(owner_display_name_for_user(user, empty="حسابي"))
         flash_html = _flash_block(flash_key, err_msg)
@@ -1044,9 +1091,8 @@ def render_owner_customer_page(
               <div class='brand-header share-report-head dashboard-head cust-page-head'>
                 <div class='dashboard-brand-col'>
                   <div class='brand'>
-                    {_brand_home_block(brand_img, owner_disp)}
+                    {_brand_customer_block(brand_img, owner_disp, _html_escape(cust.name), cust_disp_phone)}
                   </div>
-                  <div class='cust-line-identity'>👤 {cust_meta}</div>
                 </div>
                 <div class='cust-head-stats dashboard-stats-col' role='group' aria-label='إجماليات العميل'>
                     <div class='cust-stat-line'><span class='cust-stat-lbl'>أخذت</span><span class='cust-stat-val bal-red'>{_amount_to_str(took)} د.ع.</span></div>
@@ -1060,7 +1106,7 @@ def render_owner_customer_page(
               <div class='toolbar toolbar-cust-top'>
                 <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
                 <a class='btn btn-primary btn-cust-share' href='/creditbook/customer/{cust.id}/share'>📤 مشاركة</a>
-                <button type='button' class='btn btn-secondary btn-manage-compact' onclick="var p=document.getElementById('cust-manage-panel'); if(p){{ p.classList.toggle('hidden'); if(!p.classList.contains('hidden')) p.scrollIntoView({{behavior:'smooth',block:'nearest'}}); }}">⚙️ إدارة</button>
+                <button type='button' class='btn btn-secondary btn-manage-compact' onclick="var p=document.getElementById('cust-manage-panel'); if(p){{ p.classList.toggle('hidden'); if(!p.classList.contains('hidden')) p.scrollIntoView({{behavior:'smooth',block:'nearest'}}); }}">✎ تعديل العميل</button>
               </div>
               {flash_html}
               {manage_panel}
@@ -1201,11 +1247,18 @@ def try_login(phone_raw: str, password: str) -> tuple[str | None, int | None]:
         db.close()
 
 
-def load_dashboard_rows(user_id: int, q: str | None = None) -> list[tuple[Customer, float]]:
-    """قائمة العملاء مع الرصيد. إن وُجد q يُصفّى بالاسم أو الهاتف أو أي معاملة (ملاحظة/مبلغ)."""
+def load_dashboard_rows(
+    user_id: int,
+    q: str | None = None,
+    scope: str | None = None,
+) -> list[tuple[Customer, float]]:
+    """قائمة العملاء مع الرصيد. q يُصفّى حسب scope: all (كل شيء)، cust (اسم/هاتف)، txn (معاملات فقط)."""
     from sqlalchemy import String, cast, or_
 
     q = (q or "").strip()
+    sc = (scope or "all").lower()
+    if sc not in ("all", "cust", "txn"):
+        sc = "all"
     db = SessionLocal()
     try:
         base = db.query(Customer).filter(Customer.user_id == user_id)
@@ -1223,10 +1276,19 @@ def load_dashboard_rows(user_id: int, q: str | None = None) -> list[tuple[Custom
                 )
             )
             cust_ids = {r[0] for r in tx_match.distinct().all()}
-            conds = [Customer.name.ilike(like_pat), Customer.phone.ilike(like_pat)]
-            if cust_ids:
-                conds.append(Customer.id.in_(cust_ids))
-            base = base.filter(or_(*conds))
+            if sc == "cust":
+                base = base.filter(
+                    or_(Customer.name.ilike(like_pat), Customer.phone.ilike(like_pat))
+                )
+            elif sc == "txn":
+                if not cust_ids:
+                    return []
+                base = base.filter(Customer.id.in_(cust_ids))
+            else:
+                conds = [Customer.name.ilike(like_pat), Customer.phone.ilike(like_pat)]
+                if cust_ids:
+                    conds.append(Customer.id.in_(cust_ids))
+                base = base.filter(or_(*conds))
         customers = base.order_by(Customer.name.asc()).all()
         out = []
         for c in customers:
@@ -1238,19 +1300,20 @@ def load_dashboard_rows(user_id: int, q: str | None = None) -> list[tuple[Custom
         db.close()
 
 
-def render_dashboard_customer_rows_html(user_id: int, q: str | None) -> str:
+def render_dashboard_customer_rows_html(
+    user_id: int,
+    q: str | None,
+    scope: str | None = None,
+) -> str:
     """قائمة عملاء HTML فقط — للوحة التحكم وللبحث الفوري."""
-    customers = load_dashboard_rows(user_id, q)
+    customers = load_dashboard_rows(user_id, q, scope)
     rows = []
     for c, bal in customers:
-        phone_disp = format_phone_iq_local_display((c.phone or "").strip()) if c.phone else ""
-        meta = _html_escape(c.name) + (f" — {_html_escape(phone_disp)}" if phone_disp else "")
         bc = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
         rows.append(
             f"""
             <a class='cust-row' href='/creditbook/customer/{c.id}'>
               <div class='cust-name'>{_html_escape(c.name)}</div>
-              <div class='cust-meta'>{meta}</div>
               <div class='cust-bal {bc}'>الرصيد الحالي: {_amount_to_str(bal)} د.ع.</div>
             </a>
             """
@@ -1267,6 +1330,7 @@ def report_filters_query_string(
     time_order: str,
     amount_filter: str,
     on_date: str,
+    search_q: str = "",
 ) -> str:
     """معاملات GET لصفحة التقرير (للروابط و«عرض المزيد»)."""
     p: dict[str, str] = {
@@ -1277,6 +1341,9 @@ def report_filters_query_string(
     d = (on_date or "").strip()[:10]
     if d:
         p["date"] = d
+    sq = (search_q or "").strip()
+    if sq:
+        p["sq"] = sq
     return urlencode(p)
 
 
@@ -1288,13 +1355,17 @@ def load_all_transactions_page(
     time_order: str = "all",
     amount_filter: str = "all",
     on_date: str | None = None,
+    search_q: str | None = None,
 ) -> tuple[list[tuple[CustomerTransaction, Customer]], bool]:
     """
     صفحة من جميع المعاملات مع فلاتر.
     time_order: new | old | all (كل = الأحدث أولاً مثل new)
     amount_filter: all | high | low — عند high/low يُرتّب حسب المبلغ
     on_date: YYYY-MM-DD — معاملات ذلك اليوم فقط (UTC حسب created_at المخزّن)
+    search_q: نص يطابق اسم العميل أو الملاحظة أو المبلغ
     """
+    from sqlalchemy import String, cast, or_
+
     db = SessionLocal()
     try:
         q = (
@@ -1314,6 +1385,17 @@ def load_all_transactions_page(
                 )
             except ValueError:
                 pass
+
+        sq = (search_q or "").strip()
+        if sq:
+            like_pat = f"%{sq}%"
+            q = q.filter(
+                or_(
+                    Customer.name.ilike(like_pat),
+                    CustomerTransaction.note.ilike(like_pat),
+                    cast(CustomerTransaction.amount, String).ilike(like_pat),
+                )
+            )
 
         to = (time_order or "new").lower()
         if to == "all":

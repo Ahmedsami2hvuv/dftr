@@ -740,7 +740,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             q_raw = (qs.get("q") or [None])[0]
             search_q = unquote(q_raw).strip() if q_raw else None
-            frag = render_dashboard_customer_rows_html(web_user.id, search_q)
+            scope_raw = (qs.get("scope") or ["all"])[0]
+            if scope_raw not in ("all", "cust", "txn"):
+                scope_raw = "all"
+            frag = render_dashboard_customer_rows_html(web_user.id, search_q, scope_raw)
             payload = json.dumps({"html": frag}, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -754,6 +757,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             q_raw = (qs.get("q") or [None])[0]
             search_q = unquote(q_raw).strip() if q_raw else None
+            scope_raw = (qs.get("scope") or ["all"])[0]
+            if scope_raw not in ("all", "cust", "txn"):
+                scope_raw = "all"
             flash_key = (qs.get("flash") or [None])[0]
             err_msg = (qs.get("err") or [None])[0]
             if err_msg:
@@ -765,6 +771,7 @@ class Handler(BaseHTTPRequestHandler):
                 flash_key=flash_key,
                 err_msg=err_msg,
                 search_q=search_q,
+                search_scope=scope_raw,
             )
             _send_html_page(self, 200, page)
             return
@@ -786,6 +793,8 @@ class Handler(BaseHTTPRequestHandler):
                 amount_filter = "all"
             date_raw = (qs.get("date") or [None])[0]
             on_date = unquote(date_raw).strip()[:10] if date_raw else ""
+            sq_raw = (qs.get("sq") or [None])[0]
+            search_sq = unquote(sq_raw).strip() if sq_raw else ""
             rows, has_more = load_all_transactions_page(
                 web_user.id,
                 offset,
@@ -793,6 +802,7 @@ class Handler(BaseHTTPRequestHandler):
                 time_order=time_order,
                 amount_filter=amount_filter,
                 on_date=on_date or None,
+                search_q=search_sq or None,
             )
             page = render_report_all_transactions_page(
                 web_user,
@@ -804,6 +814,7 @@ class Handler(BaseHTTPRequestHandler):
                 time_order=time_order,
                 amount_filter=amount_filter,
                 on_date=on_date,
+                search_sq=search_sq,
             )
             _send_html_page(self, 200, page)
             return
