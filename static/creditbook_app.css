@@ -429,8 +429,7 @@ form.login-form { margin-top: 8px; }
   gap: 10px;
   margin-top: 18px;
 }
-.login-actions-row .login-btn-main,
-.login-actions-row .btn-register-solid {
+.login-actions-row .login-btn-main {
   flex: 1 1 calc(50% - 6px);
   min-width: 140px;
   margin-top: 0;
@@ -446,19 +445,44 @@ form.login-form { margin-top: 8px; }
   border-radius: 999px;
   box-sizing: border-box;
 }
-/* زر إنشاء حساب — ألوان صريحة حتى يظهر النص على كل المتصفحات */
-a.btn-register-solid {
-  background: #0369a1 !important;
-  background-image: linear-gradient(180deg, #0284c7 0%, #0369a1 100%) !important;
+/*
+  زر «إنشاء حساب» بدون الصنف العام .btn — لأن .btn يضع لون نص أبيض دون خلفية
+  فيُختفي النص على الخلفية البيضاء.
+*/
+.login-actions-row a.login-btn-register {
+  flex: 1 1 calc(50% - 6px);
+  min-width: 140px;
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 50px;
+  padding: 14px 14px;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
+  border-radius: 999px;
+  box-sizing: border-box;
+  text-decoration: none !important;
+  cursor: pointer;
+  font-family: inherit;
+  /* تباين قوي: خلفية زرقاء داكنة + نص أبيض + إطار */
+  background-color: #075985 !important;
+  background-image: linear-gradient(180deg, #0ea5e9 0%, #0369a1 55%, #0c4a6e 100%) !important;
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff;
-  text-decoration: none !important;
-  border: 2px solid #0c4a6e;
-  box-shadow: 0 4px 14px rgba(3, 105, 161, 0.45);
+  border: 3px solid #082f49 !important;
+  box-shadow: 0 4px 16px rgba(8, 47, 73, 0.45);
+  transition: filter 0.15s ease, transform 0.15s ease;
 }
-a.btn-register-solid:hover {
-  filter: brightness(1.05);
+.login-actions-row a.login-btn-register:hover {
+  filter: brightness(1.08);
   color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+}
+.login-actions-row a.login-btn-register:active {
+  transform: scale(0.98);
 }
 .login-register-note {
   margin: 14px 0 0;

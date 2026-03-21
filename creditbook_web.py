@@ -22,6 +22,8 @@ from utils.phone import format_phone_iq_local_display, normalize_phone, same_pho
 SESSION_COOKIE = "dftr_web"
 SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
+# زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=3"
 
 
 def _html_escape(s: str) -> str:
@@ -250,7 +252,7 @@ def wrap_creditbook_app_shell(
         <meta charset='utf-8'/>
         <meta name='viewport' content='width=device-width, initial-scale=1'/>
         <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
-        <link rel='stylesheet' href='/creditbook/static/creditbook_app.css'/>
+        <link rel='stylesheet' href='{CREDITBOOK_CSS_HREF}'/>
         <link rel='preconnect' href='https://fonts.googleapis.com'/>
         <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin/>
         <link href='https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap' rel='stylesheet'/>
@@ -400,7 +402,7 @@ def render_login_page(
         <meta charset='utf-8'/>
         <meta name='viewport' content='width=device-width, initial-scale=1'/>
         <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
-        <link rel='stylesheet' href='/creditbook/static/creditbook_app.css'/>
+        <link rel='stylesheet' href='{CREDITBOOK_CSS_HREF}'/>
         <link rel='preconnect' href='https://fonts.googleapis.com'/>
         <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin/>
         <link href='https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap' rel='stylesheet'/>
@@ -427,7 +429,7 @@ def render_login_page(
             <input type='password' id='password' name='password' required autocomplete='current-password'/>
             <div class='login-actions-row' role='group' aria-label='تسجيل الدخول أو إنشاء حساب'>
               <button type='submit' class='btn btn-primary login-btn-main'>تسجيل الدخول</button>
-              <a class='btn btn-register-solid' href='/creditbook/register'>إنشاء حساب جديد</a>
+              <a class='login-btn-register' href='/creditbook/register'>إنشاء حساب جديد</a>
             </div>
           </form>
           <p class='login-register-note'>ليس لديك حساب؟ اضغط «إنشاء حساب جديد» بجانب زر الدخول — بالاسم والهاتف وكلمة المرور (بدون تيليجرام).</p>
@@ -452,7 +454,7 @@ def render_register_page(
         <meta charset='utf-8'/>
         <meta name='viewport' content='width=device-width, initial-scale=1'/>
         <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
-        <link rel='stylesheet' href='/creditbook/static/creditbook_app.css'/>
+        <link rel='stylesheet' href='{CREDITBOOK_CSS_HREF}'/>
         <link rel='preconnect' href='https://fonts.googleapis.com'/>
         <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin/>
         <link href='https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap' rel='stylesheet'/>
