@@ -11,7 +11,8 @@ import hmac
 import html
 import re
 import time
-from urllib.parse import quote
+from datetime import datetime, timedelta
+from urllib.parse import quote, urlencode
 
 from database import SessionLocal
 from app_models import Customer, CustomerTransaction, User
@@ -24,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=8"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=9"
 
 
 def _html_escape(s: str) -> str:
@@ -655,8 +656,12 @@ def render_report_all_transactions_page(
     has_more: bool,
     favicon_href: str,
     brand_img: str,
+    *,
+    time_order: str = "all",
+    amount_filter: str = "all",
+    on_date: str = "",
 ) -> str:
-    """جميع معاملات كل العملاء، مرتبة زمنياً مع ترقيم صفحات."""
+    """جميع معاملات كل العملاء مع فلاتر وترقيم صفحات."""
     tot_gave, tot_took, tot_net = load_dashboard_aggregate_totals(user.id)
     net_class = "bal-green" if tot_net > 0 else ("bal-red" if tot_net < 0 else "")
     uname = _html_escape(owner_display_name_for_user(user))
@@ -696,11 +701,38 @@ def render_report_all_transactions_page(
             </div>
             """
         )
+    to = (time_order or "all").lower()
+    if to not in ("new", "old", "all"):
+        to = "all"
+    af = (amount_filter or "all").lower()
+    if af not in ("all", "high", "low"):
+        af = "all"
+    ds_raw = (on_date or "").strip()[:10]
+    date_val = _html_escape(ds_raw) if ds_raw else ""
+    chk = lambda cur, val: " checked" if cur == val else ""
+
     more_btn = ""
     if has_more:
         next_off = offset + REPORT_PAGE_SIZE
-        more_btn = f"<a class='btn btn-primary' href='/creditbook/report?offset={next_off}'>➕ عرض المزيد</a>"
+        nq = report_filters_query_string(next_off, to, af, on_date or "")
+        more_btn = f"<a class='btn btn-primary' href='/creditbook/report?{nq}'>➕ عرض المزيد</a>"
     count_note = f"<p class='hint'>عرض {offset + 1}–{offset + len(rows)}</p>" if rows else ""
+    filter_hint = []
+    if ds_raw:
+        filter_hint.append(f"يوم {_html_escape(ds_raw)}")
+    if af == "high":
+        filter_hint.append("ترتيب: المبلغ الأكبر أولاً")
+    elif af == "low":
+        filter_hint.append("ترتيب: المبلغ الأصغر أولاً")
+    elif to == "old":
+        filter_hint.append("ترتيب: الأقدم أولاً")
+    elif to == "all":
+        filter_hint.append("كل التقارير (الأحدث أولاً)")
+    else:
+        filter_hint.append("ترتيب: الأحدث أولاً")
+    filter_hint_s = " — ".join(filter_hint) if filter_hint else ""
+    default_filter_hint = "اختر الفلتر ثم «تطبيق الفلتر». استخدم «عرض المزيد» لصفحات إضافية."
+
     inner = f"""
           <div class='brand-header share-report-head dashboard-head'>
             <div class='dashboard-brand-col'>
@@ -721,9 +753,36 @@ def render_report_all_transactions_page(
             <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
           </div>
           <h3 class='web-h3'>📊 تقرير — جميع المعاملات</h3>
-          <p class='hint'>كل المعاملات من كل العملاء، من الأحدث إلى الأقدم. استخدم «عرض المزيد» لتحميل الدفعة التالية.</p>
+          <form class='report-filters web-section' method='get' action='/creditbook/report'>
+            <input type='hidden' name='offset' value='0'/>
+            <p class='report-filters-title'>فلتر التقرير</p>
+            <div class='report-filters-grid'>
+              <fieldset class='report-fs'>
+                <legend>الترتيب حسب التاريخ</legend>
+                <label class='report-opt'><input type='radio' name='time' value='all'{chk(to, "all")}/> كل التقارير</label>
+                <label class='report-opt'><input type='radio' name='time' value='new'{chk(to, "new")}/> الجديدة أولاً</label>
+                <label class='report-opt'><input type='radio' name='time' value='old'{chk(to, "old")}/> القديمة أولاً</label>
+              </fieldset>
+              <fieldset class='report-fs'>
+                <legend>المبالغ</legend>
+                <label class='report-opt'><input type='radio' name='amt' value='all'{chk(af, "all")}/> كل المبالغ</label>
+                <label class='report-opt'><input type='radio' name='amt' value='high'{chk(af, "high")}/> المبلغ الأكبر أولاً</label>
+                <label class='report-opt'><input type='radio' name='amt' value='low'{chk(af, "low")}/> المبلغ الأصغر أولاً</label>
+              </fieldset>
+              <div class='report-date-wrap'>
+                <label for='rep-date'>تاريخ محدد (اختياري)</label>
+                <input type='date' id='rep-date' name='date' value='{date_val}' dir='ltr'/>
+                <p class='hint report-date-hint'>إظهار معاملات هذا اليوم فقط (حسب وقت التسجيل في الدفتر).</p>
+              </div>
+            </div>
+            <div class='report-filters-actions'>
+              <button type='submit' class='btn btn-primary'>تطبيق الفلتر</button>
+              <a class='btn btn-secondary' href='/creditbook/report'>إعادة ضبط</a>
+            </div>
+          </form>
+          <p class='hint'>{_html_escape(filter_hint_s) if filter_hint_s else _html_escape(default_filter_hint)}</p>
           {count_note}
-          {''.join(tx_rows) if tx_rows else '<p class="hint">لا توجد معاملات بعد.</p>'}
+          {''.join(tx_rows) if tx_rows else '<p class="hint">لا توجد معاملات مطابقة.</p>'}
           {more_btn}
     """
     return wrap_creditbook_app_shell(
@@ -1203,21 +1262,76 @@ def render_dashboard_customer_rows_html(user_id: int, q: str | None) -> str:
     return "".join(rows)
 
 
+def report_filters_query_string(
+    offset: int,
+    time_order: str,
+    amount_filter: str,
+    on_date: str,
+) -> str:
+    """معاملات GET لصفحة التقرير (للروابط و«عرض المزيد»)."""
+    p: dict[str, str] = {
+        "offset": str(max(0, offset)),
+        "time": time_order,
+        "amt": amount_filter,
+    }
+    d = (on_date or "").strip()[:10]
+    if d:
+        p["date"] = d
+    return urlencode(p)
+
+
 def load_all_transactions_page(
-    user_id: int, offset: int, limit: int
+    user_id: int,
+    offset: int,
+    limit: int,
+    *,
+    time_order: str = "all",
+    amount_filter: str = "all",
+    on_date: str | None = None,
 ) -> tuple[list[tuple[CustomerTransaction, Customer]], bool]:
-    """صفحة من جميع المعاملات (الأحدث أولاً). يعيد (صفوف، هل يوجد المزيد)."""
+    """
+    صفحة من جميع المعاملات مع فلاتر.
+    time_order: new | old | all (كل = الأحدث أولاً مثل new)
+    amount_filter: all | high | low — عند high/low يُرتّب حسب المبلغ
+    on_date: YYYY-MM-DD — معاملات ذلك اليوم فقط (UTC حسب created_at المخزّن)
+    """
     db = SessionLocal()
     try:
         q = (
             db.query(CustomerTransaction, Customer)
             .join(Customer, Customer.id == CustomerTransaction.customer_id)
             .filter(Customer.user_id == user_id)
-            .order_by(CustomerTransaction.created_at.desc(), CustomerTransaction.id.desc())
-            .offset(offset)
-            .limit(limit + 1)
         )
-        chunk = q.all()
+        ds = (on_date or "").strip()[:10]
+        if ds:
+            try:
+                day = datetime.strptime(ds, "%Y-%m-%d").date()
+                start = datetime.combine(day, datetime.min.time())
+                end = start + timedelta(days=1)
+                q = q.filter(
+                    CustomerTransaction.created_at >= start,
+                    CustomerTransaction.created_at < end,
+                )
+            except ValueError:
+                pass
+
+        to = (time_order or "new").lower()
+        if to == "all":
+            to = "new"
+        amt = (amount_filter or "all").lower()
+        if amt not in ("all", "high", "low"):
+            amt = "all"
+
+        if amt == "high":
+            q = q.order_by(CustomerTransaction.amount.desc(), CustomerTransaction.id.desc())
+        elif amt == "low":
+            q = q.order_by(CustomerTransaction.amount.asc(), CustomerTransaction.id.asc())
+        elif to == "old":
+            q = q.order_by(CustomerTransaction.created_at.asc(), CustomerTransaction.id.asc())
+        else:
+            q = q.order_by(CustomerTransaction.created_at.desc(), CustomerTransaction.id.desc())
+
+        chunk = q.offset(offset).limit(limit + 1).all()
         has_more = len(chunk) > limit
         return (chunk[:limit], has_more)
     finally:

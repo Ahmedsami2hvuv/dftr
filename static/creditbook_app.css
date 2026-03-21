@@ -625,6 +625,87 @@ form.login-form { margin-top: 8px; }
 .page-report .tx {
   margin-bottom: 10px;
 }
+
+/* فلاتر صفحة التقرير */
+.report-filters {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+}
+.report-filters-title {
+  font-weight: 800;
+  margin: 0 0 12px;
+  color: #0f172a;
+  font-size: 1.05rem;
+}
+.report-filters-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 700px) {
+  .report-filters-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+.report-fs {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0;
+  background: #fff;
+}
+.report-fs legend {
+  font-weight: 700;
+  color: #334155;
+  padding: 0 6px;
+  font-size: 0.92rem;
+}
+.report-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.report-opt input {
+  flex-shrink: 0;
+}
+.report-date-wrap label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #334155;
+  font-size: 0.92rem;
+}
+.report-date-wrap input[type="date"] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-size: 16px;
+  font-family: inherit;
+}
+.report-date-hint {
+  margin-top: 6px !important;
+  margin-bottom: 0 !important;
+}
+.report-filters-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  align-items: center;
+}
+.report-filters-actions .btn {
+  margin-top: 0 !important;
+}
 .toolbar-cust-top {
   display: flex;
   flex-wrap: wrap;

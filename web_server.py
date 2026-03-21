@@ -778,7 +778,22 @@ class Handler(BaseHTTPRequestHandler):
                 offset = max(0, int(o_raw))
             except ValueError:
                 offset = 0
-            rows, has_more = load_all_transactions_page(web_user.id, offset, REPORT_PAGE_SIZE)
+            time_order = (qs.get("time") or ["all"])[0].lower()
+            if time_order not in ("new", "old", "all"):
+                time_order = "all"
+            amount_filter = (qs.get("amt") or ["all"])[0].lower()
+            if amount_filter not in ("all", "high", "low"):
+                amount_filter = "all"
+            date_raw = (qs.get("date") or [None])[0]
+            on_date = unquote(date_raw).strip()[:10] if date_raw else ""
+            rows, has_more = load_all_transactions_page(
+                web_user.id,
+                offset,
+                REPORT_PAGE_SIZE,
+                time_order=time_order,
+                amount_filter=amount_filter,
+                on_date=on_date or None,
+            )
             page = render_report_all_transactions_page(
                 web_user,
                 rows,
@@ -786,6 +801,9 @@ class Handler(BaseHTTPRequestHandler):
                 has_more,
                 favicon_href,
                 brand_img_src,
+                time_order=time_order,
+                amount_filter=amount_filter,
+                on_date=on_date,
             )
             _send_html_page(self, 200, page)
             return
