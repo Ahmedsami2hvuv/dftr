@@ -28,8 +28,11 @@ from creditbook_web import (
     csrf_verify,
     get_user_from_cookie_header,
     load_dashboard_rows,
+    render_account_edit_page,
+    render_account_page,
     render_dashboard_html,
     render_login_page,
+    render_logout_confirm_page,
     render_owner_customer_page,
     render_tx_edit_page,
     try_login,
@@ -42,6 +45,7 @@ from creditbook_web_actions import (
     action_tx_toggle_kind,
     action_tx_update,
     action_txn_add,
+    action_user_account_update,
     is_safe_web_photo_name,
     parse_tx_datetime,
 )
@@ -693,7 +697,8 @@ class Handler(BaseHTTPRequestHandler):
             if web_user:
                 _redirect(self, "/creditbook/dashboard")
                 return
-            page = render_login_page(None, favicon_href, brand_img_src)
+            flash_key = (qs.get("flash") or [None])[0]
+            page = render_login_page(None, favicon_href, brand_img_src, flash_key=flash_key)
             _send_html_page(self, 200, page)
             return
 
@@ -714,6 +719,43 @@ class Handler(BaseHTTPRequestHandler):
                 flash_key=flash_key,
                 err_msg=err_msg,
             )
+            _send_html_page(self, 200, page)
+            return
+
+        if path == "/creditbook/account":
+            if not web_user:
+                _redirect(self, "/creditbook/login")
+                return
+            flash_key = (qs.get("flash") or [None])[0]
+            err_msg = (qs.get("err") or [None])[0]
+            if err_msg:
+                err_msg = unquote(err_msg)
+            page = render_account_page(
+                web_user,
+                favicon_href,
+                brand_img_src,
+                flash_key=flash_key,
+                err_msg=err_msg,
+            )
+            _send_html_page(self, 200, page)
+            return
+
+        if path == "/creditbook/account/edit":
+            if not web_user:
+                _redirect(self, "/creditbook/login")
+                return
+            err_msg = (qs.get("err") or [None])[0]
+            if err_msg:
+                err_msg = unquote(err_msg)
+            page = render_account_edit_page(web_user, favicon_href, brand_img_src, err_msg=err_msg)
+            _send_html_page(self, 200, page)
+            return
+
+        if path == "/creditbook/logout_confirm":
+            if not web_user:
+                _redirect(self, "/creditbook/login")
+                return
+            page = render_logout_confirm_page(web_user, favicon_href, brand_img_src)
             _send_html_page(self, 200, page)
             return
 
@@ -918,7 +960,7 @@ class Handler(BaseHTTPRequestHandler):
             pwd = _s("password")
             err, uid = try_login(phone, pwd)
             if err:
-                page = render_login_page(err, favicon_href, brand_img_src)
+                page = render_login_page(err, favicon_href, brand_img_src, flash_key=None)
                 _send_html_page(self, 200, page)
                 return
             extra = _set_cookie_headers(uid, secure)
@@ -927,7 +969,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/creditbook/logout":
             extra = _clear_cookie_headers(secure)
-            _redirect(self, "/creditbook/login", extra)
+            _redirect(self, "/creditbook/login?flash=logout_ok", extra)
             return
 
         if not web_user:
@@ -938,6 +980,26 @@ class Handler(BaseHTTPRequestHandler):
 
         def _e(msg: str) -> str:
             return quote(msg[:400], safe="")
+
+        if path == "/creditbook/account/update":
+            csrf = _s("csrf")
+            if not csrf_verify(uid, "account_update", csrf):
+                _redirect(self, "/creditbook/account/edit?err=" + _e("انتهت صلاحية النموذج. حدّث الصفحة."))
+                return
+            err = action_user_account_update(
+                uid,
+                _s("full_name"),
+                _s("phone"),
+                _s("old_password"),
+                _s("new_password"),
+                _s("new_password2"),
+                _s("remove_phone") == "1",
+            )
+            if err:
+                _redirect(self, "/creditbook/account/edit?err=" + _e(err))
+                return
+            _redirect(self, "/creditbook/account?flash=acc_upd")
+            return
 
         if path == "/creditbook/customer/create":
             csrf = _s("csrf")
@@ -965,6 +1027,7 @@ class Handler(BaseHTTPRequestHandler):
                 cid,
                 _s("name"),
                 _s("phone"),
+                remove_phone=_s("remove_phone") == "1",
             )
             if err:
                 _redirect(self, f"/creditbook/customer/{cid}?err=" + _e(err))
