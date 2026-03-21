@@ -193,6 +193,38 @@ def _html_escape(s: str) -> str:
     return html.escape(s or "", quote=True)
 
 
+def _pwa_manifest_json_bytes() -> bytes:
+    """Web App Manifest لمسار /creditbook/ (تثبيت كتطبيق)."""
+    manifest = {
+        "name": "دفتر الديون",
+        "short_name": "دفتر الديون",
+        "description": "إدارة ديون العملاء والمعاملات",
+        "start_url": "/creditbook/dashboard",
+        "scope": "/creditbook/",
+        "display": "standalone",
+        "orientation": "portrait-primary",
+        "background_color": "#ecfdf5",
+        "theme_color": "#0f766e",
+        "lang": "ar",
+        "dir": "rtl",
+        "icons": [
+            {
+                "src": "/creditbook/logo.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any",
+            },
+            {
+                "src": "/creditbook/logo.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any",
+            },
+        ],
+    }
+    return json.dumps(manifest, ensure_ascii=False).encode("utf-8")
+
+
 def _clean_env_logo_b64(raw: str) -> str:
     """يستخرج سلسلة base64 نظيفة من المتغير أو من data:image/png;base64,..."""
     s = (raw or "").strip()
@@ -735,6 +767,32 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "text/plain; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(b"Not found")
+            return
+
+        if path == "/creditbook/manifest.webmanifest":
+            data = _pwa_manifest_json_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/manifest+json; charset=utf-8")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
+        if path == "/creditbook/pwa-sw.js":
+            try:
+                sw_path = _STATIC_DIR / "pwa_sw.js"
+                data = sw_path.read_bytes()
+            except Exception:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"Not found")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self.end_headers()
+            self.wfile.write(data)
             return
 
         if path == "/creditbook/app":

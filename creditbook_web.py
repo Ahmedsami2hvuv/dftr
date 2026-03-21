@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=12"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=13"
 
 
 def _html_escape(s: str) -> str:
@@ -297,6 +297,88 @@ def _support_whatsapp_href() -> str:
     return f"https://wa.me/{wn}" if wn else ""
 
 
+def _pwa_meta_block(brand_img: str) -> str:
+    """وسوم Web App Manifest وألوان الثيم لأيقونة الشاشة الرئيسية."""
+    icon = _html_escape(brand_img)
+    title_esc = _html_escape("دفتر الديون")
+    return (
+        f"<link rel='manifest' href='/creditbook/manifest.webmanifest'/>"
+        f"<meta name='theme-color' content='#0f766e'/>"
+        f"<meta name='mobile-web-app-capable' content='yes'/>"
+        f"<meta name='apple-mobile-web-app-capable' content='yes'/>"
+        f"<meta name='apple-mobile-web-app-status-bar-style' content='default'/>"
+        f"<meta name='apple-mobile-web-app-title' content='{title_esc}'/>"
+        f"<link rel='apple-touch-icon' href='{icon}'/>"
+    )
+
+
+def _pwa_register_sw_script() -> str:
+    """تسجيل Service Worker لنطاق تطبيق الدفتر."""
+    return """
+    <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/creditbook/pwa-sw.js', { scope: '/creditbook/' }).catch(function () {});
+    }
+    </script>
+    """
+
+
+def _pwa_install_sidebar_script() -> str:
+    """زر القائمة: تثبيت عبر المتصفح أو تعليمات يدوية."""
+    return """
+    <script>
+    (function () {
+      var deferredPrompt = null;
+      var btn = document.getElementById('sidebarInstallPwa');
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (btn) btn.classList.add('sidebar-install-ready');
+      });
+      function closeSidebar() {
+        document.body.classList.remove('sidebar-open');
+        var scrim = document.getElementById('sidebar-scrim');
+        if (scrim) scrim.hidden = true;
+        var openBtn = document.getElementById('sidebar-menu-btn');
+        if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
+        var side = document.getElementById('app-sidebar');
+        if (side) side.setAttribute('aria-hidden', 'true');
+      }
+      function helpText() {
+        return (
+          'على الكمبيوتر (Chrome أو Edge): القائمة ⋮ ← «تثبيت التطبيق» أو أيقونة التحميل بجانب شريط العنوان.\\n\\n' +
+          'على أندرويد: القائمة ← «إضافة إلى الشاشة الرئيسية» أو شريط التثبيت.\\n\\n' +
+          'على آيفون (Safari): زر المشاركة ⟵ «إضافة إلى الشاشة الرئيسية».'
+        );
+      }
+      if (btn) {
+        btn.addEventListener('click', function () {
+          var standalone =
+            window.matchMedia('(display-mode: standalone)').matches ||
+            (typeof window.navigator.standalone === 'boolean' && window.navigator.standalone);
+          if (standalone) {
+            alert('التطبيق يعمل بالفعل كنافذة مستقلة.');
+            closeSidebar();
+            return;
+          }
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(function () {
+              deferredPrompt = null;
+              if (btn) btn.classList.remove('sidebar-install-ready');
+            });
+            closeSidebar();
+            return;
+          }
+          alert(helpText());
+          closeSidebar();
+        });
+      }
+    })();
+    </script>
+    """
+
+
 def wrap_creditbook_app_shell(
     user: User,
     favicon_href: str,
@@ -322,6 +404,7 @@ def wrap_creditbook_app_shell(
       <head>
         <meta charset='utf-8'/>
         <meta name='viewport' content='width=device-width, initial-scale=1'/>
+        {_pwa_meta_block(brand_img)}
         <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
         <link rel='stylesheet' href='{CREDITBOOK_CSS_HREF}'/>
         <link rel='preconnect' href='https://fonts.googleapis.com'/>
@@ -347,6 +430,7 @@ def wrap_creditbook_app_shell(
                 {support_wa_html}
                 <a class='sidebar-link sidebar-link-logout sidebar-close-link' href='/creditbook/logout_confirm'>تسجيل الخروج</a>
               </nav>
+              <button type='button' class='sidebar-link sidebar-install-btn' id='sidebarInstallPwa'>📲 تحميل التطبيق</button>
               {f"<a class='sidebar-bot sidebar-close-link' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>البوت في تيليجرام</a>" if BOT_USERNAME else ""}
             </div>
           </aside>
@@ -393,6 +477,8 @@ def wrap_creditbook_app_shell(
           }}
         }})();
         </script>
+        {_pwa_register_sw_script()}
+        {_pwa_install_sidebar_script()}
       </body>
     </html>
     """
@@ -543,6 +629,7 @@ def render_login_page(
       <head>
         <meta charset='utf-8'/>
         <meta name='viewport' content='width=device-width, initial-scale=1'/>
+        {_pwa_meta_block(brand_img)}
         <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
         <link rel='stylesheet' href='{CREDITBOOK_CSS_HREF}'/>
         <link rel='preconnect' href='https://fonts.googleapis.com'/>
@@ -577,6 +664,7 @@ def render_login_page(
           <p class='login-register-note'>ليس لديك حساب؟ اضغط «إنشاء حساب جديد» بجانب زر الدخول — بالاسم والهاتف وكلمة المرور (بدون تيليجرام).</p>
           {f"<p style='margin-top:16px;text-align:center'><a class='btn btn-bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>فتح البوت في تيليجرام</a></p>" if BOT_USERNAME else ""}
         </div>
+        {_pwa_register_sw_script()}
       </body>
     </html>
     """
@@ -595,6 +683,7 @@ def render_register_page(
       <head>
         <meta charset='utf-8'/>
         <meta name='viewport' content='width=device-width, initial-scale=1'/>
+        {_pwa_meta_block(brand_img)}
         <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
         <link rel='stylesheet' href='{CREDITBOOK_CSS_HREF}'/>
         <link rel='preconnect' href='https://fonts.googleapis.com'/>
@@ -630,6 +719,7 @@ def render_register_page(
             <a class='btn btn-secondary' href='/creditbook/login'>◀ لديك حساب؟ تسجيل الدخول</a>
           </p>
         </div>
+        {_pwa_register_sw_script()}
       </body>
     </html>
     """

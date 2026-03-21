@@ -1070,6 +1070,20 @@ body.sidebar-open .app-sidebar {
   color: #1d4ed8 !important;
   text-decoration: none !important;
 }
+/* تثبيت PWA من القائمة الجانبية */
+button.sidebar-link.sidebar-install-btn {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  text-align: center;
+}
+.sidebar-install-btn.sidebar-install-ready {
+  outline: 2px solid rgba(13, 148, 136, 0.55);
+  outline-offset: 2px;
+}
 .sidebar-support-wa {
   background: linear-gradient(135deg, #25d366, #128c7e) !important;
   color: #fff !important;
