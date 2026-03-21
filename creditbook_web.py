@@ -392,6 +392,7 @@ def wrap_creditbook_app_shell(
 ) -> str:
     """هيكل: قائمة جانبية منزلقة (زر ☰) + المحتوى."""
     disp = _html_escape(owner_display_name_for_user(user, empty="حسابي"))
+    home_active = " sidebar-link-active" if active_nav == "home" else ""
     acc_active = " sidebar-link-active" if active_nav == "account" else ""
     wa_support = _support_whatsapp_href()
     support_wa_html = ""
@@ -427,6 +428,7 @@ def wrap_creditbook_app_shell(
               </a>
               <p class='sidebar-user'><span class='sidebar-user-name'>{disp}</span></p>
               <nav class='sidebar-nav'>
+                <a class='sidebar-link{home_active} sidebar-close-link' href='/creditbook/dashboard'>🏠 الصفحة الرئيسية</a>
                 <a class='sidebar-link{acc_active} sidebar-close-link' href='/creditbook/account'>حسابي</a>
                 <a class='sidebar-link sidebar-close-link' href='/creditbook/feedback'>💬 إرسال مشكلة أو اقتراح</a>
                 {support_wa_html}
@@ -932,7 +934,7 @@ def render_dashboard_html(
           }})();
           </script>
     """
-    return wrap_creditbook_app_shell(user, favicon_href, brand_img, "دفتر الديون — عملائي", None, card, body_class="page-dashboard")
+    return wrap_creditbook_app_shell(user, favicon_href, brand_img, "دفتر الديون — عملائي", "home", card, body_class="page-dashboard")
 
 
 def render_report_all_transactions_page(
