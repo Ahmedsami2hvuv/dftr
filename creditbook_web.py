@@ -418,26 +418,19 @@ def render_login_page(
             </div>
           </div>
           {flash_html}
-          <div class='login-split'>
-            <div class='login-split-col'>
-              <p class='hint' style='margin-top:0'>تسجيل الدخول</p>
-              {err}
-              <form class='login-form' method='post' action='/creditbook/login' autocomplete='on'>
-                <label for='phone'>رقم الهاتف</label>
-                <input type='tel' id='phone' name='phone' required placeholder='+9647xxxxxxxx' dir='ltr'/>
-                <label for='password'>كلمة المرور</label>
-                <input type='password' id='password' name='password' required autocomplete='current-password'/>
-                <p style='margin-top:16px'>
-                  <button type='submit' class='btn btn-primary btn-block'>تسجيل الدخول</button>
-                </p>
-              </form>
+          <p class='hint' style='margin-top:0'>تسجيل الدخول</p>
+          {err}
+          <form class='login-form' method='post' action='/creditbook/login' autocomplete='on'>
+            <label for='phone'>رقم الهاتف</label>
+            <input type='tel' id='phone' name='phone' required placeholder='+9647xxxxxxxx' dir='ltr'/>
+            <label for='password'>كلمة المرور</label>
+            <input type='password' id='password' name='password' required autocomplete='current-password'/>
+            <div class='login-actions-row' role='group' aria-label='تسجيل الدخول أو إنشاء حساب'>
+              <button type='submit' class='btn btn-primary login-btn-main'>تسجيل الدخول</button>
+              <a class='btn btn-register-solid' href='/creditbook/register'>إنشاء حساب جديد</a>
             </div>
-            <div class='login-split-col login-register-col'>
-              <p class='hint' style='margin-top:0'>ليس لديك حساب؟</p>
-              <p class='login-register-lead'>أنشئ حساباً جديداً بالاسم والهاتف وكلمة المرور (بدون تيليجرام).</p>
-              <a class='btn btn-register' href='/creditbook/register'>إنشاء حساب جديد</a>
-            </div>
-          </div>
+          </form>
+          <p class='login-register-note'>ليس لديك حساب؟ اضغط «إنشاء حساب جديد» بجانب زر الدخول — بالاسم والهاتف وكلمة المرور (بدون تيليجرام).</p>
           {f"<p style='margin-top:16px;text-align:center'><a class='btn btn-bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>فتح البوت في تيليجرام</a></p>" if BOT_USERNAME else ""}
         </div>
       </body>

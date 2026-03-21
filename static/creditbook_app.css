@@ -418,46 +418,53 @@ form.login-form { margin-top: 8px; }
 .new-cust-panel { border-top: none !important; padding-top: 8px !important; }
 .btn-block { display: block; width: 100%; text-align: center; box-sizing: border-box; }
 
-/* تسجيل الدخول — عمودان */
+/* تسجيل الدخول — زرّان بجانب بعض */
 .login-card { max-width: 720px; }
 .login-brand-head { margin-bottom: 8px; }
-.login-split {
+.login-actions-row {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
-  margin-top: 8px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 18px;
 }
-@media (min-width: 600px) {
-  .login-split {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 24px;
-  }
-  .login-split-col {
-    flex: 1;
-    min-width: 0;
-  }
-}
-.login-register-col {
-  padding: 16px 18px;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #f0fdfa 0%, #ecfdf5 100%);
-  border: 1px solid #99f6e4;
-}
-.login-register-lead { font-size: 0.95rem; color: #475569; margin: 8px 0 12px; line-height: 1.45; }
-.btn-register {
-  display: inline-block;
-  width: 100%;
+.login-actions-row .login-btn-main,
+.login-actions-row .btn-register-solid {
+  flex: 1 1 calc(50% - 6px);
+  min-width: 140px;
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  box-sizing: border-box;
-  padding: 14px 18px;
-  font-size: 1.05rem;
+  min-height: 50px;
+  padding: 14px 14px;
+  font-size: 1rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #0ea5e9, #0369a1) !important;
-  color: #fff !important;
+  line-height: 1.3;
   border-radius: 999px;
+  box-sizing: border-box;
+}
+/* زر إنشاء حساب — ألوان صريحة حتى يظهر النص على كل المتصفحات */
+a.btn-register-solid {
+  background: #0369a1 !important;
+  background-image: linear-gradient(180deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
   text-decoration: none !important;
-  box-shadow: 0 6px 18px rgba(3, 105, 161, 0.35);
+  border: 2px solid #0c4a6e;
+  box-shadow: 0 4px 14px rgba(3, 105, 161, 0.45);
+}
+a.btn-register-solid:hover {
+  filter: brightness(1.05);
+  color: #ffffff !important;
+}
+.login-register-note {
+  margin: 14px 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.5;
 }
 
 .brand-text-wrap { min-width: 0; }
