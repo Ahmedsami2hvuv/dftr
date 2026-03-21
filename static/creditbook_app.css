@@ -512,9 +512,67 @@ form.login-form { margin-top: 8px; }
 .share-report-head .owner-showcase {
   flex: 0 1 auto;
 }
-.cust-page-head .cust-head-left {
-  flex: 1 1 260px;
+/* لوحة رئيسية / عميل: عنوان | إحصائيات | صنع بواسطة */
+.dashboard-head {
+  align-items: stretch;
+}
+.dashboard-brand-col {
+  flex: 1 1 200px;
   min-width: 0;
+}
+.dashboard-head .cust-head-stats {
+  margin-top: 0;
+  flex: 1 1 210px;
+  min-width: 0;
+  max-width: none;
+  align-self: flex-start;
+}
+.dashboard-showcase-col {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.btn-share-dash {
+  margin-top: 0 !important;
+  text-align: center;
+  font-size: 0.95rem;
+  padding: 8px 14px;
+}
+.toolbar-cust-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.share-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+}
+.share-toolbar .btn {
+  margin-top: 0;
+  text-align: center;
+}
+.share-preview-box {
+  margin: 12px 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+.btn-wa {
+  background: linear-gradient(135deg, #25d366, #128c7e) !important;
+}
+.share-warn {
+  color: #b45309;
+  font-weight: 700;
 }
 .cust-head-stats {
   margin-top: 12px;
@@ -564,10 +622,6 @@ form.login-form { margin-top: 8px; }
   color: #0f172a;
   letter-spacing: 0.02em;
 }
-.dashboard-totals {
-  margin-top: 12px;
-}
-
 /* هيكل التطبيق: قائمة منزلقة (لا تبقى مفتوحة) */
 body.app-body {
   padding: 12px;
@@ -852,9 +906,17 @@ body.sidebar-open .app-sidebar {
     flex-direction: column;
     align-items: stretch;
   }
-  .share-report-head .owner-showcase {
+  /* صفحات قديمة: إبراز «صنع بواسطة» أعلى */
+  .share-report-head:not(.dashboard-head) .owner-showcase {
     order: -1;
     max-width: 100%;
+  }
+  .dashboard-head .owner-showcase {
+    order: unset;
+    max-width: 100%;
+  }
+  .dashboard-head {
+    flex-direction: column;
   }
   .brand-header { flex-direction: column; align-items: stretch; }
   .brand { justify-content: center; }

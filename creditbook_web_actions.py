@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import re
+import secrets
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from urllib.parse import quote, urlparse
 
-from config import WEB_TX_UPLOAD_DIR
+from config import BOT_USERNAME, WEB_BASE_URL, WEB_TX_UPLOAD_DIR
 from database import SessionLocal
 from app_models import (
     Customer,
@@ -22,7 +24,7 @@ from app_models import (
 from handlers.customers import _parse_amount_and_optional_note
 from handlers.partner_link import maybe_queue_partner_tx
 from utils.password import check_password, hash_password
-from utils.phone import is_plausible_iraq_mobile, normalize_phone, same_phone
+from utils.phone import is_plausible_iraq_mobile, normalize_phone, same_phone, wa_number as _wa_number
 
 _WEB_PHOTO_SAFE = re.compile(r"^[a-f0-9]{32}\.(jpg|jpeg|png|gif|webp)$", re.I)
 
@@ -428,5 +430,82 @@ def action_user_change_password(user_id: int, current: str, new_pw: str, new_pw2
     except Exception as e:
         db.rollback()
         return str(e)[:200]
+    finally:
+        db.close()
+
+
+def _is_public_web_url(url: str) -> bool:
+    """HTTP/HTTPS وقابل للاستخدام من خارج السيرفر (نفس منطق البوت)."""
+    if not url:
+        return False
+    try:
+        p = urlparse(url.strip())
+    except Exception:
+        return False
+    if p.scheme not in ("http", "https"):
+        return False
+    host = (p.hostname or "").lower()
+    if not host:
+        return False
+    if host in {"localhost", "127.0.0.1", "0.0.0.0"}:
+        return False
+    return True
+
+
+def build_customer_share_urls(
+    user_id: int, cid: int
+) -> tuple[str | None, str | None, bool, str | None, str | None]:
+    """
+    نفس منطق handlers.customers.cust_share: رابط التقرير + واتساب.
+    يعيد (view_url, wa_url, using_public_web, share_preview, error).
+    """
+    db = SessionLocal()
+    try:
+        cust = _get_customer_owned(db, user_id, cid)
+        if not cust:
+            return (None, None, False, None, "العميل غير موجود.")
+        gave = sum(float(t.amount or 0) for t in cust.transactions if t.kind == "gave")
+        took = sum(float(t.amount or 0) for t in cust.transactions if t.kind == "took")
+        bal = gave - took
+        cur = "د.ع."
+        token = secrets.token_urlsafe(16)
+        expires = datetime.utcnow() + timedelta(days=30)
+        link = ShareLink(customer_id=cust.id, token=token, expires_at=expires)
+        db.add(link)
+        db.commit()
+        base = (WEB_BASE_URL or "").strip().rstrip("/")
+        if _is_public_web_url(base):
+            view_url = f"{base}/creditbook/balance/{token}?lang=ar"
+            using_web = True
+        else:
+            bot_u = (BOT_USERNAME or "").strip().lstrip("@")
+            if not bot_u:
+                return (None, None, False, None, "لم يُضبط البوت.")
+            view_url = f"https://t.me/{bot_u}?start=view_{token}"
+            using_web = False
+        if bal > 0:
+            msg_balance = f"عليك رصيد {bal:.2f} {cur}"
+        elif bal < 0:
+            msg_balance = f"لك رصيد {abs(bal):.2f} {cur}"
+        else:
+            msg_balance = "الرصيد صفر"
+        link_hint = "⬇️ المس الرابط لمشاهدة كافة التفاصيل"
+        share_text = (
+            f"{cust.name}\n\n"
+            f"{msg_balance}\n"
+            "ــــــــــــــــــــــــ\n"
+            f"{link_hint}\n"
+            f"{view_url}"
+        )
+        wa_text = share_text
+        wa_num = cust.phone and _wa_number(cust.phone)
+        if wa_num:
+            wa_url = f"https://api.whatsapp.com/send?phone={wa_num}&text={quote(wa_text)}"
+        else:
+            wa_url = f"https://api.whatsapp.com/send?text={quote(wa_text)}"
+        return (view_url, wa_url, using_web, share_text, None)
+    except Exception as e:
+        db.rollback()
+        return (None, None, False, None, str(e)[:200])
     finally:
         db.close()

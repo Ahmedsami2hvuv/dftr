@@ -31,6 +31,7 @@ from creditbook_web import (
     get_user_from_cookie_header,
     load_dashboard_rows,
     render_account_page,
+    render_customer_share_page,
     render_dashboard_html,
     render_login_page,
     render_logout_confirm_page,
@@ -50,6 +51,7 @@ from creditbook_web_actions import (
     action_register_web,
     action_user_change_password,
     action_user_update_profile,
+    build_customer_share_urls,
     is_safe_web_photo_name,
     parse_tx_datetime,
 )
@@ -793,6 +795,32 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"Not found")
                 return
+            _send_html_page(self, 200, page)
+            return
+
+        cust_share_m = re.match(r"^/creditbook/customer/(?P<cid>\d+)/share$", path)
+        if cust_share_m:
+            if not web_user:
+                _redirect(self, "/creditbook/login")
+                return
+            cid = int(cust_share_m.group("cid"))
+            view_url, wa_url, using_web, share_preview, err = build_customer_share_urls(web_user.id, cid)
+            if err or not view_url or not wa_url:
+                _redirect(
+                    self,
+                    f"/creditbook/customer/{cid}?err=" + quote(err or "تعذر إنشاء المشاركة.", safe=""),
+                )
+                return
+            page = render_customer_share_page(
+                web_user,
+                cid,
+                view_url,
+                wa_url,
+                using_web,
+                share_preview or "",
+                favicon_href,
+                brand_img_src,
+            )
             _send_html_page(self, 200, page)
             return
 

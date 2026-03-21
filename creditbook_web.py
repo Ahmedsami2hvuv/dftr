@@ -23,7 +23,7 @@ SESSION_COOKIE = "dftr_web"
 SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=4"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=5"
 
 
 def _html_escape(s: str) -> str:
@@ -524,7 +524,7 @@ def render_dashboard_html(
     for c, bal in customers:
         phone_disp = format_phone_iq_local_display((c.phone or "").strip()) if c.phone else ""
         meta = _html_escape(c.name) + (f" — {_html_escape(phone_disp)}" if phone_disp else "")
-        bc = "bal-red" if bal > 0 else ("bal-green" if bal < 0 else "")
+        bc = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
         rows.append(
             f"""
             <a class='cust-row' href='/creditbook/customer/{c.id}'>
@@ -555,11 +555,18 @@ def render_dashboard_html(
     </div>
     """
     tot_gave, tot_took, tot_net = load_dashboard_aggregate_totals(user.id)
-    net_class = "bal-red" if tot_net > 0 else ("bal-green" if tot_net < 0 else "")
+    net_class = "bal-green" if tot_net > 0 else ("bal-red" if tot_net < 0 else "")
     uname = _html_escape(user.full_name or user.username or "مستخدم")
+    share_bot = ""
+    if BOT_USERNAME:
+        bu = BOT_USERNAME.strip().lstrip("@")
+        share_bot = (
+            f"<a class='btn btn-share-dash' href='https://t.me/{_html_escape(bu)}' "
+            f"target='_blank' rel='noopener'>📤 مشاركة من البوت</a>"
+        )
     card = f"""
-          <div class='brand-header share-report-head cust-page-head'>
-            <div class='cust-head-left'>
+          <div class='brand-header share-report-head dashboard-head'>
+            <div class='dashboard-brand-col'>
               <div class='brand'>
                 <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
                 <div class='brand-text-wrap'>
@@ -567,13 +574,16 @@ def render_dashboard_html(
                   <p class='brand-user-name'>{uname}</p>
                 </div>
               </div>
-              <div class='cust-head-stats dashboard-totals' role='group' aria-label='إجمالي كل العملاء'>
-                <div class='cust-stat-line'><span class='cust-stat-lbl'>أخذت الكلي</span><span class='cust-stat-val bal-red'>{_amount_to_str(tot_took)} د.ع.</span></div>
-                <div class='cust-stat-line'><span class='cust-stat-lbl'>أعطيت الكلي</span><span class='cust-stat-val bal-green'>{_amount_to_str(tot_gave)} د.ع.</span></div>
-                <div class='cust-stat-line'><span class='cust-stat-lbl'>النتيجة</span><span class='cust-stat-val {net_class}'>{_amount_to_str(tot_net)} د.ع.</span></div>
-              </div>
             </div>
-            {render_owner_showcase_card(user)}
+            <div class='cust-head-stats dashboard-totals dashboard-stats-col' role='group' aria-label='إجمالي كل العملاء'>
+                <div class='cust-stat-line'><span class='cust-stat-lbl'>أخذت</span><span class='cust-stat-val bal-red'>{_amount_to_str(tot_took)} د.ع.</span></div>
+                <div class='cust-stat-line'><span class='cust-stat-lbl'>أعطيت</span><span class='cust-stat-val bal-green'>{_amount_to_str(tot_gave)} د.ع.</span></div>
+                <div class='cust-stat-line'><span class='cust-stat-lbl'>النتيجة</span><span class='cust-stat-val {net_class}'>{_amount_to_str(tot_net)} د.ع.</span></div>
+            </div>
+            <div class='dashboard-showcase-col'>
+              {share_bot}
+              {render_owner_showcase_card(user)}
+            </div>
           </div>
           {flash_html}
           <p class='hint'>إدارة العملاء والمعاملات من المتصفح أو من البوت.</p>
@@ -582,6 +592,57 @@ def render_dashboard_html(
           {body}
     """
     return wrap_creditbook_app_shell(user, favicon_href, brand_img, "دفتر الديون — عملائي", None, card)
+
+
+def render_customer_share_page(
+    user: User,
+    customer_id: int,
+    view_url: str,
+    wa_url: str,
+    using_web: bool,
+    share_preview_plain: str,
+    favicon_href: str,
+    brand_img: str,
+) -> str:
+    """صفحة أزرار المشاركة (نفس أزرار البوت بعد cust_share)."""
+    owner_disp = _html_escape(user.full_name or user.username or "حسابي")
+    warn = ""
+    if not using_web:
+        warn = (
+            "<p class='hint share-warn'>⚠️ ملاحظة: لم يتم العثور على دومين ويب عام، "
+            "لذلك الرابط احتياطي داخل تليجرام.</p>"
+        )
+    inner = f"""
+      <div class='brand-header share-report-head'>
+        <div class='brand'>
+          <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
+          <div class='brand-text-wrap'>
+            <h2>مشاركة 📤</h2>
+            <p class='brand-user-name'>{owner_disp}</p>
+          </div>
+        </div>
+        {render_owner_showcase_card(user)}
+      </div>
+      <p class='hint' style='margin-top:0'>استخدم الأزرار أدناه — نفس رسالة البوت.</p>
+      {warn}
+      <pre class='share-preview-box'>{_html_escape(share_preview_plain)}</pre>
+      <div class='toolbar share-toolbar'>
+        <a class='btn btn-primary' href="{_html_escape(view_url)}" target='_blank' rel='noopener'>فتح صفحة المعاملات</a>
+        <a class='btn btn-wa' href="{_html_escape(wa_url)}" target='_blank' rel='noopener'>فتح واتساب وإرسال الرسالة</a>
+      </div>
+      <div class='toolbar'>
+        <a class='btn btn-secondary' href='/creditbook/customer/{customer_id}'>◀ رجوع للعميل</a>
+      </div>
+    """
+    return wrap_creditbook_app_shell(
+        user,
+        favicon_href,
+        brand_img,
+        "مشاركة — دفتر الديون",
+        None,
+        inner,
+        body_class="page-share",
+    )
 
 
 def _owner_kind_word(kind: str) -> str:
@@ -674,7 +735,7 @@ def render_owner_customer_page(
                     f"<img class='photo' src='/creditbook/photo/{fid}' alt=''/></a>"
                 )
             remain = running_after_by_tx.get(t.id, bal)
-            remain_class = "bal-red" if remain > 0 else ("bal-green" if remain < 0 else "")
+            remain_class = "bal-green" if remain > 0 else ("bal-red" if remain < 0 else "")
             kc = _owner_kind_class(t.kind)
             kind_word = _owner_kind_word(t.kind)
             tx_rows.append(
@@ -699,7 +760,7 @@ def render_owner_customer_page(
         if has_more:
             more_btn = f"<a class='btn btn-primary' href='/creditbook/customer/{cust.id}?offset={more_offset}'>➕ عرض المزيد</a>"
 
-        balance_class = "bal-red" if bal > 0 else ("bal-green" if bal < 0 else "")
+        balance_class = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
 
         cust_disp_phone = format_phone_iq_local_display((cust.phone or "").strip()) if cust.phone else ""
         cust_meta = _html_escape(cust.name) + (f" — {_html_escape(cust_disp_phone)}" if cust_disp_phone else "")
@@ -783,8 +844,8 @@ def render_owner_customer_page(
 
         net_line = f"{_amount_to_str(bal)} د.ع."
         card_inner = f"""
-              <div class='brand-header share-report-head cust-page-head'>
-                <div class='cust-head-left'>
+              <div class='brand-header share-report-head dashboard-head cust-page-head'>
+                <div class='dashboard-brand-col'>
                   <div class='brand'>
                     <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
                     <div class='brand-text-wrap'>
@@ -792,17 +853,20 @@ def render_owner_customer_page(
                       <p class='brand-user-name'>{owner_disp}</p>
                     </div>
                   </div>
-                  <div class='cust-head-stats' role='group' aria-label='إجماليات العميل'>
-                    <div class='cust-stat-line'><span class='cust-stat-lbl'>أخذت الكلي</span><span class='cust-stat-val bal-red'>{_amount_to_str(took)} د.ع.</span></div>
-                    <div class='cust-stat-line'><span class='cust-stat-lbl'>أعطيت الكلي</span><span class='cust-stat-val bal-green'>{_amount_to_str(gave)} د.ع.</span></div>
-                    <div class='cust-stat-line'><span class='cust-stat-lbl'>النتيجة</span><span class='cust-stat-val {balance_class}'>{net_line}</span></div>
-                  </div>
                   <div class='cust-line-identity'>👤 {cust_meta}</div>
                 </div>
-                {render_owner_showcase_card(user)}
+                <div class='cust-head-stats dashboard-stats-col' role='group' aria-label='إجماليات العميل'>
+                    <div class='cust-stat-line'><span class='cust-stat-lbl'>أخذت</span><span class='cust-stat-val bal-red'>{_amount_to_str(took)} د.ع.</span></div>
+                    <div class='cust-stat-line'><span class='cust-stat-lbl'>أعطيت</span><span class='cust-stat-val bal-green'>{_amount_to_str(gave)} د.ع.</span></div>
+                    <div class='cust-stat-line'><span class='cust-stat-lbl'>النتيجة</span><span class='cust-stat-val {balance_class}'>{net_line}</span></div>
+                </div>
+                <div class='dashboard-showcase-col'>
+                  {render_owner_showcase_card(user)}
+                </div>
               </div>
-              <div class='toolbar'>
+              <div class='toolbar toolbar-cust-top'>
                 <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
+                <a class='btn btn-primary' href='/creditbook/customer/{cust.id}/share'>📤 مشاركة</a>
               </div>
               {flash_html}
               {manage_panel}
