@@ -15,7 +15,7 @@ from database import SessionLocal
 from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerCategory
 from app_models.partner import PartnerLink, PartnerPendingTx, CustomerPaymentReminder
 from utils.phone import is_plausible_iraq_mobile, normalize_phone, wa_number
-from config import WEB_BASE_URL, WEB_TX_UPLOAD_DIR
+from config import WEB_BASE_URL, WEB_TX_UPLOAD_DIR, public_web_base_url_for_telegram_fetch
 from handlers.inline_nav import kb_main_menu, kb_menu_customers, kb_tx_detail
 
 (
@@ -1520,16 +1520,6 @@ def _format_tx_amount(amount) -> str:
         return str(amount)
 
 
-def _web_public_base_for_bot_photo() -> bool:
-    """رابط عام يصل إليه خوادم تيليجرام (ليس localhost)."""
-    u = (WEB_BASE_URL or "").strip().lower()
-    if not u.startswith(("http://", "https://")):
-        return False
-    if "localhost" in u or "127.0.0.1" in u or "[::1]" in u:
-        return False
-    return True
-
-
 def _local_input_file_for_web_photo(p, name: str):
     try:
         from telegram import FSInputFile
@@ -1553,11 +1543,13 @@ def _photo_args_for_telegram_send(photo_file_id: str | None) -> list:
         return []
     p = WEB_TX_UPLOAD_DIR / name
     out = []
-    # خوادم تيليجرام تجلب الصورة من هذا المسار (يعمل مع Docker حتى لو البوت لا يرى الملف محلياً)
-    if _web_public_base_for_bot_photo():
-        out.append(f"{WEB_BASE_URL.rstrip('/')}/creditbook/photo/{quote(s, safe='')}")
+    # 1) رفع الملف من القرص أولاً (لا يعتمد على WEB_BASE_URL)
     if p.is_file():
         out.append(_local_input_file_for_web_photo(p, name))
+    # 2) رابط HTTPS عام (خوادم تيليجرام) — يُستنتج من RAILWAY_PUBLIC_DOMAIN إن كان WEB_BASE_URL لا يزال localhost
+    base = public_web_base_url_for_telegram_fetch()
+    if base:
+        out.append(f"{base}/creditbook/photo/{quote(s, safe='')}")
     return out
 
 
@@ -1619,13 +1611,16 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
         text, keyboard = await _render_tx_detail(db, tx)
         # نعرض التفاصيل أولاً، ثم الأزرار برسالة منفصلة (حسب طلب المستخدم).
         photo_args = _photo_args_for_telegram_send(getattr(tx, "photo_file_id", None))
+        _cap = text
+        if len(_cap) > 1024:
+            _cap = _cap[:1022] + "…"
         sent_photo = False
         for photo_arg in photo_args:
             try:
                 await context.bot.send_photo(
                     chat_id=update.effective_user.id,
                     photo=photo_arg,
-                    caption=text,
+                    caption=_cap,
                 )
                 sent_photo = True
                 break
@@ -2909,9 +2904,9 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.add(link)
         db.commit()
         # رابط عرض المعاملات:
-        # 1) رابط موقع عام (WEB_BASE_URL أو Railway domain)
+        # 1) رابط موقع عام (WEB_BASE_URL أو استنتاج من RAILWAY_PUBLIC_DOMAIN)
         # 2) fallback تليجرام فقط إذا ماكو دومين عام نهائياً
-        base = (WEB_BASE_URL or "").strip().rstrip("/")
+        base = public_web_base_url_for_telegram_fetch() or (WEB_BASE_URL or "").strip().rstrip("/")
         if _is_public_http_url(base):
             view_url = f"{base}/creditbook/balance/{token}?lang=ar"
             using_web = True

@@ -36,6 +36,42 @@ if _raw_base and not _raw_base.startswith(("http://", "https://")):
 
 WEB_BASE_URL = _raw_base.rstrip("/")
 
+
+def _url_looks_local(u: str) -> bool:
+    ul = (u or "").lower()
+    return "localhost" in ul or "127.0.0.1" in ul or ul.startswith("http://0.") or "[::1]" in ul
+
+
+def public_web_base_url_for_telegram_fetch() -> str | None:
+    """
+    قاعدة https://… يمكن لخوادم تيليجرام جلب صورة من /creditbook/photo/…
+    إذا كان WEB_BASE_URL ما زال localhost لكن المنصة تعرّف دوميناً عاماً (مثل Railway) نستخدمه.
+    يمكن ضبط TELEGRAM_PHOTO_BASE_URL أو PUBLIC_WEB_BASE_URL يدوياً.
+    """
+    manual = get_env("TELEGRAM_PHOTO_BASE_URL") or get_env("PUBLIC_WEB_BASE_URL")
+    if manual and manual.startswith(("http://", "https://")) and not _url_looks_local(manual):
+        return manual.rstrip("/")
+
+    if WEB_BASE_URL and not _url_looks_local(WEB_BASE_URL):
+        return WEB_BASE_URL.rstrip("/")
+
+    rd = get_env("RAILWAY_PUBLIC_DOMAIN")
+    if rd:
+        h = rd.strip().lstrip("https://").lstrip("http://").split("/")[0]
+        if h:
+            return f"https://{h}".rstrip("/")
+
+    rpu = get_env("RAILWAY_PUBLIC_URL")
+    if rpu and rpu.startswith(("http://", "https://")) and not _url_looks_local(rpu):
+        return rpu.rstrip("/")
+
+    rex = get_env("RENDER_EXTERNAL_URL")
+    if rex and rex.startswith(("http://", "https://")) and not _url_looks_local(rex):
+        return rex.rstrip("/")
+
+    return None
+
+
 # بطاقة «صنع بواسطة» في واجهة الويب — هوية صانع الدفتر (ثابتة لجميع المستخدمين؛ يمكن تغييرها من Railway)
 CREDITBOOK_SHOWCASE_NAME = get_env("CREDITBOOK_SHOWCASE_NAME", "ابو الاكبر للتوصيل")
 CREDITBOOK_SHOWCASE_PHONE = get_env("CREDITBOOK_SHOWCASE_PHONE", "07733921468")
