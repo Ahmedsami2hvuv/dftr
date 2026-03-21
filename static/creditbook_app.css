@@ -422,11 +422,13 @@ form.login-form { margin-top: 8px; }
 .new-cust-block { margin: 14px 0; }
 .btn-new-cust {
   margin-top: 0;
-  width: 100%;
-  max-width: 360px;
-  font-size: 1.08rem;
-  padding: 14px 20px;
-  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.35);
+  flex: 0 1 auto;
+  width: auto;
+  max-width: min(100%, 260px);
+  font-size: 0.95rem;
+  padding: 11px 16px;
+  font-weight: 800;
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.28);
 }
 .new-cust-panel { border-top: none !important; padding-top: 8px !important; }
 .btn-block { display: block; width: 100%; text-align: center; box-sizing: border-box; }
@@ -641,16 +643,23 @@ form.login-form { margin-top: 8px; }
 }
 .btn-report {
   margin-top: 0 !important;
+  flex: 1 1 160px;
+  min-width: 140px;
+  padding: 14px 22px !important;
+  font-size: 1.06rem !important;
+  font-weight: 800 !important;
+  box-shadow: 0 8px 20px rgba(71, 85, 105, 0.35) !important;
 }
 .new-cust-actions {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   gap: 10px;
-  align-items: center;
+  align-items: stretch;
   margin-bottom: 12px;
 }
 .new-cust-actions .btn-report {
-  flex: 0 0 auto;
+  flex: 1 1 160px;
 }
 .btn-manage-compact {
   padding: 8px 12px !important;
@@ -877,6 +886,7 @@ form.login-form { margin-top: 8px; }
 body.app-body {
   padding: 12px;
   padding-top: 56px;
+  overflow-x: clip;
 }
 .sidebar-menu-btn {
   position: fixed;
@@ -908,7 +918,7 @@ body.app-body {
   max-width: 1200px;
   margin: 0 auto;
 }
-/* يمين الشاشة (إحداثيات مادية) — يتفادى اختلاف RTL الذي كان يضع اللوحة في المنتصف */
+/* يمين الشاشة — مخفية بالكامل عند الإغلاق (بدون ظل أو طرف ظاهر) */
 .app-sidebar {
   position: fixed;
   top: 0;
@@ -923,13 +933,26 @@ body.app-body {
   padding: 0;
   box-shadow: -6px 0 28px rgba(15, 23, 42, 0.2);
   border-left: 1px solid rgba(13, 148, 136, 0.2);
-  transform: translate3d(100%, 0, 0);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translate3d(calc(100% + 28px), 0, 0);
+  transition:
+    transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0s linear 0.28s,
+    box-shadow 0.28s ease;
   overflow-y: auto;
+  overflow-x: hidden;
   will-change: transform;
+  visibility: hidden;
+  pointer-events: none;
+  contain: layout paint;
 }
 body.sidebar-open .app-sidebar {
   transform: translate3d(0, 0, 0);
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0s linear 0s,
+    box-shadow 0.28s ease;
 }
 .sidebar-inner {
   position: relative;
@@ -1018,6 +1041,18 @@ body.sidebar-open .app-sidebar {
   font-weight: 700;
   color: #1d4ed8 !important;
   text-decoration: none !important;
+}
+.sidebar-support-wa {
+  background: linear-gradient(135deg, #25d366, #128c7e) !important;
+  color: #fff !important;
+  border-color: rgba(255,255,255,0.35) !important;
+}
+.sidebar-support-wa:hover {
+  background: linear-gradient(135deg, #2ee576, #15967a) !important;
+  border-color: rgba(255,255,255,0.5) !important;
+}
+.feedback-kind-fs {
+  margin-bottom: 8px;
 }
 .app-main {
   width: 100%;

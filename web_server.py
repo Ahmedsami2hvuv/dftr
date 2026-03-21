@@ -13,10 +13,11 @@ import re
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, unquote, urlparse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from database import SessionLocal
 from app_models import BRAND_LOGO_SETTING_KEY, Customer, CustomerTransaction, ShareLink, SiteSetting, User
+from config import ADMIN_ID
 from config import BOT_LOGO_BASE64
 from config import BOT_TOKEN
 from config import BOT_USERNAME
@@ -39,6 +40,7 @@ from creditbook_web import (
     render_account_page,
     render_customer_share_page,
     render_dashboard_html,
+    render_feedback_page,
     render_login_page,
     render_logout_confirm_page,
     render_owner_customer_page,
@@ -159,6 +161,32 @@ def _redirect(
     for k, v in extra_headers or []:
         handler.send_header(k, v)
     handler.end_headers()
+
+
+def _send_telegram_admin_message(text: str) -> bool:
+    """إرسال نص إلى حساب الإدارة (ADMIN_ID) عبر Bot API."""
+    if not BOT_TOKEN or not ADMIN_ID:
+        return False
+    t = (text or "").strip()
+    if not t:
+        return False
+    payload = json.dumps(
+        {"chat_id": ADMIN_ID, "text": t[:4000]},
+        ensure_ascii=False,
+    ).encode("utf-8")
+    req = Request(
+        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=15) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+        data = json.loads(body)
+        return bool(data.get("ok"))
+    except Exception:
+        return False
 
 
 def _html_escape(s: str) -> str:
@@ -776,6 +804,24 @@ class Handler(BaseHTTPRequestHandler):
             _send_html_page(self, 200, page)
             return
 
+        if path == "/creditbook/feedback":
+            if not web_user:
+                _redirect(self, "/creditbook/login")
+                return
+            flash_key = (qs.get("flash") or [None])[0]
+            err_msg = (qs.get("err") or [None])[0]
+            if err_msg:
+                err_msg = unquote(err_msg)
+            page = render_feedback_page(
+                web_user,
+                favicon_href,
+                brand_img_src,
+                flash_key=flash_key,
+                err_msg=err_msg,
+            )
+            _send_html_page(self, 200, page)
+            return
+
         if path == "/creditbook/report":
             if not web_user:
                 _redirect(self, "/creditbook/login")
@@ -1127,6 +1173,34 @@ class Handler(BaseHTTPRequestHandler):
 
         def _e(msg: str) -> str:
             return quote(msg[:400], safe="")
+
+        if path == "/creditbook/feedback":
+            csrf = _s("csrf")
+            if not csrf_verify(uid, "feedback_web", csrf):
+                _redirect(self, "/creditbook/feedback?err=" + _e("انتهت صلاحية النموذج. حدّث الصفحة."))
+                return
+            kind = (_s("kind") or "problem").lower()
+            if kind not in ("problem", "suggestion"):
+                kind = "problem"
+            msg = (_s("message") or "").strip()
+            if len(msg) < 3:
+                _redirect(self, "/creditbook/feedback?err=" + _e("النص قصير جداً."))
+                return
+            kind_ar = "مشكلة" if kind == "problem" else "اقتراح"
+            body_txt = (
+                f"📩 من الويب — {kind_ar}\n"
+                f"المستخدم: {owner_display_name_for_user(web_user)} (id={web_user.id})\n"
+                f"الهاتف: {(web_user.phone or '—').strip()}\n\n"
+                f"{msg}"
+            )
+            if _send_telegram_admin_message(body_txt):
+                _redirect(self, "/creditbook/feedback?flash=fb_ok")
+            else:
+                _redirect(
+                    self,
+                    "/creditbook/feedback?err=" + _e("تعذر الإرسال. حاول لاحقاً أو تواصل عبر «تواصل مع الدعم»."),
+                )
+            return
 
         if path == "/creditbook/account/profile":
             csrf = _s("csrf")

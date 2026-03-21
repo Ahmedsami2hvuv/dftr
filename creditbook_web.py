@@ -16,7 +16,7 @@ from urllib.parse import quote, urlencode
 
 from database import SessionLocal
 from app_models import Customer, CustomerTransaction, User
-from config import BOT_USERNAME, CREDITBOOK_SHOWCASE_NAME, CREDITBOOK_SHOWCASE_PHONE, web_session_secret
+from config import ADMIN_PHONE, BOT_USERNAME, CREDITBOOK_SHOWCASE_NAME, CREDITBOOK_SHOWCASE_PHONE, web_session_secret
 from utils.password import check_password
 from utils.phone import format_phone_iq_local_display, normalize_phone, same_phone, wa_number as _wa_number
 
@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=10"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=11"
 
 
 def _html_escape(s: str) -> str:
@@ -190,6 +190,7 @@ FLASH_LABELS = {
     "acc_prof": "تم حفظ بيانات الحساب ✅",
     "acc_pwd": "تم تغيير كلمة المرور ✅",
     "reg_ok": "تم إنشاء الحساب — يمكنك تسجيل الدخول الآن ✅",
+    "fb_ok": "تم إرسال رسالتك إلى الإدارة عبر تيليجرام ✅",
 }
 
 
@@ -287,6 +288,15 @@ def render_owner_showcase_card(user: User) -> str:
     """
 
 
+def _support_whatsapp_href() -> str:
+    """رابط واتساب للدعم من ADMIN_PHONE في الإعدادات."""
+    raw = (ADMIN_PHONE or "").strip()
+    if not raw:
+        return ""
+    wn = _wa_number(raw)
+    return f"https://wa.me/{wn}" if wn else ""
+
+
 def wrap_creditbook_app_shell(
     user: User,
     favicon_href: str,
@@ -299,6 +309,13 @@ def wrap_creditbook_app_shell(
     """هيكل: قائمة جانبية منزلقة (زر ☰) + المحتوى."""
     disp = _html_escape(owner_display_name_for_user(user, empty="حسابي"))
     acc_active = " sidebar-link-active" if active_nav == "account" else ""
+    wa_support = _support_whatsapp_href()
+    support_wa_html = ""
+    if wa_support:
+        support_wa_html = (
+            f"<a class='sidebar-link sidebar-support-wa sidebar-close-link' href='{_html_escape(wa_support)}' "
+            f"target='_blank' rel='noopener'>📞 تواصل مع الدعم</a>"
+        )
     head = f"""
     <!doctype html>
     <html lang='ar' dir='rtl'>
@@ -326,6 +343,8 @@ def wrap_creditbook_app_shell(
               <p class='sidebar-user'><span class='sidebar-user-name'>{disp}</span></p>
               <nav class='sidebar-nav'>
                 <a class='sidebar-link{acc_active} sidebar-close-link' href='/creditbook/account'>حسابي</a>
+                <a class='sidebar-link sidebar-close-link' href='/creditbook/feedback'>💬 إرسال مشكلة أو اقتراح</a>
+                {support_wa_html}
                 <a class='sidebar-link sidebar-link-logout sidebar-close-link' href='/creditbook/logout_confirm'>تسجيل الخروج</a>
               </nav>
               {f"<a class='sidebar-bot sidebar-close-link' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>البوت في تيليجرام</a>" if BOT_USERNAME else ""}
@@ -456,6 +475,58 @@ def render_account_page(
       </div>
     """
     return wrap_creditbook_app_shell(user, favicon_href, brand_img, "حسابي — دفتر الديون", "account", inner)
+
+
+def render_feedback_page(
+    user: User,
+    favicon_href: str,
+    brand_img: str,
+    flash_key: str | None = None,
+    err_msg: str | None = None,
+) -> str:
+    """إرسال مشكلة أو اقتراح إلى الإدارة عبر تيليجرام."""
+    uid = user.id
+    csrf_f = csrf_token(uid, "feedback_web")
+    flash_html = _flash_block(flash_key, err_msg)
+    inner = f"""
+      <div class='brand-header share-report-head'>
+        <div class='brand'>
+          <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
+          <div class='brand-text-wrap'>
+            <h2>مشكلة أو اقتراح</h2>
+            <p class='brand-user-name'>{_html_escape(owner_display_name_for_user(user, empty="—"))}</p>
+          </div>
+        </div>
+        {render_owner_showcase_card(user)}
+      </div>
+      {flash_html}
+      <div class='web-section'>
+        <p class='hint'>تُرسل رسالتك إلى الإدارة على تيليجرام.</p>
+        <form method='post' action='/creditbook/feedback' class='stack-form'>
+          <input type='hidden' name='csrf' value='{_html_escape(csrf_f)}'/>
+          <fieldset class='report-fs feedback-kind-fs'>
+            <legend>النوع</legend>
+            <label class='report-opt'><input type='radio' name='kind' value='problem' checked/> مشكلة</label>
+            <label class='report-opt'><input type='radio' name='kind' value='suggestion'/> اقتراح</label>
+          </fieldset>
+          <label for='fb_text'>النص</label>
+          <textarea id='fb_text' name='message' rows='6' required maxlength='3500' placeholder='اكتب التفاصيل هنا…'></textarea>
+          <button type='submit' class='btn btn-primary'>إرسال</button>
+        </form>
+      </div>
+      <div class='toolbar'>
+        <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
+      </div>
+    """
+    return wrap_creditbook_app_shell(
+        user,
+        favicon_href,
+        brand_img,
+        "مشكلة أو اقتراح — دفتر الديون",
+        None,
+        inner,
+        body_class="page-feedback",
+    )
 
 
 def render_login_page(
