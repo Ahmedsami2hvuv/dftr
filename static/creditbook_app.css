@@ -1000,6 +1000,13 @@ button.cust-search-clear-inline:hover {
   margin-top: 0 !important;
 }
 
+/* صفحة تعديل المعاملة — المبلغ بمحاذاة اليمين (واجهة عربية) مع بقاء الأرقام LTR */
+.page-tx-edit .tx-edit-amt {
+  text-align: right;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
 /* حسابي — سجل الحذف/التعديل (منزلق + بحث فوري) */
 .acct-txhist-details {
   margin: 0 0 14px;

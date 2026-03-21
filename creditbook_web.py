@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=21"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=22"
 
 
 def _html_escape(s: str) -> str:
@@ -1599,7 +1599,7 @@ def render_tx_edit_page(
                 <form method='post' action='/creditbook/tx/{tx_id}/update' class='stack-form' enctype='multipart/form-data'>
                   <input type='hidden' name='csrf' value='{_html_escape(csrf_e)}'/>
                   <label for='txamt'>المبلغ (د.ع.)</label>
-                  <input type='text' id='txamt' name='amount' required value='{_html_escape(amt_s)}' dir='ltr'/>
+                  <input type='text' id='txamt' class='tx-edit-amt' name='amount' required value='{_html_escape(amt_s)}' dir='ltr' inputmode='decimal' autocomplete='off'/>
                   <label for='txnote'>الملاحظة (اتركها فارغة لمسحها)</label>
                   <textarea id='txnote' name='note' rows='3'>{note_s}</textarea>
                   <label for='txdt'>تاريخ ووقت المعاملة</label>
