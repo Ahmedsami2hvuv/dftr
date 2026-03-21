@@ -2,12 +2,13 @@
 """دفتر الديون: عملاء، أخذت/أعطيت، مشاركة"""
 import re
 import secrets
+from io import BytesIO
 from urllib.parse import quote
 from urllib.parse import urlparse
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, datetime, timedelta
 
-from telegram import BufferedInputFile, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InputFile, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from sqlalchemy import func
 from database import SessionLocal
@@ -1520,7 +1521,7 @@ def _format_tx_amount(amount) -> str:
 
 
 def _photo_arg_for_telegram_send(photo_file_id: str | None):
-    """file_id من تيليجرام، أو BufferedInputFile لصور المرفوعة من الموقع (web:…)."""
+    """file_id من تيليجرام، أو InputFile لصور المرفوعة من الموقع (web:…)."""
     if not photo_file_id:
         return None
     s = str(photo_file_id)
@@ -1535,7 +1536,7 @@ def _photo_arg_for_telegram_send(photo_file_id: str | None):
     p = WEB_TX_UPLOAD_DIR / name
     if not p.is_file():
         return None
-    return BufferedInputFile(p.read_bytes(), filename=name)
+    return InputFile(BytesIO(p.read_bytes()), filename=name)
 
 
 async def _render_tx_detail(db, tx: CustomerTransaction):
