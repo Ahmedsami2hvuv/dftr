@@ -643,12 +643,13 @@ form.login-form { margin-top: 8px; }
 }
 .btn-report {
   margin-top: 0 !important;
-  flex: 1 1 160px;
-  min-width: 140px;
-  padding: 14px 22px !important;
-  font-size: 1.06rem !important;
-  font-weight: 800 !important;
-  box-shadow: 0 8px 20px rgba(71, 85, 105, 0.35) !important;
+  flex: 0 1 auto;
+  width: auto;
+  max-width: min(100%, 260px);
+  padding: 11px 16px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  box-shadow: 0 6px 16px rgba(71, 85, 105, 0.28);
 }
 .new-cust-actions {
   display: flex;
@@ -659,7 +660,7 @@ form.login-form { margin-top: 8px; }
   margin-bottom: 12px;
 }
 .new-cust-actions .btn-report {
-  flex: 1 1 160px;
+  flex: 0 1 auto;
 }
 .btn-manage-compact {
   padding: 8px 12px !important;
