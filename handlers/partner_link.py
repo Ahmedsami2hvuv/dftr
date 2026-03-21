@@ -307,6 +307,7 @@ async def partner_batch_approve(update: Update, context: ContextTypes.DEFAULT_TY
                 kind=invert_kind(src.kind),
                 note=src.note,
                 photo_file_id=src.photo_file_id,
+                photo_web_blob=getattr(src, "photo_web_blob", None),
             )
             db.add(new_tx)
             db.flush()

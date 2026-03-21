@@ -93,15 +93,31 @@ def _mime_for_ext(fn: str) -> str:
 
 
 def _try_local_web_photo(file_id: str) -> tuple[bytes, str] | None:
+    """صورة معاملة الموقع: من القرص أو من قاعدة البيانات إن فُقد الملف على الحاوية."""
     if not file_id.startswith("web:"):
         return None
     name = file_id[4:]
     if not is_safe_web_photo_name(name):
         return None
     p = WEB_TX_UPLOAD_DIR / name
-    if not p.is_file():
-        return None
-    return p.read_bytes(), _mime_for_ext(name)
+    if p.is_file():
+        return p.read_bytes(), _mime_for_ext(name)
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(CustomerTransaction.photo_web_blob)
+            .filter(
+                CustomerTransaction.photo_file_id == file_id,
+                CustomerTransaction.photo_web_blob.isnot(None),
+            )
+            .limit(1)
+            .first()
+        )
+        if row and row[0] is not None:
+            return bytes(row[0]), _mime_for_ext(name)
+    finally:
+        db.close()
+    return None
 
 
 def _parse_multipart_post(raw: bytes, content_type: str) -> dict[str, str | tuple[bytes, str]]:

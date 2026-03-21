@@ -91,6 +91,7 @@ def _log_tx_edited_before(db, user_id: int, tx: CustomerTransaction) -> None:
             kind=tx.kind,
             note=tx.note,
             photo_file_id=tx.photo_file_id,
+            photo_web_blob=getattr(tx, "photo_web_blob", None),
             txn_created_at=tx.created_at,
         )
     )
@@ -113,6 +114,7 @@ def _log_tx_deleted(db, user_id: int, tx: CustomerTransaction) -> None:
             kind=tx.kind,
             note=tx.note,
             photo_file_id=tx.photo_file_id,
+            photo_web_blob=getattr(tx, "photo_web_blob", None),
             txn_created_at=tx.created_at,
         )
     )
@@ -271,12 +273,14 @@ def action_txn_add(
     if amt is None:
         return "لم أستخرج مبلغاً صحيحاً (مثال: 775.25 أو سطران: المبلغ ثم الملاحظة)."
     photo_id = None
+    blob_val = None
     if photo_bytes and len(photo_bytes) > 0:
         fn, err = save_web_photo_bytes(photo_bytes, photo_oriname or "")
         if err:
             return err
         if fn:
             photo_id = f"web:{fn}"
+            blob_val = photo_bytes
     db = SessionLocal()
     try:
         cust = _get_customer_owned(db, user_id, cid)
@@ -288,6 +292,7 @@ def action_txn_add(
             kind=kind,
             note=note_opt,
             photo_file_id=photo_id,
+            photo_web_blob=blob_val,
         )
         if created_at is not None:
             t.created_at = created_at
@@ -335,12 +340,14 @@ def action_tx_update(
         if remove_photo:
             unlink_web_photo(tx.photo_file_id)
             tx.photo_file_id = None
+            tx.photo_web_blob = None
         elif photo_bytes and len(photo_bytes) > 0:
             unlink_web_photo(tx.photo_file_id)
             fn, err = save_web_photo_bytes(photo_bytes, photo_oriname or "")
             if err:
                 return err
             tx.photo_file_id = f"web:{fn}" if fn else None
+            tx.photo_web_blob = photo_bytes if fn else None
         db.commit()
         return None
     except Exception as e:
@@ -470,6 +477,7 @@ def action_tx_history_restore(user_id: int, history_id: int) -> str | None:
                 kind=h.kind,
                 note=h.note,
                 photo_file_id=h.photo_file_id,
+                photo_web_blob=getattr(h, "photo_web_blob", None),
             )
             t.created_at = h.txn_created_at
             db.add(t)
@@ -492,6 +500,7 @@ def action_tx_history_restore(user_id: int, history_id: int) -> str | None:
             tx.kind = h.kind
             tx.note = h.note
             tx.photo_file_id = h.photo_file_id
+            tx.photo_web_blob = getattr(h, "photo_web_blob", None)
             tx.created_at = h.txn_created_at
             db.delete(h)
             db.commit()

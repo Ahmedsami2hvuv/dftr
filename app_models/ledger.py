@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """سجلات الدفتر والديون + العملاء ومعاملاتهم"""
-from sqlalchemy import Column, Integer, BigInteger, String, Numeric, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, BigInteger, String, Numeric, DateTime, ForeignKey, Text, LargeBinary
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -35,6 +35,8 @@ class CustomerTransaction(Base):
     kind = Column(String(10), nullable=False)  # "gave" أعطيت أو "took" أخذت
     note = Column(Text, nullable=True)
     photo_file_id = Column(String(255), nullable=True)
+    # صور مرفوعة من الموقع — نسخة في DB حتى لا تُفقد مع قرص الحاوية (Railway)
+    photo_web_blob = Column(LargeBinary, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     customer = relationship("Customer", back_populates="transactions")
@@ -54,6 +56,7 @@ class TransactionHistory(Base):
     kind = Column(String(10), nullable=False)
     note = Column(Text, nullable=True)
     photo_file_id = Column(String(255), nullable=True)
+    photo_web_blob = Column(LargeBinary, nullable=True)
     txn_created_at = Column(DateTime, nullable=False)
     logged_at = Column(DateTime, default=datetime.utcnow)
 

@@ -65,6 +65,20 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(
+                text("ALTER TABLE customer_transactions ADD COLUMN IF NOT EXISTS photo_web_blob BYTEA")
+            )
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(
+                text("ALTER TABLE transaction_history ADD COLUMN IF NOT EXISTS photo_web_blob BYTEA")
+            )
+            conn.commit()
+        except Exception:
+            pass
 
         # عمود التصنيف لدفتر الحسابات
         try:

@@ -1555,8 +1555,8 @@ def _web_tx_local_path_name(photo_file_id: str) -> tuple | None:
     return p, name
 
 
-def _photo_args_for_telegram_send(photo_file_id: str | None) -> list:
-    """قائمة مرشّحات لـ send_photo: file_id، أو رابط HTTPS، أو رفع من القرص."""
+def _photo_args_for_telegram_send(photo_file_id: str | None, photo_web_blob: bytes | None = None) -> list:
+    """قائمة مرشّحات لـ send_photo: file_id، أو بايتات من DB، أو رابط HTTPS، أو قرص."""
     if not photo_file_id:
         return []
     s = str(photo_file_id)
@@ -1569,11 +1569,12 @@ def _photo_args_for_telegram_send(photo_file_id: str | None) -> list:
         return []
     p = WEB_TX_UPLOAD_DIR / name
     out = []
-    # 1) رابط HTTPS — تيليجرام يحمّل الصورة من موقعك (أقل مشاكل مع مكتبة PTB)
+    wb = photo_web_blob
+    if wb is not None and len(wb) > 0:
+        out.append(InputFile(BytesIO(bytes(wb)), filename=name))
     url = _web_tx_public_photo_url(s)
     if url:
         out.append(url)
-    # 2) رفع من القرص إن وُجد (نفس الحاوية / Volume)
     if p.is_file():
         out.append(_local_input_file_for_web_photo(p, name))
     return out
@@ -1636,7 +1637,10 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
             return
         text, keyboard = await _render_tx_detail(db, tx)
         # نعرض التفاصيل أولاً، ثم الأزرار برسالة منفصلة (حسب طلب المستخدم).
-        photo_args = _photo_args_for_telegram_send(getattr(tx, "photo_file_id", None))
+        photo_args = _photo_args_for_telegram_send(
+            getattr(tx, "photo_file_id", None),
+            getattr(tx, "photo_web_blob", None),
+        )
         _cap = text
         if len(_cap) > 1024:
             _cap = _cap[:1022] + "…"
@@ -1654,18 +1658,32 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
                 continue
         # أحياناً تيليجرام يرفض send_photo لكن يقبل الملف كمستند
         if not sent_photo:
-            pmeta = _web_tx_local_path_name(str(tx.photo_file_id or ""))
-            if pmeta:
-                plocal, fname = pmeta
+            pfi_s = str(tx.photo_file_id or "")
+            wb = getattr(tx, "photo_web_blob", None)
+            if wb is not None and len(wb) > 0 and pfi_s.startswith("web:"):
+                fname = pfi_s[4:]
                 try:
                     await context.bot.send_document(
                         chat_id=update.effective_user.id,
-                        document=InputFile(BytesIO(plocal.read_bytes()), filename=fname),
+                        document=InputFile(BytesIO(bytes(wb)), filename=fname),
                         caption=_cap,
                     )
                     sent_photo = True
                 except Exception:
                     pass
+            if not sent_photo:
+                pmeta = _web_tx_local_path_name(pfi_s)
+                if pmeta:
+                    plocal, fname = pmeta
+                    try:
+                        await context.bot.send_document(
+                            chat_id=update.effective_user.id,
+                            document=InputFile(BytesIO(plocal.read_bytes()), filename=fname),
+                            caption=_cap,
+                        )
+                        sent_photo = True
+                    except Exception:
+                        pass
         if not sent_photo:
             pfi = getattr(tx, "photo_file_id", None)
             if pfi and str(pfi).startswith("web:"):
