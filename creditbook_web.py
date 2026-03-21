@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 from database import SessionLocal
 from app_models import Customer, CustomerTransaction, User
-from config import BOT_USERNAME, web_session_secret
+from config import BOT_USERNAME, CREDITBOOK_SHOWCASE_NAME, CREDITBOOK_SHOWCASE_PHONE, web_session_secret
 from utils.password import check_password
 from utils.phone import format_phone_iq_local_display, normalize_phone, same_phone, wa_number as _wa_number
 
@@ -24,7 +24,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=6"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=7"
 
 
 def _html_escape(s: str) -> str:
@@ -237,26 +237,20 @@ def _brand_home_block(brand_img: str, user_name_display_esc: str) -> str:
 
 
 def render_owner_showcase_card(user: User) -> str:
-    """مربع «صنع بواسطة» — نفس الاسم ورقم حسابي وصفحة الفاتورة العامة (يُعاد تحميل المستخدم من DB)."""
-    db = SessionLocal()
-    try:
-        row = db.query(User).filter(User.id == user.id).first()
-        who = row or user
-    finally:
-        db.close()
-    owner_name = owner_display_name_for_user(who, empty="صاحب الحساب")
-    owner_phone = (who.phone or "").strip()
-    owner_name_esc = _html_escape(owner_name)
-    if owner_phone:
-        disp = format_phone_iq_local_display(owner_phone)
-        wa_p = _wa_number(owner_phone)
+    """مربع «صنع بواسطة» — هوية صانع الدفتر ثابتة (CREDITBOOK_* في الإعدادات) لجميع المستخدمين."""
+    _ = user  # يُبقى للتوافق مع الاستدعاءات
+    owner_name_esc = _html_escape(CREDITBOOK_SHOWCASE_NAME)
+    raw = (CREDITBOOK_SHOWCASE_PHONE or "").strip()
+    if raw:
+        disp = format_phone_iq_local_display(raw) or raw
+        wa_p = _wa_number(raw)
         wa_href = _html_escape(f"https://api.whatsapp.com/send?phone={wa_p}")
         phone_html = (
-            f"<a class='owner-phone owner-phone-wa' href='{wa_href}' "
+            f"<a class='owner-phone owner-phone-wa creditbook-showcase-phone' href='{wa_href}' "
             f"target='_blank' rel='noopener' dir='ltr' title='فتح واتساب'>{_html_escape(disp)}</a>"
         )
     else:
-        phone_html = "<span class='owner-phone-muted'>لم يُضف رقم بعد</span>"
+        phone_html = "<span class='owner-phone-muted'>لم يُضبط رقم صانع الدفتر</span>"
     return f"""
     <div class='owner-showcase'>
       <div class='owner-badge'>صنع بواسطة</div>

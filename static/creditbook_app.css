@@ -908,6 +908,15 @@ body.sidebar-open .app-sidebar {
   border: 1px solid rgba(254, 202, 202, 0.55);
   white-space: nowrap;
 }
+/* إضاءة حمراء خفيفة خلف رقم صانع الدفتر */
+.owner-showcase a.owner-phone-wa.creditbook-showcase-phone {
+  box-shadow:
+    0 0 12px rgba(239, 68, 68, 0.3),
+    0 0 22px rgba(248, 113, 113, 0.18) !important;
+  background: rgba(254, 226, 226, 0.22) !important;
+  border-color: rgba(252, 165, 165, 0.48) !important;
+  text-shadow: 0 0 8px rgba(254, 202, 202, 0.65), 0 0 16px rgba(239, 68, 68, 0.22);
+}
 .owner-phone-wa::before {
   content: "";
   display: inline-block;

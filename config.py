@@ -36,6 +36,10 @@ if _raw_base and not _raw_base.startswith(("http://", "https://")):
 
 WEB_BASE_URL = _raw_base.rstrip("/")
 
+# بطاقة «صنع بواسطة» في واجهة الويب — هوية صانع الدفتر (ثابتة لجميع المستخدمين؛ يمكن تغييرها من Railway)
+CREDITBOOK_SHOWCASE_NAME = get_env("CREDITBOOK_SHOWCASE_NAME", "ابو الاكبر للتوصيل")
+CREDITBOOK_SHOWCASE_PHONE = get_env("CREDITBOOK_SHOWCASE_PHONE", "07733921468")
+
 # صور المعاملات المرفوعة من موقع الويب (ليست من تيليجرام)
 _ROOT_DIR = Path(__file__).resolve().parent
 WEB_TX_UPLOAD_DIR = _ROOT_DIR / "data" / "web_tx_photos"

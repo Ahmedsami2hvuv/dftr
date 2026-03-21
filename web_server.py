@@ -20,6 +20,8 @@ from app_models import BRAND_LOGO_SETTING_KEY, Customer, CustomerTransaction, Sh
 from config import BOT_LOGO_BASE64
 from config import BOT_TOKEN
 from config import BOT_USERNAME
+from config import CREDITBOOK_SHOWCASE_NAME
+from config import CREDITBOOK_SHOWCASE_PHONE
 from config import WEB_BASE_URL
 from config import WEB_TX_UPLOAD_DIR
 from creditbook_web import (
@@ -358,18 +360,19 @@ def _render_page(token: str, offset: int) -> str:
 
         title = "دفتر الديون"
         brand_img_src, favicon_href = _brand_visual_for_page()
-        # بدون تسميات «صاحب الحساب / العميل» — الاسم والرقم فقط، رقم محلي 11 رقم يبدأ بـ 0
-        owner_disp_phone = format_phone_iq_local_display(owner_phone) if owner_phone else ""
-        owner_name_esc = _html_escape(owner_name)
-        if owner_disp_phone and owner_phone:
-            wa_phone_card = _wa_number(owner_phone)
-            wa_href_card = _html_escape(f"https://api.whatsapp.com/send?phone={wa_phone_card}")
-            owner_phone_html = (
-                f"<a class='owner-phone owner-phone-wa' href='{wa_href_card}' "
-                f"target='_blank' rel='noopener' dir='ltr' title='فتح واتساب'>{_html_escape(owner_disp_phone)}</a>"
+        # بطاقة «صنع بواسطة» — صانع الدفتر (ثابت)، وليس صاحب حساب التاجر
+        showcase_name_esc = _html_escape(CREDITBOOK_SHOWCASE_NAME)
+        raw_show = (CREDITBOOK_SHOWCASE_PHONE or "").strip()
+        if raw_show:
+            showcase_disp = format_phone_iq_local_display(raw_show) or raw_show
+            show_wa = _wa_number(raw_show)
+            wa_href_show = _html_escape(f"https://api.whatsapp.com/send?phone={show_wa}")
+            showcase_phone_html = (
+                f"<a class='owner-phone owner-phone-wa creditbook-showcase-phone' href='{wa_href_show}' "
+                f"target='_blank' rel='noopener' dir='ltr' title='فتح واتساب'>{_html_escape(showcase_disp)}</a>"
             )
         else:
-            owner_phone_html = "<span class='owner-phone-muted'>لم يُضف رقم بعد</span>"
+            showcase_phone_html = "<span class='owner-phone-muted'>لم يُضبط رقم صانع الدفتر</span>"
         cust_disp_phone = format_phone_iq_local_display((cust.phone or "").strip()) if cust.phone else ""
         cust_meta = _html_escape(cust.name) + (
             f" — {_html_escape(cust_disp_phone)}" if cust_disp_phone else ""
@@ -522,6 +525,14 @@ def _render_page(token: str, offset: int) -> str:
                 background: rgba(0,0,0,0.25);
                 transform: scale(1.02);
               }}
+              .owner-showcase a.owner-phone-wa.creditbook-showcase-phone {{
+                box-shadow:
+                  0 0 10px rgba(239, 68, 68, 0.32),
+                  0 0 20px rgba(248, 113, 113, 0.22) !important;
+                background: rgba(254, 226, 226, 0.22) !important;
+                border-color: rgba(252, 165, 165, 0.5);
+                text-shadow: 0 0 8px rgba(254, 202, 202, 0.75), 0 0 16px rgba(239, 68, 68, 0.28);
+              }}
               .owner-phone-wa::before {{
                 content: "";
                 display: inline-block;
@@ -624,8 +635,8 @@ def _render_page(token: str, offset: int) -> str:
                 <div class='owner-showcase'>
                   <div class='owner-badge'>صنع بواسطة</div>
                   <div class='owner-name-row'>
-                    <div class='owner-name'>{owner_name_esc}</div>
-                    {owner_phone_html}
+                    <div class='owner-name'>{showcase_name_esc}</div>
+                    {showcase_phone_html}
                   </div>
                 </div>
               </div>
