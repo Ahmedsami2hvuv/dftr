@@ -7,14 +7,14 @@ from urllib.parse import urlparse
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, datetime, timedelta
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import BufferedInputFile, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from sqlalchemy import func
 from database import SessionLocal
 from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerCategory
 from app_models.partner import PartnerLink, PartnerPendingTx, CustomerPaymentReminder
 from utils.phone import is_plausible_iraq_mobile, normalize_phone, wa_number
-from config import WEB_BASE_URL
+from config import WEB_BASE_URL, WEB_TX_UPLOAD_DIR
 from handlers.inline_nav import kb_main_menu, kb_menu_customers, kb_tx_detail
 
 (
@@ -1519,6 +1519,25 @@ def _format_tx_amount(amount) -> str:
         return str(amount)
 
 
+def _photo_arg_for_telegram_send(photo_file_id: str | None):
+    """file_id من تيليجرام، أو BufferedInputFile لصور المرفوعة من الموقع (web:…)."""
+    if not photo_file_id:
+        return None
+    s = str(photo_file_id)
+    if not s.startswith("web:"):
+        return s
+    # تأجيل الاستيراد لتجنب دائرة مع creditbook_web_actions
+    from creditbook_web_actions import is_safe_web_photo_name
+
+    name = s[4:]
+    if not is_safe_web_photo_name(name):
+        return None
+    p = WEB_TX_UPLOAD_DIR / name
+    if not p.is_file():
+        return None
+    return BufferedInputFile(p.read_bytes(), filename=name)
+
+
 async def _render_tx_detail(db, tx: CustomerTransaction):
     cust = db.query(Customer).filter(Customer.id == tx.customer_id).first()
     icon = _tx_kind_ar(tx.kind)
@@ -1576,13 +1595,16 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
             return
         text, keyboard = await _render_tx_detail(db, tx)
         # نعرض التفاصيل أولاً، ثم الأزرار برسالة منفصلة (حسب طلب المستخدم).
-        if getattr(tx, "photo_file_id", None):
+        photo_arg = _photo_arg_for_telegram_send(getattr(tx, "photo_file_id", None))
+        if photo_arg is not None:
             await context.bot.send_photo(
                 chat_id=update.effective_user.id,
-                photo=tx.photo_file_id,
+                photo=photo_arg,
                 caption=text,
             )
         else:
+            if getattr(tx, "photo_file_id", None) and str(tx.photo_file_id).startswith("web:"):
+                text = text + "\n\n⚠️ الصورة المرفقة من الموقع غير متاحة على هذا السيرفر."
             await context.bot.send_message(
                 chat_id=update.effective_user.id,
                 text=text,
