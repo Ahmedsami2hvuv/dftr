@@ -1648,6 +1648,32 @@ def try_login(phone_raw: str, password: str) -> tuple[str | None, int | None]:
         db.close()
 
 
+def _dashboard_customer_search_sort_key(cust: Customer, q: str) -> tuple:
+    """
+    أولوية التطابق عند البحث (أصغر = أعلى في القائمة):
+    0 اسم مطابق تماماً — 1 يبدأ الاسم بالاستعلام — 2 كلمة في الاسم تبدأ بالاستعلام —
+    3 يحتوي الاسم على الاستعلام — 4 الهاتف — 5 تطابق من معاملة فقط (ملاحظة/مبلغ).
+    """
+    q = (q or "").strip().lower()
+    name = (cust.name or "").lower()
+    phone = (cust.phone or "").lower()
+    if not q:
+        return (0, name)
+    if q in name:
+        if name == q:
+            return (0, 0, name)
+        if name.startswith(q):
+            return (1, 0, name)
+        pos = name.find(q)
+        prev_ok = pos == 0 or name[pos - 1] in " \t\n،؛,/،"
+        if prev_ok:
+            return (2, pos, name)
+        return (3, pos, name)
+    if q in phone:
+        return (4, 0, name)
+    return (5, 0, name)
+
+
 def load_dashboard_rows(
     user_id: int,
     q: str | None = None,
@@ -1690,7 +1716,10 @@ def load_dashboard_rows(
                 if cust_ids:
                     conds.append(Customer.id.in_(cust_ids))
                 base = base.filter(or_(*conds))
-        customers = base.order_by(Customer.name.asc()).all()
+            customers = base.all()
+            customers = sorted(customers, key=lambda c: _dashboard_customer_search_sort_key(c, q))
+        else:
+            customers = base.order_by(Customer.name.asc()).all()
         out = []
         for c in customers:
             gave = sum(float(t.amount or 0) for t in c.transactions if t.kind == "gave")
