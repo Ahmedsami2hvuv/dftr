@@ -1006,6 +1006,20 @@ button.cust-search-clear-inline:hover {
   direction: ltr;
   unicode-bidi: isolate;
 }
+.page-tx-edit .tx-edit-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: 4px;
+}
+.page-tx-edit .tx-edit-delete-form {
+  margin: 0;
+  display: inline-block;
+}
+.page-tx-edit .tx-edit-actions-row .btn {
+  margin-top: 0 !important;
+}
 
 /* حسابي — سجل الحذف/التعديل (منزلق + بحث فوري) */
 .acct-txhist-details {
