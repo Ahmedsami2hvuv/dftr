@@ -21,6 +21,11 @@ body.app-body .app-card {
   max-width: min(960px, 100%);
   width: 100%;
 }
+/* كل حقول البحث في التطبيق — نص وplaceholder بمحاذاة اليمين (RTL) */
+body.app-body input[type="search"] {
+  text-align: right;
+  direction: rtl;
+}
 .brand-header {
   display: flex;
   flex-direction: row;

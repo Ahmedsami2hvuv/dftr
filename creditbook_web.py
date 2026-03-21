@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=24"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=25"
 
 
 def _html_escape(s: str) -> str:
@@ -577,7 +577,7 @@ def render_account_page(
         <summary class='acct-txhist-summary'>📜 سجل الحذف والتعديل <span class='acct-txhist-summary-hint'>استعادة أو تجاهل — بحث فوري</span></summary>
         <div class='acct-txhist-body'>
           <label class='visually-hidden' for='acct-txhist-q'>بحث في السجل</label>
-          <input type='search' id='acct-txhist-q' class='acct-txhist-q' placeholder='اسم عميل، مبلغ، ملاحظة…' dir='auto' autocomplete='off'/>
+          <input type='search' id='acct-txhist-q' class='acct-txhist-q' placeholder='اسم عميل، مبلغ، ملاحظة…' dir='rtl' autocomplete='off'/>
           <div id='acct-txhist-list' class='acct-txhist-list'>{tx_hist_initial}</div>
         </div>
       </details>
@@ -888,7 +888,7 @@ def render_dashboard_html(
                 <option value='txn'{sel("txn")}>معاملات فقط</option>
               </select>
               <div class='dashboard-search-field-wrap'>
-                <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off' class='dash-search-input'/>
+                <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='اسم، هاتف، ملاحظة، مبلغ…' dir='rtl' autocomplete='off' class='dash-search-input'/>
                 {clear_search}
               </div>
             </div>
@@ -1067,7 +1067,7 @@ def render_report_all_transactions_page(
               </div>
               <div class='report-search-wrap'>
                 <label for='rep-sq'>تصفية النتائج</label>
-                <input type='search' id='rep-sq' name='sq' value='{sq_esc}' placeholder='اسم عميل، ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
+                <input type='search' id='rep-sq' name='sq' value='{sq_esc}' placeholder='اسم عميل، ملاحظة، مبلغ…' dir='rtl' autocomplete='off'/>
                 <p class='hint'>تصفية الصفوف المعروضة حسب الاسم أو الملاحظة أو المبلغ.</p>
               </div>
             </div>
@@ -1421,7 +1421,7 @@ def render_owner_customer_page(
               <div class='cust-tx-search' role='search' data-cust-id='{cust.id}'>
                 <label class='visually-hidden' for='cust-tx-q'>تصفية معاملات هذا العميل</label>
                 <div class='cust-search-field-wrap{" cust-search-field-wrap--has-clear" if sq else ""}' id='cust-search-field-wrap'>
-                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
+                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='ملاحظة، مبلغ…' dir='rtl' autocomplete='off'/>
                   <button type='button' class='cust-search-clear-inline' id='cust-tx-clear' aria-label='مسح' title='مسح'{" hidden" if not sq else ""}>✕</button>
                 </div>
               </div>
