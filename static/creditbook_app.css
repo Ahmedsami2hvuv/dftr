@@ -671,6 +671,58 @@ form.login-form { margin-top: 8px; }
     justify-content: stretch;
   }
 }
+
+/* لوحة التحكم — تقليل الفراغ الرأسي حول عنوان «عملائي» وصف البحث على الجوال */
+@media (max-width: 560px) {
+  .page-dashboard .hint-dashboard-note {
+    margin: 0.15rem 0 0.3rem !important;
+    line-height: 1.35;
+  }
+  .page-dashboard .new-cust-block {
+    margin-top: 0.15rem !important;
+    margin-bottom: 0.3rem !important;
+  }
+  .page-dashboard .new-cust-actions {
+    margin-bottom: 8px;
+  }
+  .page-dashboard .dashboard-cust-heading-row {
+    flex-direction: column;
+    align-items: stretch;
+    margin: 0 0 0.35rem !important;
+    gap: 4px;
+  }
+  .page-dashboard .dashboard-cust-title {
+    line-height: 1.15;
+  }
+  .page-dashboard .dashboard-search-inline {
+    gap: 4px;
+    margin-top: 0;
+    justify-content: stretch;
+  }
+  .page-dashboard .dashboard-search-field-wrap input[type="search"],
+  .page-dashboard .dashboard-search-field-wrap .dash-search-input {
+    padding: 6px 10px;
+    padding-inline-end: 40px;
+    font-size: 16px;
+    line-height: 1.25;
+  }
+  .page-dashboard .dash-scope-select {
+    padding: 6px 9px;
+    font-size: 16px;
+    line-height: 1.25;
+  }
+  .page-dashboard #cust-list {
+    margin-top: 0;
+    padding-top: 0;
+  }
+  .page-dashboard #cust-list .cust-row {
+    margin-top: 6px;
+    margin-bottom: 6px;
+  }
+  .page-dashboard #cust-list .cust-row:first-child {
+    margin-top: 0;
+  }
+}
 .dashboard-search {
   display: flex;
   flex-wrap: wrap;
