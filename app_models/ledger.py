@@ -40,6 +40,24 @@ class CustomerTransaction(Base):
     customer = relationship("Customer", back_populates="transactions")
 
 
+class TransactionHistory(Base):
+    """سجل معاملات محذوفة أو لقطة قبل التعديل — لاستعادتها أو تجاهلها من صفحة حسابي."""
+
+    __tablename__ = "transaction_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    ref_tx_id = Column(Integer, nullable=False)
+    event_type = Column(String(20), nullable=False)
+    amount = Column(Numeric(15, 2), nullable=False)
+    kind = Column(String(10), nullable=False)
+    note = Column(Text, nullable=True)
+    photo_file_id = Column(String(255), nullable=True)
+    txn_created_at = Column(DateTime, nullable=False)
+    logged_at = Column(DateTime, default=datetime.utcnow)
+
+
 class ShareLink(Base):
     """رابط مشاركة لعميل (لرؤية المعاملات)"""
     __tablename__ = "share_links"

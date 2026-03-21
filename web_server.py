@@ -28,6 +28,7 @@ from config import WEB_TX_UPLOAD_DIR
 from creditbook_web import (
     _clear_cookie_headers,
     _set_cookie_headers,
+    csrf_token,
     csrf_token_public,
     csrf_verify,
     csrf_verify_public,
@@ -38,6 +39,7 @@ from creditbook_web import (
     REPORT_PAGE_SIZE,
     render_report_all_transactions_page,
     render_account_page,
+    render_tx_history_rows_html,
     render_customer_share_page,
     render_dashboard_html,
     render_feedback_page,
@@ -58,6 +60,8 @@ from creditbook_web_actions import (
     action_tx_update,
     action_txn_add,
     action_register_web,
+    action_tx_history_dismiss,
+    action_tx_history_restore,
     action_user_change_password,
     action_user_update_profile,
     build_customer_share_urls,
@@ -924,6 +928,25 @@ class Handler(BaseHTTPRequestHandler):
             _send_html_page(self, 200, page)
             return
 
+        if path == "/creditbook/account/tx_history_search":
+            if not web_user:
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b'{"error":"login"}')
+                return
+            q_raw = (qs.get("q") or [None])[0]
+            search_q = unquote(q_raw).strip() if q_raw else None
+            frag = render_tx_history_rows_html(
+                web_user.id, search_q, csrf_token(web_user.id, "tx_history")
+            )
+            payload = json.dumps({"html": frag}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
         if path == "/creditbook/account":
             if not web_user:
                 _redirect(self, "/creditbook/login")
@@ -1321,6 +1344,36 @@ class Handler(BaseHTTPRequestHandler):
                 _redirect(self, "/creditbook/account?err=" + _e(err))
                 return
             _redirect(self, "/creditbook/account?flash=acc_pwd")
+            return
+
+        if path == "/creditbook/account/tx_history_action":
+            csrf = _s("csrf")
+            if not csrf_verify(uid, "tx_history", csrf):
+                _redirect(self, "/creditbook/account?err=" + _e("انتهت صلاحية النموذج. حدّث الصفحة."))
+                return
+            do = (_s("do") or "").strip().lower()
+            try:
+                hid = int((_s("hid") or "0").strip())
+            except ValueError:
+                hid = 0
+            if not hid:
+                _redirect(self, "/creditbook/account?err=" + _e("طلب غير صالح."))
+                return
+            if do == "restore":
+                err = action_tx_history_restore(uid, hid)
+                if err:
+                    _redirect(self, "/creditbook/account?err=" + _e(err))
+                    return
+                _redirect(self, "/creditbook/account?flash=tx_hist_restore")
+                return
+            if do == "dismiss":
+                err = action_tx_history_dismiss(uid, hid)
+                if err:
+                    _redirect(self, "/creditbook/account?err=" + _e(err))
+                    return
+                _redirect(self, "/creditbook/account?flash=tx_hist_dismiss")
+                return
+            _redirect(self, "/creditbook/account?err=" + _e("إجراء غير معروف."))
             return
 
         if path == "/creditbook/customer/create":

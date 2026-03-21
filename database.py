@@ -33,6 +33,7 @@ def init_db():
         Debt,
         Customer,
         CustomerTransaction,
+        TransactionHistory,
         ShareLink,
         CustomerCategory,
         LedgerCategory,

@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=20"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=21"
 
 
 def _html_escape(s: str) -> str:
@@ -191,6 +191,8 @@ FLASH_LABELS = {
     "acc_pwd": "تم تغيير كلمة المرور ✅",
     "reg_ok": "تم إنشاء الحساب — يمكنك تسجيل الدخول الآن ✅",
     "fb_ok": "تم إرسال رسالتك إلى الإدارة عبر تيليجرام ✅",
+    "tx_hist_restore": "تمت استعادة المعاملة من السجل ✅",
+    "tx_hist_dismiss": "تم تجاهل السجل ✅",
 }
 
 
@@ -504,6 +506,56 @@ def render_logout_confirm_page(user: User, favicon_href: str, brand_img: str) ->
     return wrap_creditbook_app_shell(user, favicon_href, brand_img, "تسجيل الخروج", None, inner)
 
 
+def render_tx_history_rows_html(user_id: int, q: str | None, csrf_token: str) -> str:
+    """قائمة HTML لسجل الحذف/التعديل — صفحة حسابي و`/account/tx_history_search`."""
+    from creditbook_web_actions import fetch_tx_history_rows
+
+    rows = fetch_tx_history_rows(user_id, q, limit=80)
+    if not rows:
+        return "<p class='hint acct-txhist-empty'>لا توجد عناصر في السجل أو لا توجد مطابقة للبحث.</p>"
+    out = []
+    for h, cust_name in rows:
+        badge = "محذوفة" if h.event_type == "deleted" else "قبل التعديل"
+        badge_class = "acct-txhist-badge-del" if h.event_type == "deleted" else "acct-txhist-badge-edit"
+        kind_ar = "أخذت" if h.kind == "took" else "أعطيت"
+        dt_s = h.txn_created_at.strftime("%Y-%m-%d %H:%M") if h.txn_created_at else "—"
+        note_s = (h.note or "").strip()
+        note_html = (
+            f"<div class='acct-txhist-note'>{_html_escape(note_s[:800])}</div>" if note_s else ""
+        )
+        cust_esc = _html_escape(cust_name or "")
+        amt_s = _amount_to_str(h.amount)
+        hid = int(h.id)
+        out.append(
+            f"""
+      <div class='acct-txhist-row'>
+        <div class='acct-txhist-row-head'>
+          <span class='acct-txhist-badge {badge_class}'>{_html_escape(badge)}</span>
+          <span class='acct-txhist-cust'>{cust_esc}</span>
+        </div>
+        <div class='acct-txhist-meta'><strong>{_html_escape(kind_ar)}</strong> · {amt_s} د.ع. · <span dir='ltr'>{_html_escape(dt_s)}</span></div>
+        {note_html}
+        <div class='acct-txhist-actions'>
+          <form method='post' action='/creditbook/account/tx_history_action' class='acct-txhist-form'>
+            <input type='hidden' name='csrf' value='{_html_escape(csrf_token)}'/>
+            <input type='hidden' name='hid' value='{hid}'/>
+            <input type='hidden' name='do' value='restore'/>
+            <button type='submit' class='btn btn-primary acct-txhist-btn'>↩ استعادة</button>
+          </form>
+          <form method='post' action='/creditbook/account/tx_history_action' class='acct-txhist-form'
+                onsubmit="return confirm('تجاهل هذا السجل؟ لن يمكن استعادته من هنا لاحقاً.');">
+            <input type='hidden' name='csrf' value='{_html_escape(csrf_token)}'/>
+            <input type='hidden' name='hid' value='{hid}'/>
+            <input type='hidden' name='do' value='dismiss'/>
+            <button type='submit' class='btn btn-secondary acct-txhist-btn'>تجاهل</button>
+          </form>
+        </div>
+      </div>
+            """
+        )
+    return "".join(out)
+
+
 def render_account_page(
     user: User,
     favicon_href: str,
@@ -514,10 +566,45 @@ def render_account_page(
     uid = user.id
     csrf_p = csrf_token(uid, "acct_profile")
     csrf_w = csrf_token(uid, "acct_pass")
+    csrf_tx = csrf_token(uid, "tx_history")
     name_v = _html_escape((user.full_name or user.username or "").strip())
     phone_v = _html_escape((user.phone or "").strip())
     disp_phone = format_phone_iq_local_display((user.phone or "").strip()) if user.phone else "—"
     flash_html = _flash_block(flash_key, err_msg)
+    tx_hist_initial = render_tx_history_rows_html(uid, None, csrf_tx)
+    tx_hist_panel = f"""
+      <details class='acct-txhist-details'>
+        <summary class='acct-txhist-summary'>📜 سجل الحذف والتعديل <span class='acct-txhist-summary-hint'>استعادة أو تجاهل — بحث فوري</span></summary>
+        <div class='acct-txhist-body'>
+          <label class='visually-hidden' for='acct-txhist-q'>بحث في السجل</label>
+          <input type='search' id='acct-txhist-q' class='acct-txhist-q' placeholder='اسم عميل، مبلغ، ملاحظة…' dir='auto' autocomplete='off'/>
+          <div id='acct-txhist-list' class='acct-txhist-list'>{tx_hist_initial}</div>
+        </div>
+      </details>
+      <script>
+      (function() {{
+        var inp = document.getElementById('acct-txhist-q');
+        var list = document.getElementById('acct-txhist-list');
+        if (!inp || !list) return;
+        var t = null;
+        function load() {{
+          var q = (inp.value || '').trim();
+          fetch('/creditbook/account/tx_history_search?q=' + encodeURIComponent(q), {{ credentials: 'same-origin' }})
+            .then(function(r) {{ return r.json(); }})
+            .then(function(data) {{
+              if (data && data.html !== undefined) list.innerHTML = data.html;
+            }})
+            .catch(function() {{}});
+        }}
+        function debounce() {{
+          clearTimeout(t);
+          t = setTimeout(load, 300);
+        }}
+        inp.addEventListener('input', debounce);
+        inp.addEventListener('search', debounce);
+      }})();
+      </script>
+    """
     inner = f"""
       <div class='brand-header share-report-head'>
         <div class='brand'>
@@ -530,6 +617,7 @@ def render_account_page(
         {render_owner_showcase_card(user)}
       </div>
       {flash_html}
+      {tx_hist_panel}
       <div class='web-section' style='border-top:none;padding-top:0'>
         <h3 class='web-h3'>معلومات الحساب</h3>
         <p class='acct-summary'><strong>الاسم الظاهر:</strong> {_html_escape(owner_display_name_for_user(user, empty="—"))}</p>

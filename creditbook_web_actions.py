@@ -19,6 +19,7 @@ from app_models import (
     PartnerLink,
     PartnerPendingTx,
     ShareLink,
+    TransactionHistory,
     User,
 )
 from handlers.customers import _parse_amount_and_optional_note
@@ -75,6 +76,45 @@ def _get_customer_owned(db, user_id: int, cid: int) -> Customer | None:
         db.query(Customer)
         .filter(Customer.id == cid, Customer.user_id == user_id)
         .first()
+    )
+
+
+def _log_tx_edited_before(db, user_id: int, tx: CustomerTransaction) -> None:
+    """لقطة قبل التعديل أو تغيير النوع — لاستعادة الحالة السابقة من حسابي."""
+    db.add(
+        TransactionHistory(
+            user_id=user_id,
+            customer_id=tx.customer_id,
+            ref_tx_id=tx.id,
+            event_type="edited_before",
+            amount=tx.amount,
+            kind=tx.kind,
+            note=tx.note,
+            photo_file_id=tx.photo_file_id,
+            txn_created_at=tx.created_at,
+        )
+    )
+
+
+def _log_tx_deleted(db, user_id: int, tx: CustomerTransaction) -> None:
+    """إزالة لقطات «قبل التعديل» لنفس ref ثم تسجيل حذف كامل."""
+    db.query(TransactionHistory).filter(
+        TransactionHistory.user_id == user_id,
+        TransactionHistory.ref_tx_id == tx.id,
+        TransactionHistory.event_type == "edited_before",
+    ).delete(synchronize_session=False)
+    db.add(
+        TransactionHistory(
+            user_id=user_id,
+            customer_id=tx.customer_id,
+            ref_tx_id=tx.id,
+            event_type="deleted",
+            amount=tx.amount,
+            kind=tx.kind,
+            note=tx.note,
+            photo_file_id=tx.photo_file_id,
+            txn_created_at=tx.created_at,
+        )
     )
 
 
@@ -284,6 +324,10 @@ def action_tx_update(
         if not got:
             return "المعاملة غير موجودة."
         tx, _cust = got
+        try:
+            _log_tx_edited_before(db, user_id, tx)
+        except Exception:
+            pass
         tx.amount = amt
         tx.note = note_val
         if created_at is not None:
@@ -313,6 +357,10 @@ def action_tx_toggle_kind(user_id: int, tx_id: int) -> str | None:
         if not got:
             return "المعاملة غير موجودة."
         tx, _cust = got
+        try:
+            _log_tx_edited_before(db, user_id, tx)
+        except Exception:
+            pass
         tx.kind = "gave" if tx.kind == "took" else "took"
         db.commit()
         return None
@@ -332,6 +380,10 @@ def action_tx_delete(user_id: int, tx_id: int) -> tuple[str | None, int | None]:
             return ("المعاملة غير موجودة.", None)
         tx, _cust = got
         cid = tx.customer_id
+        try:
+            _log_tx_deleted(db, user_id, tx)
+        except Exception:
+            pass
         unlink_web_photo(tx.photo_file_id)
         db.delete(tx)
         db.commit()
@@ -339,6 +391,116 @@ def action_tx_delete(user_id: int, tx_id: int) -> tuple[str | None, int | None]:
     except Exception as e:
         db.rollback()
         return (str(e)[:200], None)
+    finally:
+        db.close()
+
+
+def fetch_tx_history_rows(
+    user_id: int,
+    q: str | None,
+    limit: int = 80,
+) -> list[tuple[TransactionHistory, str]]:
+    """قائمة (سجل، اسم العميل) لصفحة حسابي والبحث الفوري."""
+    from sqlalchemy import String, cast, or_
+
+    db = SessionLocal()
+    try:
+        qry = (
+            db.query(TransactionHistory, Customer.name)
+            .join(Customer, Customer.id == TransactionHistory.customer_id)
+            .filter(TransactionHistory.user_id == user_id)
+        )
+        sq = (q or "").strip()
+        if sq:
+            like = f"%{sq}%"
+            qry = qry.filter(
+                or_(
+                    Customer.name.ilike(like),
+                    cast(TransactionHistory.amount, String).ilike(like),
+                    TransactionHistory.note.ilike(like),
+                )
+            )
+        return qry.order_by(TransactionHistory.logged_at.desc()).limit(limit).all()
+    finally:
+        db.close()
+
+
+def action_tx_history_dismiss(user_id: int, history_id: int) -> str | None:
+    db = SessionLocal()
+    try:
+        h = (
+            db.query(TransactionHistory)
+            .filter(TransactionHistory.id == history_id, TransactionHistory.user_id == user_id)
+            .first()
+        )
+        if not h:
+            return "السجل غير موجود."
+        db.delete(h)
+        db.commit()
+        return None
+    except Exception as e:
+        db.rollback()
+        return str(e)[:200]
+    finally:
+        db.close()
+
+
+def action_tx_history_restore(user_id: int, history_id: int) -> str | None:
+    db = SessionLocal()
+    try:
+        h = (
+            db.query(TransactionHistory)
+            .filter(TransactionHistory.id == history_id, TransactionHistory.user_id == user_id)
+            .first()
+        )
+        if not h:
+            return "السجل غير موجود."
+        cust = (
+            db.query(Customer)
+            .filter(Customer.id == h.customer_id, Customer.user_id == user_id)
+            .first()
+        )
+        if not cust:
+            return "لم يعد العميل موجوداً — لا يمكن الاستعادة."
+
+        if h.event_type == "deleted":
+            t = CustomerTransaction(
+                customer_id=h.customer_id,
+                amount=h.amount,
+                kind=h.kind,
+                note=h.note,
+                photo_file_id=h.photo_file_id,
+            )
+            t.created_at = h.txn_created_at
+            db.add(t)
+            db.flush()
+            tid = t.id
+            db.delete(h)
+            db.commit()
+            tt = db.query(CustomerTransaction).filter(CustomerTransaction.id == tid).first()
+            if tt:
+                maybe_queue_partner_tx(db, tt)
+            return None
+
+        if h.event_type == "edited_before":
+            tx = db.query(CustomerTransaction).filter(CustomerTransaction.id == h.ref_tx_id).first()
+            if not tx:
+                db.delete(h)
+                db.commit()
+                return "المعاملة الأصلية لم تعد موجودة — أُزيل السجل."
+            tx.amount = h.amount
+            tx.kind = h.kind
+            tx.note = h.note
+            tx.photo_file_id = h.photo_file_id
+            tx.created_at = h.txn_created_at
+            db.delete(h)
+            db.commit()
+            return None
+
+        return "نوع سجل غير معروف."
+    except Exception as e:
+        db.rollback()
+        return str(e)[:200]
     finally:
         db.close()
 

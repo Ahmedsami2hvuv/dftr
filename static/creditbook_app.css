@@ -999,6 +999,119 @@ button.cust-search-clear-inline:hover {
 .btn-tx-toggle-kind {
   margin-top: 0 !important;
 }
+
+/* حسابي — سجل الحذف/التعديل (منزلق + بحث فوري) */
+.acct-txhist-details {
+  margin: 0 0 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  overflow: hidden;
+}
+.acct-txhist-summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 800;
+  font-size: 1rem;
+  color: #0f172a;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.acct-txhist-summary::-webkit-details-marker {
+  display: none;
+}
+.acct-txhist-summary-hint {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+.acct-txhist-body {
+  padding: 0 12px 12px;
+}
+.acct-txhist-q {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 11px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-size: 16px;
+  font-family: inherit;
+}
+.acct-txhist-list {
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.acct-txhist-row {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+.acct-txhist-row:last-child {
+  margin-bottom: 0;
+}
+.acct-txhist-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 6px;
+}
+.acct-txhist-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.acct-txhist-badge-del {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.acct-txhist-badge-edit {
+  background: #e0f2fe;
+  color: #075985;
+}
+.acct-txhist-cust {
+  font-weight: 800;
+  color: #0f172a;
+}
+.acct-txhist-meta {
+  font-size: 0.9rem;
+  color: #475569;
+  margin-bottom: 4px;
+}
+.acct-txhist-note {
+  font-size: 0.88rem;
+  color: #334155;
+  margin: 6px 0 8px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.acct-txhist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.acct-txhist-form {
+  display: inline;
+  margin: 0;
+}
+.acct-txhist-btn {
+  margin-top: 0 !important;
+  padding: 7px 12px !important;
+  font-size: 0.88rem !important;
+}
+.acct-txhist-empty {
+  margin: 4px 0 0 !important;
+}
+
 .share-toolbar {
   flex-direction: column;
   align-items: stretch;
