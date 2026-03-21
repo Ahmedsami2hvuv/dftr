@@ -1520,23 +1520,45 @@ def _format_tx_amount(amount) -> str:
         return str(amount)
 
 
-def _photo_arg_for_telegram_send(photo_file_id: str | None):
-    """file_id من تيليجرام، أو InputFile لصور المرفوعة من الموقع (web:…)."""
+def _web_public_base_for_bot_photo() -> bool:
+    """رابط عام يصل إليه خوادم تيليجرام (ليس localhost)."""
+    u = (WEB_BASE_URL or "").strip().lower()
+    if not u.startswith(("http://", "https://")):
+        return False
+    if "localhost" in u or "127.0.0.1" in u or "[::1]" in u:
+        return False
+    return True
+
+
+def _local_input_file_for_web_photo(p, name: str):
+    try:
+        from telegram import FSInputFile
+
+        return FSInputFile(p)
+    except ImportError:
+        return InputFile(BytesIO(p.read_bytes()), filename=name)
+
+
+def _photo_args_for_telegram_send(photo_file_id: str | None) -> list:
+    """قائمة مرشّحات لـ send_photo: file_id، أو رابط HTTPS للصورة، أو ملف محلي."""
     if not photo_file_id:
-        return None
+        return []
     s = str(photo_file_id)
     if not s.startswith("web:"):
-        return s
-    # تأجيل الاستيراد لتجنب دائرة مع creditbook_web_actions
+        return [s]
     from creditbook_web_actions import is_safe_web_photo_name
 
     name = s[4:]
     if not is_safe_web_photo_name(name):
-        return None
+        return []
     p = WEB_TX_UPLOAD_DIR / name
-    if not p.is_file():
-        return None
-    return InputFile(BytesIO(p.read_bytes()), filename=name)
+    out = []
+    # خوادم تيليجرام تجلب الصورة من هذا المسار (يعمل مع Docker حتى لو البوت لا يرى الملف محلياً)
+    if _web_public_base_for_bot_photo():
+        out.append(f"{WEB_BASE_URL.rstrip('/')}/creditbook/photo/{quote(s, safe='')}")
+    if p.is_file():
+        out.append(_local_input_file_for_web_photo(p, name))
+    return out
 
 
 async def _render_tx_detail(db, tx: CustomerTransaction):
@@ -1596,16 +1618,22 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
             return
         text, keyboard = await _render_tx_detail(db, tx)
         # نعرض التفاصيل أولاً، ثم الأزرار برسالة منفصلة (حسب طلب المستخدم).
-        photo_arg = _photo_arg_for_telegram_send(getattr(tx, "photo_file_id", None))
-        if photo_arg is not None:
-            await context.bot.send_photo(
-                chat_id=update.effective_user.id,
-                photo=photo_arg,
-                caption=text,
-            )
-        else:
+        photo_args = _photo_args_for_telegram_send(getattr(tx, "photo_file_id", None))
+        sent_photo = False
+        for photo_arg in photo_args:
+            try:
+                await context.bot.send_photo(
+                    chat_id=update.effective_user.id,
+                    photo=photo_arg,
+                    caption=text,
+                )
+                sent_photo = True
+                break
+            except Exception:
+                continue
+        if not sent_photo:
             if getattr(tx, "photo_file_id", None) and str(tx.photo_file_id).startswith("web:"):
-                text = text + "\n\n⚠️ الصورة المرفقة من الموقع غير متاحة على هذا السيرفر."
+                text = text + "\n\n⚠️ الصورة المرفقة من الموقع غير متاحة (تحقق من رابط الموقع أو الملف على السيرفر)."
             await context.bot.send_message(
                 chat_id=update.effective_user.id,
                 text=text,
