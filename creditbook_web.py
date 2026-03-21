@@ -23,7 +23,7 @@ SESSION_COOKIE = "dftr_web"
 SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=3"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=4"
 
 
 def _html_escape(s: str) -> str:
@@ -269,7 +269,7 @@ def wrap_creditbook_app_shell(
                 <img class='brand-logo-sm' src="{_html_escape(brand_img)}" width='48' height='48' alt=''/>
                 <span class='sidebar-brand-txt'>دفتر الديون</span>
               </a>
-              <p class='sidebar-user'>{disp}</p>
+              <p class='sidebar-user'><span class='sidebar-user-name'>{disp}</span></p>
               <nav class='sidebar-nav'>
                 <a class='sidebar-link{acc_active} sidebar-close-link' href='/creditbook/account'>حسابي</a>
                 <a class='sidebar-link sidebar-link-logout sidebar-close-link' href='/creditbook/logout_confirm'>تسجيل الخروج</a>
@@ -291,11 +291,28 @@ def wrap_creditbook_app_shell(
           var openBtn = document.getElementById('sidebar-menu-btn');
           var closeBtn = document.getElementById('sidebar-close-btn');
           function setOpen(on) {{
-            if (on) {{ b.classList.add('sidebar-open'); scrim.hidden = false; if(openBtn) openBtn.setAttribute('aria-expanded','true'); if(side) {{ side.setAttribute('aria-hidden','false'); }} }}
-            else {{ b.classList.remove('sidebar-open'); scrim.hidden = true; if(openBtn) openBtn.setAttribute('aria-expanded','false'); if(side) {{ side.setAttribute('aria-hidden','true'); }} }}
+            if (on) {{
+              b.classList.add('sidebar-open');
+              if (scrim) scrim.hidden = false;
+              if (openBtn) openBtn.setAttribute('aria-expanded','true');
+              if (side) side.setAttribute('aria-hidden','false');
+            }} else {{
+              b.classList.remove('sidebar-open');
+              if (scrim) scrim.hidden = true;
+              if (openBtn) openBtn.setAttribute('aria-expanded','false');
+              if (side) side.setAttribute('aria-hidden','true');
+            }}
           }}
-          if (openBtn) openBtn.addEventListener('click', function() {{ setOpen(!b.classList.contains('sidebar-open')); }});
-          if (closeBtn) closeBtn.addEventListener('click', function() {{ setOpen(false); }});
+          if (openBtn) openBtn.addEventListener('click', function(e) {{
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(!b.classList.contains('sidebar-open'));
+          }});
+          if (closeBtn) closeBtn.addEventListener('click', function(e) {{
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(false);
+          }});
           if (scrim) scrim.addEventListener('click', function() {{ setOpen(false); }});
           var links = document.querySelectorAll('.sidebar-close-link');
           for (var i = 0; i < links.length; i++) {{
@@ -348,7 +365,7 @@ def render_account_page(
           <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
           <div class='brand-text-wrap'>
             <h2>حسابي</h2>
-            <p class='brand-subtitle'>اسم المستخدم: {_html_escape(user.full_name or user.username or "—")}</p>
+            <p class='brand-user-name'>{_html_escape(user.full_name or user.username or "—")}</p>
           </div>
         </div>
         {render_owner_showcase_card(user)}
@@ -537,14 +554,23 @@ def render_dashboard_html(
       </div>
     </div>
     """
+    tot_gave, tot_took, tot_net = load_dashboard_aggregate_totals(user.id)
+    net_class = "bal-red" if tot_net > 0 else ("bal-green" if tot_net < 0 else "")
     uname = _html_escape(user.full_name or user.username or "مستخدم")
     card = f"""
-          <div class='brand-header share-report-head'>
-            <div class='brand'>
-              <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
-              <div class='brand-text-wrap'>
-                <h2>دفتر الديون</h2>
-                <p class='brand-subtitle'>اسم المستخدم: {uname}</p>
+          <div class='brand-header share-report-head cust-page-head'>
+            <div class='cust-head-left'>
+              <div class='brand'>
+                <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
+                <div class='brand-text-wrap'>
+                  <h2>دفتر الديون</h2>
+                  <p class='brand-user-name'>{uname}</p>
+                </div>
+              </div>
+              <div class='cust-head-stats dashboard-totals' role='group' aria-label='إجمالي كل العملاء'>
+                <div class='cust-stat-line'><span class='cust-stat-lbl'>أخذت الكلي</span><span class='cust-stat-val bal-red'>{_amount_to_str(tot_took)} د.ع.</span></div>
+                <div class='cust-stat-line'><span class='cust-stat-lbl'>أعطيت الكلي</span><span class='cust-stat-val bal-green'>{_amount_to_str(tot_gave)} د.ع.</span></div>
+                <div class='cust-stat-line'><span class='cust-stat-lbl'>النتيجة</span><span class='cust-stat-val {net_class}'>{_amount_to_str(tot_net)} د.ع.</span></div>
               </div>
             </div>
             {render_owner_showcase_card(user)}
@@ -689,7 +715,6 @@ def render_owner_customer_page(
           <button type='button' class='btn btn-primary btn-manage-cust' onclick="document.getElementById('cust-manage-panel').classList.toggle('hidden');">
             ⚙️ إدارة العميل — تعديل أو حذف
           </button>
-          <p class='hint cust-manage-hint'>اضغط لفتح نموذج تعديل الاسم والهاتف أو حذف العميل نهائياً</p>
         </div>
         <div id='cust-manage-panel' class='hidden web-section cust-manage-panel'>
           <h3 class='web-h3'>تعديل بيانات العميل</h3>
@@ -764,7 +789,7 @@ def render_owner_customer_page(
                     <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
                     <div class='brand-text-wrap'>
                       <h2>دفتر الديون</h2>
-                      <p class='brand-subtitle'>اسم المستخدم: {owner_disp}</p>
+                      <p class='brand-user-name'>{owner_disp}</p>
                     </div>
                   </div>
                   <div class='cust-head-stats' role='group' aria-label='إجماليات العميل'>
@@ -850,7 +875,7 @@ def render_tx_edit_page(
                   <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
                   <div class='brand-text-wrap'>
                     <h2>تعديل معاملة</h2>
-                    <p class='brand-subtitle'>اسم المستخدم: {owner_disp}</p>
+                    <p class='brand-user-name'>{owner_disp}</p>
                   </div>
                 </div>
                 {render_owner_showcase_card(user)}
@@ -933,5 +958,30 @@ def load_dashboard_rows(user_id: int) -> list[tuple[Customer, float]]:
             took = sum(float(t.amount or 0) for t in c.transactions if t.kind == "took")
             out.append((c, gave - took))
         return out
+    finally:
+        db.close()
+
+
+def load_dashboard_aggregate_totals(user_id: int) -> tuple[float, float, float]:
+    """إجمالي أعطيت / أخذت / النتيجة لجميع عملاء المستخدم."""
+    from sqlalchemy import func
+
+    db = SessionLocal()
+    try:
+        gave_sum = (
+            db.query(func.coalesce(func.sum(CustomerTransaction.amount), 0))
+            .join(Customer, Customer.id == CustomerTransaction.customer_id)
+            .filter(Customer.user_id == user_id, CustomerTransaction.kind == "gave")
+            .scalar()
+        )
+        took_sum = (
+            db.query(func.coalesce(func.sum(CustomerTransaction.amount), 0))
+            .join(Customer, Customer.id == CustomerTransaction.customer_id)
+            .filter(Customer.user_id == user_id, CustomerTransaction.kind == "took")
+            .scalar()
+        )
+        g = float(gave_sum or 0)
+        t = float(took_sum or 0)
+        return (g, t, g - t)
     finally:
         db.close()
