@@ -575,24 +575,36 @@ form.login-form { margin-top: 8px; }
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
-  margin: 6px 0 8px;
+  margin: 0.25rem 0 0.5rem;
   justify-content: space-between;
+}
+.page-dashboard .dashboard-cust-heading-row {
+  margin: 0.15rem 0 0.45rem;
 }
 .dashboard-cust-title {
   margin: 0 !important;
+}
+.hint-dashboard-note {
+  margin: 0.35rem 0 0.45rem !important;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.page-dashboard .new-cust-block {
+  margin-top: 0.35rem;
+  margin-bottom: 0.55rem;
 }
 .dashboard-search-inline {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  flex: 1 1 200px;
+  flex: 1 1 220px;
   min-width: 0;
   justify-content: flex-end;
 }
 .dashboard-search-field-wrap {
   position: relative;
-  flex: 1 1 140px;
+  flex: 1 1 160px;
   min-width: 0;
   display: block;
 }
@@ -600,16 +612,16 @@ form.login-form { margin-top: 8px; }
 .dashboard-search-field-wrap .dash-search-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 7px 10px;
-  padding-inline-end: 38px;
+  padding: 8px 11px;
+  padding-inline-end: 40px;
   border-radius: 10px;
   border: 1px solid #cbd5e1;
-  font-size: 14px;
+  font-size: 15px;
   font-family: inherit;
 }
 .dash-search-clear-inline {
   position: absolute;
-  inset-inline-end: 4px;
+  inset-inline-end: 5px;
   top: 50%;
   transform: translateY(-50%);
   width: 28px;
@@ -617,10 +629,10 @@ form.login-form { margin-top: 8px; }
   margin: 0;
   padding: 0;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #e2e8f0;
   color: #475569;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -640,10 +652,10 @@ form.login-form { margin-top: 8px; }
   display: none !important;
 }
 .dash-scope-select {
-  padding: 6px 10px;
+  padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid #cbd5e1;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   font-family: inherit;
   background: #fff;
@@ -706,10 +718,6 @@ form.login-form { margin-top: 8px; }
 }
 .btn-cust-share {
   margin-top: 0 !important;
-}
-.search-hint {
-  margin-top: 0;
-  margin-bottom: 10px;
 }
 .visually-hidden {
   position: absolute;
@@ -844,7 +852,7 @@ form.login-form { margin-top: 8px; }
   align-items: center;
   justify-content: flex-start;
 }
-/* تصفية معاملات العميل — فورية بدون زر إرسال */
+/* بحث داخل صفحة العميل — تصفية المعاملات */
 .cust-tx-search {
   display: flex;
   flex-wrap: wrap;
@@ -859,35 +867,35 @@ form.login-form { margin-top: 8px; }
 }
 .cust-search-field-wrap {
   position: relative;
-  flex: 1 1 180px;
+  flex: 1 1 200px;
   min-width: 0;
   display: block;
 }
 .cust-search-field-wrap input[type="search"] {
   width: 100%;
   box-sizing: border-box;
-  padding: 7px 10px;
-  border-radius: 10px;
+  padding: 11px 14px;
+  border-radius: 12px;
   border: 1px solid #cbd5e1;
-  font-size: 14px;
+  font-size: 16px;
   font-family: inherit;
 }
 .cust-search-field-wrap--has-clear input[type="search"] {
-  padding-inline-end: 38px;
+  padding-inline-end: 44px;
 }
 a.cust-search-clear-inline {
   position: absolute;
-  inset-inline-end: 4px;
+  inset-inline-end: 6px;
   top: 50%;
   transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: #e2e8f0;
   color: #475569 !important;
   font-size: 1rem;
   font-weight: 700;
-  line-height: 28px;
+  line-height: 32px;
   text-align: center;
   text-decoration: none !important;
   transition: background 0.15s ease, color 0.15s ease;
@@ -895,6 +903,10 @@ a.cust-search-clear-inline {
 a.cust-search-clear-inline:hover {
   background: #cbd5e1;
   color: #0f172a !important;
+}
+.btn-cust-search-submit {
+  margin-top: 0 !important;
+  flex: 0 0 auto;
 }
 /* صفحة تعديل المعاملة — نوع المعاملة + زر التغيير */
 .tx-kind-edit-row {
@@ -1338,28 +1350,48 @@ button.sidebar-link.sidebar-install-btn {
     order: -1;
     max-width: 100%;
   }
-  /* لوحة + تقرير: صف واحد تقريباً كصفحة الفاتورة — العنوان سطر، ثم إحصائيات | صنع بواسطة جنباً إلى جنب */
-  .dashboard-head {
-    flex-direction: row;
-    flex-wrap: wrap;
+  /* لوحة + تقرير + عميل: شبكة — العلامة سطر كامل، ثم صف من عمودين: إحصائيات | صنع بواسطة */
+  .page-dashboard .brand-header.dashboard-head,
+  .page-report .brand-header.dashboard-head,
+  .page-cust .brand-header.dashboard-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 8px;
     align-items: stretch;
-    gap: 10px;
   }
-  .dashboard-head .dashboard-brand-col {
-    flex: 1 1 100%;
-    width: 100%;
+  .page-dashboard .dashboard-head .dashboard-brand-col,
+  .page-report .dashboard-head .dashboard-brand-col,
+  .page-cust .dashboard-head .dashboard-brand-col {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100% !important;
+    max-width: none !important;
+    flex: none !important;
   }
-  .dashboard-head .cust-head-stats.dashboard-stats-col {
-    flex: 1 1 calc(50% - 6px);
+  .page-dashboard .dashboard-head .cust-head-stats,
+  .page-report .dashboard-head .cust-head-stats,
+  .page-cust .dashboard-head .cust-head-stats {
+    grid-column: 1;
+    grid-row: 2;
+    max-width: none !important;
     min-width: 0;
-    max-width: calc(50% - 6px);
+    width: 100%;
+    flex: none !important;
+    margin-top: 0 !important;
     box-sizing: border-box;
   }
-  .dashboard-head .dashboard-showcase-col {
-    flex: 1 1 calc(50% - 6px);
+  .page-dashboard .dashboard-head .dashboard-showcase-col,
+  .page-report .dashboard-head .dashboard-showcase-col,
+  .page-cust .dashboard-head .dashboard-showcase-col {
+    grid-column: 2;
+    grid-row: 2;
+    max-width: none !important;
     min-width: 0;
-    max-width: calc(50% - 6px);
+    width: 100%;
+    flex: none !important;
     align-self: stretch;
+    box-sizing: border-box;
   }
   .dashboard-head .owner-showcase {
     order: unset;
@@ -1386,12 +1418,6 @@ button.sidebar-link.sidebar-install-btn {
     font-size: 0.78rem;
     padding: 5px 9px;
     align-self: flex-start;
-  }
-  .page-cust .dashboard-head .cust-head-stats {
-    max-width: calc(50% - 6px);
-  }
-  .page-cust .dashboard-head .dashboard-showcase-col {
-    max-width: calc(50% - 6px);
   }
   /* صفحة عميل على الجوال: إخفاء صاحب الحساب ورقم الهاتف، الإبقاء على العنوان واسم العميل */
   .page-cust .brand-user-name,

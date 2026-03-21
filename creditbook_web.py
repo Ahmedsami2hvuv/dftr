@@ -767,10 +767,9 @@ def render_dashboard_html(
     uname = _html_escape(owner_display_name_for_user(user))
     q_esc = _html_escape(search_q or "")
     sel = lambda v: " selected" if sc == v else ""
-    q_hint = "<p class='hint search-hint' id='search-hint-line' hidden>تصفية فورية أثناء الكتابة.</p>"
     clear_search = (
         "<button type='button' class='dash-search-clear-inline' id='dash-q-clear' hidden "
-        "aria-label='مسح النص' title='مسح'>✕</button>"
+        "aria-label='مسح' title='مسح'>✕</button>"
     )
     card = f"""
           <div class='brand-header share-report-head dashboard-head'>
@@ -789,8 +788,7 @@ def render_dashboard_html(
             </div>
           </div>
           {flash_html}
-          <p class='hint'>إدارة العملاء والمعاملات من المتصفح أو من البوت.</p>
-          {q_hint}
+          <p class='hint hint-dashboard-note'>إدارة العملاء والمعاملات من المتصفح أو من البوت.</p>
           {add_form}
           <div class='dashboard-cust-heading-row'>
             <h3 class='web-h3 dashboard-cust-title'>📋 عملائي</h3>
@@ -813,7 +811,6 @@ def render_dashboard_html(
             var inp = document.getElementById('dash-q');
             var list = document.getElementById('cust-list');
             var clr = document.getElementById('dash-q-clear');
-            var hint = document.getElementById('search-hint-line');
             var scopeEl = document.getElementById('dash-scope');
             if (!inp || !list) return;
             var t = null;
@@ -821,7 +818,6 @@ def render_dashboard_html(
             function showClear() {{
               var v = (inp.value || '').trim();
               if (clr) clr.hidden = !v;
-              if (hint) hint.hidden = !v;
             }}
             function load() {{
               var q = (inp.value || '').trim();
@@ -926,7 +922,7 @@ def render_report_all_transactions_page(
     if ds_raw:
         filter_hint.append(f"يوم {_html_escape(ds_raw)}")
     if sq_raw:
-        filter_hint.append(f"بحث: {_html_escape(sq_raw)}")
+        filter_hint.append(f"تصفية: {_html_escape(sq_raw)}")
     if af == "high":
         filter_hint.append("ترتيب: المبلغ الأكبر أولاً")
     elif af == "low":
@@ -982,7 +978,7 @@ def render_report_all_transactions_page(
                 <p class='hint report-date-hint' dir='rtl'>إظهار معاملات هذا اليوم فقط (حسب وقت التسجيل في الدفتر).</p>
               </div>
               <div class='report-search-wrap'>
-                <label for='rep-sq'>بحث في التقرير</label>
+                <label for='rep-sq'>تصفية النتائج</label>
                 <input type='search' id='rep-sq' name='sq' value='{sq_esc}' placeholder='اسم عميل، ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
                 <p class='hint'>تصفية الصفوف المعروضة حسب الاسم أو الملاحظة أو المبلغ.</p>
               </div>
@@ -1264,13 +1260,13 @@ def render_owner_customer_page(
 
         net_line = f"{_amount_to_str(bal)} د.ع."
         empty_tx_hint = (
-            "<p class='hint'>لا توجد معاملات مطابقة للبحث.</p>"
+            "<p class='hint'>لا توجد معاملات مطابقة.</p>"
             if sq and not tx_rows
             else ('<p class="hint">لا توجد معاملات بعد.</p>' if not tx_rows else "")
         )
         clear_in_field = (
             f"<a class='cust-search-clear-inline' href='/creditbook/customer/{cust.id}' "
-            f"aria-label='مسح النص' title='مسح'>✕</a>"
+            f"aria-label='مسح' title='مسح'>✕</a>"
             if sq
             else ""
         )
@@ -1281,6 +1277,7 @@ def render_owner_customer_page(
                   <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
                   {clear_in_field}
                 </div>
+                <button type='submit' class='btn btn-secondary btn-cust-search-submit'>تطبيق</button>
               </form>
         """
 
@@ -1525,7 +1522,7 @@ def render_dashboard_customer_rows_html(
         )
     if not rows:
         if (q or "").strip():
-            return "<p class='hint'>لا يوجد عملاء مطابقين للبحث.</p>"
+            return "<p class='hint'>لا يوجد عملاء مطابقين.</p>"
         return "<p class='hint'>لا يوجد عملاء بعد — اضغط «عميل جديد» لإضافة أول عميل.</p>"
     return "".join(rows)
 
