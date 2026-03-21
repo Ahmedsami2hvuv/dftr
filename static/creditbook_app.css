@@ -507,12 +507,12 @@ form.login-form { margin-top: 8px; }
 
 .brand-text-wrap { min-width: 0; }
 .brand-text-wrap h2 { margin: 0; }
-.brand-h2-with-cust .brand-cust-inline {
-  -webkit-text-fill-color: #0f172a;
-  color: #0f172a;
+.brand-cust-name-line {
+  margin: 6px 0 0;
+  font-size: clamp(1.02rem, 3.1vw, 1.22rem);
   font-weight: 800;
-  font-size: clamp(0.82rem, 3.1vw, 1.02rem);
-  letter-spacing: 0;
+  color: #0f172a;
+  line-height: 1.35;
 }
 .brand-cust-phone {
   margin: 4px 0 0;
@@ -836,6 +836,34 @@ form.login-form { margin-top: 8px; }
   margin-top: 0 !important;
   flex: 0 0 auto;
 }
+/* صفحة تعديل المعاملة — نوع المعاملة + زر التغيير */
+.tx-kind-edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+.tx-kind-edit-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.tx-kind-current {
+  font-size: 1.05rem;
+}
+.tx-kind-toggle-form {
+  margin: 0;
+}
+.btn-tx-toggle-kind {
+  margin-top: 0 !important;
+}
 .share-toolbar {
   flex-direction: column;
   align-items: stretch;
@@ -877,13 +905,14 @@ form.login-form { margin-top: 8px; }
 .cust-stat-line {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: baseline;
-  gap: 12px;
+  gap: 0.35rem 0.55rem;
+  flex-wrap: wrap;
   font-size: 0.98rem;
 }
-.cust-stat-lbl { font-weight: 700; color: #334155; }
-.cust-stat-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+.cust-stat-lbl { font-weight: 700; color: #334155; flex: 0 0 auto; }
+.cust-stat-val { font-weight: 800; font-variant-numeric: tabular-nums; flex: 0 1 auto; }
 .cust-line-identity {
   margin-top: 10px;
   font-size: 1.05rem;
@@ -1303,6 +1332,11 @@ button.sidebar-link.sidebar-install-btn {
   }
   .page-cust .dashboard-head .dashboard-showcase-col {
     max-width: calc(50% - 6px);
+  }
+  /* صفحة عميل على الجوال: إخفاء صاحب الحساب ورقم الهاتف، الإبقاء على العنوان واسم العميل */
+  .page-cust .brand-user-name,
+  .page-cust .brand-cust-phone {
+    display: none !important;
   }
   .brand-header { flex-direction: column; align-items: stretch; }
   .brand { justify-content: center; }

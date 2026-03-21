@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=14"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=15"
 
 
 def _html_escape(s: str) -> str:
@@ -229,7 +229,7 @@ def owner_display_name_for_user(user: User | None, *, empty: str = "مستخدم
 def _brand_home_block(brand_img: str, user_name_display_esc: str) -> str:
     """الشعار + عنوان دفتر الديون + اسم صاحب الحساب — النقر يعيد للوحة الرئيسية."""
     return (
-        f"<a class='brand-home-link' href='/creditbook/dashboard'>"
+        f"<a class='brand-home-link' href='/creditbook/dashboard' title='العودة إلى قائمة العملاء' aria-label='العودة إلى قائمة العملاء'>"
         f"<img class='brand-logo' src=\"{_html_escape(brand_img)}\" width='64' height='64' alt=''/>"
         f"<div class='brand-text-wrap'>"
         f"<h2>{_html_escape('دفتر الديون')}</h2>"
@@ -244,19 +244,19 @@ def _brand_customer_block(
     cust_name_esc: str,
     phone_local_display: str,
 ) -> str:
-    """صفحة عميل: دفتر الديون + اسم العميل في السطر نفسه، ثم صاحب الحساب، ثم الهاتف فقط إن وُجد."""
+    """صفحة عميل: دفتر الديون ← صاحب الحساب ← اسم العميل ← الهاتف (يُخفى الهاتف وصاحب الحساب على الجوال بالـ CSS)."""
     phone_html = ""
     if (phone_local_display or "").strip():
         phone_html = (
             f"<p class='brand-cust-phone' dir='ltr'>📞 {_html_escape(phone_local_display.strip())}</p>"
         )
     return (
-        f"<a class='brand-home-link' href='/creditbook/dashboard'>"
-        f"<img class='brand-logo' src=\"{_html_escape(brand_img)}\" width='64' height='64' alt=''/>"
+        f"<a class='brand-home-link' href='/creditbook/dashboard' title='العودة إلى قائمة العملاء' aria-label='العودة إلى قائمة العملاء'>"
+        f"<img class='brand-logo' src=\"{_html_escape(brand_img)}\" width='64' height='64' alt='دفتر الديون'/>"
         f"<div class='brand-text-wrap'>"
-        f"<h2 class='brand-h2-with-cust'>{_html_escape('دفتر الديون')}"
-        f"<span class='brand-cust-inline'> — {cust_name_esc}</span></h2>"
+        f"<h2 class='brand-h2-title'>{_html_escape('دفتر الديون')}</h2>"
         f"<p class='brand-user-name'>{owner_disp_esc}</p>"
+        f"<p class='brand-cust-name-line'>{cust_name_esc}</p>"
         f"{phone_html}"
         f"</div></a>"
     )
@@ -419,7 +419,7 @@ def wrap_creditbook_app_shell(
           <aside class='app-sidebar' id='app-sidebar' aria-label='القائمة' aria-hidden='true'>
             <div class='sidebar-inner'>
               <button type='button' class='sidebar-close-btn' id='sidebar-close-btn' title='إغلاق'>✕</button>
-              <a class='sidebar-brand sidebar-close-link' href='/creditbook/dashboard' title='العملاء'>
+              <a class='sidebar-brand sidebar-close-link' href='/creditbook/dashboard' title='الرئيسية — قائمة العملاء'>
                 <img class='brand-logo-sm' src="{_html_escape(brand_img)}" width='48' height='48' alt=''/>
                 <span class='sidebar-brand-txt'>دفتر الديون</span>
               </a>
@@ -601,7 +601,7 @@ def render_feedback_page(
         </form>
       </div>
       <div class='toolbar'>
-        <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
+        <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ رجوع لـ العملاء</a>
       </div>
     """
     return wrap_creditbook_app_shell(
@@ -954,7 +954,7 @@ def render_report_all_transactions_page(
             </div>
           </div>
           <div class='toolbar'>
-            <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
+            <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ رجوع لـ العملاء</a>
           </div>
           <h3 class='web-h3'>📊 تقرير — جميع المعاملات</h3>
           <form class='report-filters web-section' method='get' action='/creditbook/report'>
@@ -1209,7 +1209,7 @@ def render_owner_customer_page(
             <h3 class='web-h3'>حذف العميل نهائياً</h3>
             <p class='hint' style='margin-top:0'>يُحذف العميل وجميع معاملاته ولا يمكن التراجع.</p>
             <form method='post' action='/creditbook/customer/{cust.id}/delete' class='stack-form'
-                  onsubmit="return confirm('حذف العميل وجميع معاملاته؟ لا يمكن التراجع.');">
+                  onsubmit="return confirm('هل أنت متأكد؟ سيتم حذف هذا العميل وجميع معاملاته نهائياً ولا يمكن التراجع.');">
               <input type='hidden' name='csrf' value='{_html_escape(csrf_d)}'/>
               <button type='submit' class='btn btn-danger'>حذف هذا العميل</button>
             </form>
@@ -1296,7 +1296,7 @@ def render_owner_customer_page(
                 </div>
               </div>
               <div class='toolbar toolbar-cust-top'>
-                <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
+                <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ رجوع لـ العملاء</a>
                 <a class='btn btn-primary btn-cust-share' href='/creditbook/customer/{cust.id}/share'>📤 مشاركة</a>
                 <button type='button' class='btn btn-secondary btn-manage-compact' onclick="var p=document.getElementById('cust-manage-panel'); if(p){{ p.classList.toggle('hidden'); if(!p.classList.contains('hidden')) p.scrollIntoView({{behavior:'smooth',block:'nearest'}}); }}">✎ تعديل العميل</button>
               </div>
@@ -1369,20 +1369,32 @@ def render_tx_edit_page(
         inner = f"""
               <div class='brand-header share-report-head'>
                 <div class='brand'>
-                  <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
-                  <div class='brand-text-wrap'>
-                    <h2>تعديل معاملة</h2>
-                    <p class='brand-user-name'>{owner_disp}</p>
-                  </div>
+                  <a class='brand-home-link' href='/creditbook/dashboard' title='العودة إلى قائمة العملاء' aria-label='العودة إلى قائمة العملاء'>
+                    <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt='دفتر الديون'/>
+                    <div class='brand-text-wrap'>
+                      <h2>تعديل معاملة</h2>
+                      <p class='brand-user-name'>{owner_disp}</p>
+                    </div>
+                  </a>
                 </div>
                 {render_owner_showcase_card(user)}
               </div>
               <div class='toolbar'>
-                <a class='btn btn-secondary' href='{cust_link}'>◀ {_html_escape(cust.name)}</a>
-                <a class='btn btn-secondary' href='/creditbook/dashboard'>العملاء</a>
+                <a class='btn btn-secondary' href='{cust_link}'>◀ رجوع لـ العميل</a>
+                <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ رجوع لـ العملاء</a>
               </div>
               {flash_html}
-              <p class='hint'>النوع الحالي: <strong>{kind_ar}</strong></p>
+              <div class='tx-kind-edit-row'>
+                <div class='tx-kind-edit-label'>
+                  <span class='hint' style='margin:0'>نوع المعاملة:</span>
+                  <strong class='tx-kind-current'>{kind_ar}</strong>
+                </div>
+                <form method='post' action='/creditbook/tx/{tx_id}/toggle_kind' class='tx-kind-toggle-form'
+                      onsubmit="return confirm('هل أنت متأكد من تغيير نوع المعاملة بين أعطيت وأخذت؟');">
+                  <input type='hidden' name='csrf' value='{_html_escape(csrf_k)}'/>
+                  <button type='submit' class='btn btn-secondary btn-tx-toggle-kind'>🔁 تغيير النوع</button>
+                </form>
+              </div>
               {cur_photo}
               <div class='web-section'>
                 <form method='post' action='/creditbook/tx/{tx_id}/update' class='stack-form' enctype='multipart/form-data'>
@@ -1399,22 +1411,17 @@ def render_tx_edit_page(
                   <button type='submit' class='btn btn-primary'>حفظ التعديلات</button>
                 </form>
               </div>
-              <div class='web-section'>
-                <form method='post' action='/creditbook/tx/{tx_id}/toggle_kind' class='stack-form'
-                      onsubmit="return confirm('تأكيد عكس نوع المعاملة (أعطيت ↔ أخذت)؟');">
-                  <input type='hidden' name='csrf' value='{_html_escape(csrf_k)}'/>
-                  <button type='submit' class='btn btn-secondary'>🔁 عكس النوع (أعطيت / أخذت)</button>
-                </form>
-              </div>
               <div class='web-section web-danger'>
                 <form method='post' action='/creditbook/tx/{tx_id}/delete' class='stack-form'
-                      onsubmit="return confirm('حذف هذه المعاملة نهائياً؟');">
+                      onsubmit="return confirm('هل أنت متأكد من حذف هذه المعاملة نهائياً؟ لا يمكن التراجع.');">
                   <input type='hidden' name='csrf' value='{_html_escape(csrf_x)}'/>
                   <button type='submit' class='btn btn-danger'>🗑 حذف المعاملة</button>
                 </form>
               </div>
         """
-        return wrap_creditbook_app_shell(user, favicon_href, brand_img, f"معاملة #{tx_id}", None, inner)
+        return wrap_creditbook_app_shell(
+            user, favicon_href, brand_img, f"معاملة #{tx_id}", None, inner, body_class="page-tx-edit"
+        )
     finally:
         db.close()
 
