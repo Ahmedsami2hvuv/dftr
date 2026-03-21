@@ -569,11 +569,11 @@ form.login-form { margin-top: 8px; }
   gap: 10px;
 }
 
-/* صفحة العميل — تقليل الفراغ الأفقي بين خانه النتيجة (إحصائيات) وبطاقة صنع بواسطة */
+/* صفحة العميل — خانه النتيجة أوضح، وبطاقة صنع بواسطة بأقصى اليسار */
 .page-cust .brand-header.share-report-head.dashboard-head.cust-page-head {
   justify-content: flex-start;
   align-items: flex-start;
-  gap: 8px 12px;
+  gap: 10px 14px;
 }
 .page-cust .cust-page-head .dashboard-brand-col {
   flex: 0 1 auto;
@@ -581,12 +581,19 @@ form.login-form { margin-top: 8px; }
 }
 .page-cust .brand-header.dashboard-head .cust-head-stats.dashboard-stats-col {
   flex: 0 0 auto;
-  max-width: min(100%, 290px);
+  min-width: min(100%, 260px);
+  max-width: min(100%, 430px);
   margin-top: 0;
+  padding: 16px 18px;
+  gap: 12px;
+}
+.page-cust .brand-header.dashboard-head .cust-head-stats.dashboard-stats-col .cust-stat-line {
+  font-size: 1.08rem;
 }
 .page-cust .cust-page-head .dashboard-showcase-col {
-  flex: 0 1 min(260px, 46vw);
+  flex: 0 1 min(240px, 44vw);
   min-width: 0;
+  margin-inline-start: auto;
 }
 
 .dashboard-tools {
@@ -1660,6 +1667,10 @@ button.sidebar-link.sidebar-install-btn {
   }
   .page-cust .dashboard-head .cust-head-stats.dashboard-stats-col {
     width: auto !important;
-    max-width: min(100%, 280px);
+    max-width: min(100%, 380px);
+    padding: 14px 16px !important;
+  }
+  .page-cust .dashboard-head .dashboard-showcase-col {
+    margin-inline-start: auto;
   }
 }
