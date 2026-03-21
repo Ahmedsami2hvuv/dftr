@@ -29,8 +29,11 @@ from creditbook_web import (
     csrf_verify,
     csrf_verify_public,
     get_user_from_cookie_header,
+    load_all_transactions_page,
     load_dashboard_rows,
     owner_display_name_for_user,
+    REPORT_PAGE_SIZE,
+    render_report_all_transactions_page,
     render_account_page,
     render_customer_share_page,
     render_dashboard_html,
@@ -721,7 +724,9 @@ class Handler(BaseHTTPRequestHandler):
             if not web_user:
                 _redirect(self, "/creditbook/login")
                 return
-            rows = load_dashboard_rows(web_user.id)
+            q_raw = (qs.get("q") or [None])[0]
+            search_q = unquote(q_raw).strip() if q_raw else None
+            rows = load_dashboard_rows(web_user.id, search_q)
             flash_key = (qs.get("flash") or [None])[0]
             err_msg = (qs.get("err") or [None])[0]
             if err_msg:
@@ -733,6 +738,28 @@ class Handler(BaseHTTPRequestHandler):
                 brand_img_src,
                 flash_key=flash_key,
                 err_msg=err_msg,
+                search_q=search_q,
+            )
+            _send_html_page(self, 200, page)
+            return
+
+        if path == "/creditbook/report":
+            if not web_user:
+                _redirect(self, "/creditbook/login")
+                return
+            o_raw = (qs.get("offset") or ["0"])[0]
+            try:
+                offset = max(0, int(o_raw))
+            except ValueError:
+                offset = 0
+            rows, has_more = load_all_transactions_page(web_user.id, offset, REPORT_PAGE_SIZE)
+            page = render_report_all_transactions_page(
+                web_user,
+                rows,
+                offset,
+                has_more,
+                favicon_href,
+                brand_img_src,
             )
             _send_html_page(self, 200, page)
             return

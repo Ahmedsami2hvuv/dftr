@@ -22,8 +22,9 @@ from utils.phone import format_phone_iq_local_display, normalize_phone, same_pho
 SESSION_COOKIE = "dftr_web"
 SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
+REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=5"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=6"
 
 
 def _html_escape(s: str) -> str:
@@ -221,6 +222,18 @@ def owner_display_name_for_user(user: User | None, *, empty: str = "مستخدم
     if un:
         return un
     return empty
+
+
+def _brand_home_block(brand_img: str, user_name_display_esc: str) -> str:
+    """الشعار + عنوان دفتر الديون + اسم صاحب الحساب — النقر يعيد للوحة الرئيسية."""
+    return (
+        f"<a class='brand-home-link' href='/creditbook/dashboard'>"
+        f"<img class='brand-logo' src=\"{_html_escape(brand_img)}\" width='64' height='64' alt=''/>"
+        f"<div class='brand-text-wrap'>"
+        f"<h2>{_html_escape('دفتر الديون')}</h2>"
+        f"<p class='brand-user-name'>{user_name_display_esc}</p>"
+        f"</div></a>"
+    )
 
 
 def render_owner_showcase_card(user: User) -> str:
@@ -539,6 +552,7 @@ def render_dashboard_html(
     brand_img: str,
     flash_key: str | None = None,
     err_msg: str | None = None,
+    search_q: str | None = None,
 ) -> str:
     uid = user.id
     csrf_c = csrf_token(uid, "cust_create")
@@ -579,22 +593,20 @@ def render_dashboard_html(
     tot_gave, tot_took, tot_net = load_dashboard_aggregate_totals(user.id)
     net_class = "bal-green" if tot_net > 0 else ("bal-red" if tot_net < 0 else "")
     uname = _html_escape(owner_display_name_for_user(user))
-    share_bot = ""
-    if BOT_USERNAME:
-        bu = BOT_USERNAME.strip().lstrip("@")
-        share_bot = (
-            f"<a class='btn btn-share-dash' href='https://t.me/{_html_escape(bu)}' "
-            f"target='_blank' rel='noopener'>📤 مشاركة من البوت</a>"
-        )
+    q_esc = _html_escape(search_q or "")
+    q_hint = (
+        "<p class='hint search-hint'>نتائج البحث — يمكنك البحث باسم العميل، الهاتف، الملاحظة، أو جزء من المبلغ.</p>"
+        if (search_q or "").strip()
+        else ""
+    )
+    clear_search = ""
+    if (search_q or "").strip():
+        clear_search = "<a class='btn btn-secondary btn-search-clear' href='/creditbook/dashboard'>مسح البحث</a>"
     card = f"""
           <div class='brand-header share-report-head dashboard-head'>
             <div class='dashboard-brand-col'>
               <div class='brand'>
-                <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
-                <div class='brand-text-wrap'>
-                  <h2>دفتر الديون</h2>
-                  <p class='brand-user-name'>{uname}</p>
-                </div>
+                {_brand_home_block(brand_img, uname)}
               </div>
             </div>
             <div class='cust-head-stats dashboard-totals dashboard-stats-col' role='group' aria-label='إجمالي كل العملاء'>
@@ -603,17 +615,108 @@ def render_dashboard_html(
                 <div class='cust-stat-line'><span class='cust-stat-lbl'>النتيجة</span><span class='cust-stat-val {net_class}'>{_amount_to_str(tot_net)} د.ع.</span></div>
             </div>
             <div class='dashboard-showcase-col'>
-              {share_bot}
               {render_owner_showcase_card(user)}
             </div>
           </div>
           {flash_html}
           <p class='hint'>إدارة العملاء والمعاملات من المتصفح أو من البوت.</p>
+          <div class='dashboard-tools'>
+            <form class='dashboard-search' method='get' action='/creditbook/dashboard' role='search'>
+              <label class='visually-hidden' for='dash-q'>بحث في العملاء والمعاملات</label>
+              <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='بحث: اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
+              <button type='submit' class='btn btn-primary'>بحث</button>
+              {clear_search}
+            </form>
+            <a class='btn btn-secondary btn-report' href='/creditbook/report'>📊 تقرير المعاملات</a>
+          </div>
+          {q_hint}
           {add_form}
           <h3 class='web-h3' style='margin-top:8px'>📋 عملائي</h3>
           {body}
     """
     return wrap_creditbook_app_shell(user, favicon_href, brand_img, "دفتر الديون — عملائي", None, card)
+
+
+def render_report_all_transactions_page(
+    user: User,
+    rows: list[tuple[CustomerTransaction, Customer]],
+    offset: int,
+    has_more: bool,
+    favicon_href: str,
+    brand_img: str,
+) -> str:
+    """جميع معاملات كل العملاء، مرتبة زمنياً مع ترقيم صفحات."""
+    uname = _html_escape(owner_display_name_for_user(user))
+    tx_rows = []
+    for t, cust in rows:
+        dt = t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else ""
+        note = (t.note or "").strip()
+        note_html = (
+            f"<div class='tx-note-black'><span class='tx-note-label'>ملاحظة:</span> {_html_escape(note)}</div>"
+            if note
+            else ""
+        )
+        photo_html = ""
+        if getattr(t, "photo_file_id", None):
+            fid = quote(str(t.photo_file_id), safe="")
+            photo_html = (
+                f"<a class='tx-inline-photo' href='/creditbook/photo-view/{fid}' target='_blank' rel='noopener' title='صورة'>"
+                f"<img class='photo' src='/creditbook/photo/{fid}' alt=''/></a>"
+            )
+        kc = _owner_kind_class(t.kind)
+        kind_word = _owner_kind_word(t.kind)
+        cust_link = f"/creditbook/customer/{cust.id}"
+        tx_rows.append(
+            f"""
+            <div class='tx tx-row-{t.kind}'>
+              <div class='tx-line-main'>
+                <a class='report-cust-name' href='{cust_link}'>{_html_escape(cust.name)}</a>
+                <span class='tx-sep' aria-hidden='true'>·</span>
+                <span class='tx-kind-amt {kc}'><span class='tx-kind-txt'>{kind_word}</span> {_amount_to_str(t.amount)} د.ع.</span>
+                <span class='tx-sep' aria-hidden='true'>·</span>
+                <span class='tx-date' dir='ltr'>{dt}</span>
+                <span class='tx-sep' aria-hidden='true'>·</span>
+                <a class='tx-edit-btn' href='/creditbook/tx/{t.id}'><span class='tx-edit-ico'>✎</span> تعديل</a>
+                {photo_html}
+              </div>
+              {note_html}
+            </div>
+            """
+        )
+    more_btn = ""
+    if has_more:
+        next_off = offset + REPORT_PAGE_SIZE
+        more_btn = f"<a class='btn btn-primary' href='/creditbook/report?offset={next_off}'>➕ عرض المزيد</a>"
+    count_note = f"<p class='hint'>عرض {offset + 1}–{offset + len(rows)}</p>" if rows else ""
+    inner = f"""
+          <div class='brand-header share-report-head dashboard-head'>
+            <div class='dashboard-brand-col'>
+              <div class='brand'>
+                {_brand_home_block(brand_img, uname)}
+              </div>
+            </div>
+            <div class='dashboard-showcase-col'>
+              {render_owner_showcase_card(user)}
+            </div>
+          </div>
+          <div class='toolbar'>
+            <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
+          </div>
+          <h3 class='web-h3'>📊 تقرير — جميع المعاملات</h3>
+          <p class='hint'>كل المعاملات من كل العملاء، من الأحدث إلى الأقدم. استخدم «عرض المزيد» لتحميل الدفعة التالية.</p>
+          {count_note}
+          {''.join(tx_rows) if tx_rows else '<p class="hint">لا توجد معاملات بعد.</p>'}
+          {more_btn}
+    """
+    return wrap_creditbook_app_shell(
+        user,
+        favicon_href,
+        brand_img,
+        "تقرير المعاملات — دفتر الديون",
+        None,
+        inner,
+        body_class="page-report",
+    )
 
 
 def render_customer_share_page(
@@ -869,11 +972,7 @@ def render_owner_customer_page(
               <div class='brand-header share-report-head dashboard-head cust-page-head'>
                 <div class='dashboard-brand-col'>
                   <div class='brand'>
-                    <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
-                    <div class='brand-text-wrap'>
-                      <h2>دفتر الديون</h2>
-                      <p class='brand-user-name'>{owner_disp}</p>
-                    </div>
+                    {_brand_home_block(brand_img, owner_disp)}
                   </div>
                   <div class='cust-line-identity'>👤 {cust_meta}</div>
                 </div>
@@ -1029,21 +1128,60 @@ def try_login(phone_raw: str, password: str) -> tuple[str | None, int | None]:
         db.close()
 
 
-def load_dashboard_rows(user_id: int) -> list[tuple[Customer, float]]:
+def load_dashboard_rows(user_id: int, q: str | None = None) -> list[tuple[Customer, float]]:
+    """قائمة العملاء مع الرصيد. إن وُجد q يُصفّى بالاسم أو الهاتف أو أي معاملة (ملاحظة/مبلغ)."""
+    from sqlalchemy import String, cast, or_
+
+    q = (q or "").strip()
     db = SessionLocal()
     try:
-        customers = (
-            db.query(Customer)
-            .filter(Customer.user_id == user_id)
-            .order_by(Customer.name.asc())
-            .all()
-        )
+        base = db.query(Customer).filter(Customer.user_id == user_id)
+        if q:
+            like_pat = f"%{q}%"
+            tx_match = (
+                db.query(CustomerTransaction.customer_id)
+                .join(Customer, Customer.id == CustomerTransaction.customer_id)
+                .filter(Customer.user_id == user_id)
+                .filter(
+                    or_(
+                        CustomerTransaction.note.ilike(like_pat),
+                        cast(CustomerTransaction.amount, String).ilike(like_pat),
+                    )
+                )
+            )
+            cust_ids = {r[0] for r in tx_match.distinct().all()}
+            conds = [Customer.name.ilike(like_pat), Customer.phone.ilike(like_pat)]
+            if cust_ids:
+                conds.append(Customer.id.in_(cust_ids))
+            base = base.filter(or_(*conds))
+        customers = base.order_by(Customer.name.asc()).all()
         out = []
         for c in customers:
             gave = sum(float(t.amount or 0) for t in c.transactions if t.kind == "gave")
             took = sum(float(t.amount or 0) for t in c.transactions if t.kind == "took")
             out.append((c, gave - took))
         return out
+    finally:
+        db.close()
+
+
+def load_all_transactions_page(
+    user_id: int, offset: int, limit: int
+) -> tuple[list[tuple[CustomerTransaction, Customer]], bool]:
+    """صفحة من جميع المعاملات (الأحدث أولاً). يعيد (صفوف، هل يوجد المزيد)."""
+    db = SessionLocal()
+    try:
+        q = (
+            db.query(CustomerTransaction, Customer)
+            .join(Customer, Customer.id == CustomerTransaction.customer_id)
+            .filter(Customer.user_id == user_id)
+            .order_by(CustomerTransaction.created_at.desc(), CustomerTransaction.id.desc())
+            .offset(offset)
+            .limit(limit + 1)
+        )
+        chunk = q.all()
+        has_more = len(chunk) > limit
+        return (chunk[:limit], has_more)
     finally:
         db.close()
 
