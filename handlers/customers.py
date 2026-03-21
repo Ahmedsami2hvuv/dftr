@@ -1172,8 +1172,8 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         customers = _customers_ordered_by_usage_least_first(db, user.id)
         keyboard: list[list[InlineKeyboardButton]] = []
-        total_out = 0.0  # الصادر الكلي (أعطيت)
-        total_in = 0.0   # الوارد الكلي (أخذت)
+        total_out = 0.0  # أعطيت (gave)
+        total_in = 0.0   # أخذت (took)
         for c in customers:
             for t in c.transactions:
                 amt = float(t.amount or 0)
@@ -1186,12 +1186,19 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("🔎 بحث", callback_data="cust_search_start")])
         keyboard.append([InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")])
         remain = total_out - total_in
+        # نفس منطق الموقع: أعطيت 🟢 / أخذت 🔴 / المجموع بلون حسب الإشارة (أعطيت − أخذت)
+        if remain > 0:
+            net_emoji = "🟢"
+        elif remain < 0:
+            net_emoji = "🔴"
+        else:
+            net_emoji = "⚪"
         await query.edit_message_text(
             (
                 "دفتر الديون 📒\n\n"
-                f"الصادر الكلي: {total_out:.2f} د.ع.\n"
-                f"الوارد الكلي: {total_in:.2f} د.ع.\n"
-                f"الباقي: {remain:.2f} د.ع.\n\n"
+                f"🟢 أعطيت: {total_out:.2f} د.ع.\n"
+                f"🔴 أخذت: {total_in:.2f} د.ع.\n"
+                f"{net_emoji} المجموع: {remain:.2f} د.ع.\n\n"
                 "اختر عميلاً أو أضف عميلاً."
             ),
             reply_markup=InlineKeyboardMarkup(keyboard),
