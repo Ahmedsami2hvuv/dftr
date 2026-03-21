@@ -392,11 +392,14 @@ form.login-form { margin-top: 8px; }
 .web-check input { width: auto; }
 .cust-edit-toggle { margin-bottom: 10px; }
 .btn-manage-cust {
-  font-size: 1rem;
-  padding: 12px 16px;
+  font-size: 1.05rem;
+  padding: 14px 18px;
   line-height: 1.35;
   text-align: center;
   white-space: normal;
+  width: 100%;
+  max-width: 100%;
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.28);
 }
 .cust-manage-panel .cust-del-inner {
   margin-top: 18px;
@@ -404,28 +407,184 @@ form.login-form { margin-top: 8px; }
   border-top: 1px dashed #fecaca;
 }
 .new-cust-block { margin: 14px 0; }
-.btn-new-cust { margin-top: 0; width: 100%; max-width: 320px; }
-.new-cust-panel { border-top: none !important; padding-top: 8px !important; }
-
-/* هيكل التطبيق: شريط جانبي + محتوى */
-body.app-body {
-  padding: 12px;
+.btn-new-cust {
+  margin-top: 0;
+  width: 100%;
+  max-width: 360px;
+  font-size: 1.08rem;
+  padding: 14px 20px;
+  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.35);
 }
-.app-shell {
+.new-cust-panel { border-top: none !important; padding-top: 8px !important; }
+.btn-block { display: block; width: 100%; text-align: center; box-sizing: border-box; }
+
+/* تسجيل الدخول — عمودان */
+.login-card { max-width: 720px; }
+.login-brand-head { margin-bottom: 8px; }
+.login-split {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 8px;
+}
+@media (min-width: 600px) {
+  .login-split {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 24px;
+  }
+  .login-split-col {
+    flex: 1;
+    min-width: 0;
+  }
+}
+.login-register-col {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f0fdfa 0%, #ecfdf5 100%);
+  border: 1px solid #99f6e4;
+}
+.login-register-lead { font-size: 0.95rem; color: #475569; margin: 8px 0 12px; line-height: 1.45; }
+.btn-register {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+  padding: 14px 18px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #0ea5e9, #0369a1) !important;
+  color: #fff !important;
+  border-radius: 999px;
+  text-decoration: none !important;
+  box-shadow: 0 6px 18px rgba(3, 105, 161, 0.35);
+}
+
+.brand-text-wrap { min-width: 0; }
+.brand-text-wrap h2 { margin: 0; }
+.brand-subtitle {
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #475569;
+  line-height: 1.4;
+}
+
+/* رأس الصفحة مثل تقرير المشاركة: شعار + صنع بواسطة */
+.share-report-head {
   display: flex;
   flex-direction: row;
+  justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.share-report-head .owner-showcase {
+  flex: 0 1 auto;
+}
+.cust-page-head .cust-head-left {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.cust-head-stats {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+.cust-stat-line {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.98rem;
+}
+.cust-stat-lbl { font-weight: 700; color: #334155; }
+.cust-stat-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+.cust-line-identity {
+  margin-top: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.cust-manage-hint { margin: 8px 0 0 !important; font-size: 0.88rem !important; }
+
+/* هيكل التطبيق: قائمة منزلقة (لا تبقى مفتوحة) */
+body.app-body {
+  padding: 12px;
+  padding-top: 56px;
+}
+.sidebar-menu-btn {
+  position: fixed;
+  top: 12px;
+  inset-inline-end: 12px;
+  z-index: 300;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 2px solid rgba(13, 148, 136, 0.35);
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(15, 118, 110, 0.2);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #0f766e;
+  font-weight: 800;
+}
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+.app-shell {
+  display: block;
   max-width: 1200px;
   margin: 0 auto;
 }
 .app-sidebar {
-  flex: 0 0 200px;
+  position: fixed;
+  top: 0;
+  inset-inline-end: 0;
+  width: min(300px, 92vw);
+  height: 100vh;
+  height: 100dvh;
+  z-index: 280;
   background: #fff;
-  border-radius: 18px;
-  padding: 14px 12px;
-  box-shadow: 0 6px 24px rgba(15, 118, 110, 0.08);
-  border: 1px solid rgba(13, 148, 136, 0.12);
+  padding: 0;
+  box-shadow: -8px 0 32px rgba(15, 23, 42, 0.18);
+  border-inline-start: 1px solid rgba(13, 148, 136, 0.15);
+  transform: translateX(105%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
+}
+body.sidebar-open .app-sidebar {
+  transform: translateX(0);
+}
+.sidebar-inner {
+  position: relative;
+  padding: 52px 16px 24px;
+}
+.sidebar-close-btn {
+  position: absolute;
+  top: 12px;
+  inset-inline-start: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #64748b;
+  line-height: 1;
 }
 .sidebar-brand {
   display: flex;
@@ -497,14 +656,11 @@ body.app-body {
   text-decoration: none !important;
 }
 .app-main {
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
 
-/* مربع صنع بواسطة (مثل تقرير المشاركة) */
-.owner-showcase-app {
-  margin-top: 0;
-}
+/* مربع صنع بواسطة — نفس مقاس تقرير المشاركة (عرض أقصى 420px / 42vw على الحاسوب) */
 .acct-showcase-wrap {
   margin-top: 8px;
 }
@@ -593,49 +749,54 @@ body.app-body {
   line-height: 1.5;
 }
 
-@media (min-width: 900px) {
-  body.app-body {
-    padding: 24px 20px;
-  }
-  .app-sidebar {
-    flex: 0 0 220px;
-    padding: 18px 14px;
-  }
-  .owner-showcase {
-    max-width: 420px;
-    padding: 14px 18px;
+@media (min-width: 561px) {
+  .share-report-head .owner-showcase {
+    max-width: min(420px, 42vw);
+    padding: 16px 20px;
     border-radius: 16px;
+  }
+  .owner-badge {
+    font-size: 0.92rem;
+    margin-bottom: 10px;
   }
   .owner-name-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
+    gap: 14px;
   }
   .owner-name {
+    font-size: clamp(1.34rem, 2.05vw, 1.68rem);
     white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .owner-phone {
+    font-size: 1.12rem;
+    padding: 10px 17px;
+    align-self: flex-start;
+  }
+  .owner-phone-wa::before {
+    width: 20px;
+    height: 20px;
   }
 }
 
-@media (max-width: 720px) {
-  .app-shell {
-    flex-direction: column;
-  }
-  .app-sidebar {
-    flex: none;
-    width: 100%;
-    max-width: 100%;
-  }
-  .sidebar-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .sidebar-link {
-    flex: 1 1 42%;
-    text-align: center;
+@media (min-width: 900px) {
+  body.app-body {
+    padding: 24px 20px;
+    padding-top: 64px;
   }
 }
 
 @media (max-width: 560px) {
+  .share-report-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .share-report-head .owner-showcase {
+    order: -1;
+    max-width: 100%;
+  }
   .brand-header { flex-direction: column; align-items: stretch; }
   .brand { justify-content: center; }
 }

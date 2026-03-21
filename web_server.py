@@ -25,7 +25,9 @@ from config import WEB_TX_UPLOAD_DIR
 from creditbook_web import (
     _clear_cookie_headers,
     _set_cookie_headers,
+    csrf_token_public,
     csrf_verify,
+    csrf_verify_public,
     get_user_from_cookie_header,
     load_dashboard_rows,
     render_account_page,
@@ -33,6 +35,7 @@ from creditbook_web import (
     render_login_page,
     render_logout_confirm_page,
     render_owner_customer_page,
+    render_register_page,
     render_tx_edit_page,
     try_login,
 )
@@ -44,6 +47,7 @@ from creditbook_web_actions import (
     action_tx_toggle_kind,
     action_tx_update,
     action_txn_add,
+    action_register_web,
     action_user_change_password,
     action_user_update_profile,
     is_safe_web_photo_name,
@@ -697,7 +701,16 @@ class Handler(BaseHTTPRequestHandler):
             if web_user:
                 _redirect(self, "/creditbook/dashboard")
                 return
-            page = render_login_page(None, favicon_href, brand_img_src)
+            flash_key = (qs.get("flash") or [None])[0]
+            page = render_login_page(None, favicon_href, brand_img_src, flash_key=flash_key)
+            _send_html_page(self, 200, page)
+            return
+
+        if path == "/creditbook/register":
+            if web_user:
+                _redirect(self, "/creditbook/dashboard")
+                return
+            page = render_register_page(None, favicon_href, brand_img_src, csrf_token_public("register"))
             _send_html_page(self, 200, page)
             return
 
@@ -956,11 +969,38 @@ class Handler(BaseHTTPRequestHandler):
             pwd = _s("password")
             err, uid = try_login(phone, pwd)
             if err:
-                page = render_login_page(err, favicon_href, brand_img_src)
+                page = render_login_page(err, favicon_href, brand_img_src, flash_key=None)
                 _send_html_page(self, 200, page)
                 return
             extra = _set_cookie_headers(uid, secure)
             _redirect(self, "/creditbook/dashboard", extra)
+            return
+
+        if path == "/creditbook/register":
+            if web_user:
+                _redirect(self, "/creditbook/dashboard")
+                return
+            csrf = _s("csrf")
+            if not csrf_verify_public("register", csrf):
+                page = render_register_page(
+                    "انتهت صلاحية النموذج. حدّث الصفحة.",
+                    favicon_href,
+                    brand_img_src,
+                    csrf_token_public("register"),
+                )
+                _send_html_page(self, 200, page)
+                return
+            err = action_register_web(
+                _s("full_name"),
+                _s("phone"),
+                _s("password"),
+                _s("password2"),
+            )
+            if err:
+                page = render_register_page(err, favicon_href, brand_img_src, csrf_token_public("register"))
+                _send_html_page(self, 200, page)
+                return
+            _redirect(self, "/creditbook/login?flash=reg_ok")
             return
 
         if path == "/creditbook/logout":

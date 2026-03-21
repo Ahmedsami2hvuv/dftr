@@ -148,6 +148,33 @@ def csrf_verify(uid: int, action: str, token: str) -> bool:
     return hmac.compare_digest(expected, sig)
 
 
+def csrf_token_public(action: str) -> str:
+    """رمز للنماذج بدون جلسة (مثل التسجيل)."""
+    tb = int(time.time()) // 86400
+    msg = f"pub:{action}:{tb}".encode("utf-8")
+    sig = hmac.new(web_session_secret().encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return f"{tb}.{sig}"
+
+
+def csrf_verify_public(action: str, token: str) -> bool:
+    if not token or "." not in token:
+        return False
+    parts = token.split(".", 1)
+    if len(parts) != 2:
+        return False
+    tb_s, sig = parts
+    try:
+        tb = int(tb_s)
+    except ValueError:
+        return False
+    now_d = int(time.time()) // 86400
+    if tb < now_d - 14 or tb > now_d + 1:
+        return False
+    msg = f"pub:{action}:{tb}".encode("utf-8")
+    expected = hmac.new(web_session_secret().encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, sig)
+
+
 FLASH_LABELS = {
     "cust_new": "تمت إضافة العميل ✅",
     "cust_upd": "تم حفظ بيانات العميل ✅",
@@ -158,6 +185,7 @@ FLASH_LABELS = {
     "tx_del": "تم حذف المعاملة ✅",
     "acc_prof": "تم حفظ بيانات الحساب ✅",
     "acc_pwd": "تم تغيير كلمة المرور ✅",
+    "reg_ok": "تم إنشاء الحساب — يمكنك تسجيل الدخول الآن ✅",
 }
 
 
@@ -193,7 +221,7 @@ def render_owner_showcase_card(user: User) -> str:
     else:
         phone_html = "<span class='owner-phone-muted'>لم يُضف رقم بعد</span>"
     return f"""
-    <div class='owner-showcase owner-showcase-app'>
+    <div class='owner-showcase'>
       <div class='owner-badge'>صنع بواسطة</div>
       <div class='owner-name-row'>
         <div class='owner-name'>{owner_name_esc}</div>
@@ -212,7 +240,7 @@ def wrap_creditbook_app_shell(
     card_inner: str,
     body_class: str = "",
 ) -> str:
-    """هيكل: قائمة جانبية (حسابي، تسجيل الخروج) + المحتوى."""
+    """هيكل: قائمة جانبية منزلقة (زر ☰) + المحتوى."""
     disp = _html_escape(user.full_name or user.username or "حسابي")
     acc_active = " sidebar-link-active" if active_nav == "account" else ""
     head = f"""
@@ -229,18 +257,23 @@ def wrap_creditbook_app_shell(
         <title>{_html_escape(page_title)}</title>
       </head>
       <body class='app-body {body_class}'>
+        <button type='button' class='sidebar-menu-btn' id='sidebar-menu-btn' aria-expanded='false' aria-controls='app-sidebar' title='القائمة'>☰</button>
+        <div class='sidebar-scrim' id='sidebar-scrim' hidden></div>
         <div class='app-shell'>
-          <aside class='app-sidebar' aria-label='القائمة'>
-            <a class='sidebar-brand' href='/creditbook/dashboard' title='العملاء'>
-              <img class='brand-logo-sm' src="{_html_escape(brand_img)}" width='48' height='48' alt=''/>
-              <span class='sidebar-brand-txt'>دفتر الديون</span>
-            </a>
-            <p class='sidebar-user'>{disp}</p>
-            <nav class='sidebar-nav'>
-              <a class='sidebar-link{acc_active}' href='/creditbook/account'>حسابي</a>
-              <a class='sidebar-link sidebar-link-logout' href='/creditbook/logout_confirm'>تسجيل الخروج</a>
-            </nav>
-            {f"<a class='sidebar-bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>البوت في تيليجرام</a>" if BOT_USERNAME else ""}
+          <aside class='app-sidebar' id='app-sidebar' aria-label='القائمة' aria-hidden='true'>
+            <div class='sidebar-inner'>
+              <button type='button' class='sidebar-close-btn' id='sidebar-close-btn' title='إغلاق'>✕</button>
+              <a class='sidebar-brand sidebar-close-link' href='/creditbook/dashboard' title='العملاء'>
+                <img class='brand-logo-sm' src="{_html_escape(brand_img)}" width='48' height='48' alt=''/>
+                <span class='sidebar-brand-txt'>دفتر الديون</span>
+              </a>
+              <p class='sidebar-user'>{disp}</p>
+              <nav class='sidebar-nav'>
+                <a class='sidebar-link{acc_active} sidebar-close-link' href='/creditbook/account'>حسابي</a>
+                <a class='sidebar-link sidebar-link-logout sidebar-close-link' href='/creditbook/logout_confirm'>تسجيل الخروج</a>
+              </nav>
+              {f"<a class='sidebar-bot sidebar-close-link' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>البوت في تيليجرام</a>" if BOT_USERNAME else ""}
+            </div>
           </aside>
           <main class='app-main'>
             <div class='card app-card'>
@@ -248,6 +281,26 @@ def wrap_creditbook_app_shell(
             </div>
           </main>
         </div>
+        <script>
+        (function() {{
+          var b = document.body;
+          var side = document.getElementById('app-sidebar');
+          var scrim = document.getElementById('sidebar-scrim');
+          var openBtn = document.getElementById('sidebar-menu-btn');
+          var closeBtn = document.getElementById('sidebar-close-btn');
+          function setOpen(on) {{
+            if (on) {{ b.classList.add('sidebar-open'); scrim.hidden = false; if(openBtn) openBtn.setAttribute('aria-expanded','true'); if(side) {{ side.setAttribute('aria-hidden','false'); }} }}
+            else {{ b.classList.remove('sidebar-open'); scrim.hidden = true; if(openBtn) openBtn.setAttribute('aria-expanded','false'); if(side) {{ side.setAttribute('aria-hidden','true'); }} }}
+          }}
+          if (openBtn) openBtn.addEventListener('click', function() {{ setOpen(!b.classList.contains('sidebar-open')); }});
+          if (closeBtn) closeBtn.addEventListener('click', function() {{ setOpen(false); }});
+          if (scrim) scrim.addEventListener('click', function() {{ setOpen(false); }});
+          var links = document.querySelectorAll('.sidebar-close-link');
+          for (var i = 0; i < links.length; i++) {{
+            links[i].addEventListener('click', function() {{ setOpen(false); }});
+          }}
+        }})();
+        </script>
       </body>
     </html>
     """
@@ -288,11 +341,15 @@ def render_account_page(
     disp_phone = format_phone_iq_local_display((user.phone or "").strip()) if user.phone else "—"
     flash_html = _flash_block(flash_key, err_msg)
     inner = f"""
-      <div class='brand-header'>
+      <div class='brand-header share-report-head'>
         <div class='brand'>
           <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
-          <h2>حسابي</h2>
+          <div class='brand-text-wrap'>
+            <h2>حسابي</h2>
+            <p class='brand-subtitle'>اسم المستخدم: {_html_escape(user.full_name or user.username or "—")}</p>
+          </div>
         </div>
+        {render_owner_showcase_card(user)}
       </div>
       {flash_html}
       <div class='web-section' style='border-top:none;padding-top:0'>
@@ -324,13 +381,18 @@ def render_account_page(
           <button type='submit' class='btn btn-primary'>تحديث كلمة المرور</button>
         </form>
       </div>
-      <div class='acct-showcase-wrap'>{render_owner_showcase_card(user)}</div>
     """
     return wrap_creditbook_app_shell(user, favicon_href, brand_img, "حسابي — دفتر الديون", "account", inner)
 
 
-def render_login_page(error: str | None, favicon_href: str, brand_img: str) -> str:
+def render_login_page(
+    error: str | None,
+    favicon_href: str,
+    brand_img: str,
+    flash_key: str | None = None,
+) -> str:
     err = f"<div class='err'>{_html_escape(error)}</div>" if error else ""
+    flash_html = _flash_block(flash_key, None)
     return f"""
     <!doctype html>
     <html lang='ar' dir='rtl'>
@@ -345,25 +407,91 @@ def render_login_page(error: str | None, favicon_href: str, brand_img: str) -> s
         <title>تسجيل الدخول — دفتر الديون</title>
       </head>
       <body>
-        <div class='card'>
-          <div class='brand-header'>
+        <div class='card login-card'>
+          <div class='brand-header login-brand-head'>
             <div class='brand'>
               <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt='دفتر الديون'/>
-              <h2>دفتر الديون</h2>
+              <div class='brand-text-wrap'>
+                <h2>دفتر الديون</h2>
+                <p class='brand-subtitle'>سجّل الدخول أو أنشئ حساباً جديداً — نفس رقم الهاتف وكلمة المرور كما في البوت</p>
+              </div>
             </div>
           </div>
-          <p class='hint'>سجّل الدخول بنفس رقم الهاتف وكلمة المرور المستخدمين في البوت.</p>
+          {flash_html}
+          <div class='login-split'>
+            <div class='login-split-col'>
+              <p class='hint' style='margin-top:0'>تسجيل الدخول</p>
+              {err}
+              <form class='login-form' method='post' action='/creditbook/login' autocomplete='on'>
+                <label for='phone'>رقم الهاتف</label>
+                <input type='tel' id='phone' name='phone' required placeholder='+9647xxxxxxxx' dir='ltr'/>
+                <label for='password'>كلمة المرور</label>
+                <input type='password' id='password' name='password' required autocomplete='current-password'/>
+                <p style='margin-top:16px'>
+                  <button type='submit' class='btn btn-primary btn-block'>تسجيل الدخول</button>
+                </p>
+              </form>
+            </div>
+            <div class='login-split-col login-register-col'>
+              <p class='hint' style='margin-top:0'>ليس لديك حساب؟</p>
+              <p class='login-register-lead'>أنشئ حساباً جديداً بالاسم والهاتف وكلمة المرور (بدون تيليجرام).</p>
+              <a class='btn btn-register' href='/creditbook/register'>إنشاء حساب جديد</a>
+            </div>
+          </div>
+          {f"<p style='margin-top:16px;text-align:center'><a class='btn btn-bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>فتح البوت في تيليجرام</a></p>" if BOT_USERNAME else ""}
+        </div>
+      </body>
+    </html>
+    """
+
+
+def render_register_page(
+    error: str | None,
+    favicon_href: str,
+    brand_img: str,
+    csrf: str,
+) -> str:
+    err = f"<div class='err'>{_html_escape(error)}</div>" if error else ""
+    return f"""
+    <!doctype html>
+    <html lang='ar' dir='rtl'>
+      <head>
+        <meta charset='utf-8'/>
+        <meta name='viewport' content='width=device-width, initial-scale=1'/>
+        <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
+        <link rel='stylesheet' href='/creditbook/static/creditbook_app.css'/>
+        <link rel='preconnect' href='https://fonts.googleapis.com'/>
+        <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin/>
+        <link href='https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap' rel='stylesheet'/>
+        <title>إنشاء حساب — دفتر الديون</title>
+      </head>
+      <body>
+        <div class='card login-card'>
+          <div class='brand-header'>
+            <div class='brand'>
+              <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
+              <div class='brand-text-wrap'>
+                <h2>دفتر الديون</h2>
+                <p class='brand-subtitle'>حساب جديد للوصول من المتصفح</p>
+              </div>
+            </div>
+          </div>
           {err}
-          <form class='login-form' method='post' action='/creditbook/login' autocomplete='on'>
-            <label for='phone'>رقم الهاتف</label>
-            <input type='tel' id='phone' name='phone' required placeholder='+9647xxxxxxxx' dir='ltr'/>
-            <label for='password'>كلمة المرور</label>
-            <input type='password' id='password' name='password' required autocomplete='current-password'/>
-            <p style='margin-top:16px'>
-              <button type='submit' class='btn btn-primary'>تسجيل الدخول</button>
-            </p>
+          <form class='stack-form' method='post' action='/creditbook/register' autocomplete='off'>
+            <input type='hidden' name='csrf' value='{_html_escape(csrf)}'/>
+            <label for='reg_name'>الاسم الكامل</label>
+            <input type='text' id='reg_name' name='full_name' required maxlength='255' placeholder='الاسم الظاهر في الدفتر'/>
+            <label for='reg_phone'>رقم الهاتف</label>
+            <input type='tel' id='reg_phone' name='phone' required placeholder='+9647… أو 077…' dir='ltr' autocomplete='tel'/>
+            <label for='reg_pw'>كلمة المرور (4 أحرف على الأقل)</label>
+            <input type='password' id='reg_pw' name='password' required minlength='4' autocomplete='new-password'/>
+            <label for='reg_pw2'>تأكيد كلمة المرور</label>
+            <input type='password' id='reg_pw2' name='password2' required minlength='4' autocomplete='new-password'/>
+            <button type='submit' class='btn btn-primary btn-block'>إنشاء الحساب</button>
           </form>
-          {f"<p style='margin-top:12px'><a class='btn btn-bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>فتح البوت في تيليجرام</a></p>" if BOT_USERNAME else ""}
+          <p style='margin-top:16px;text-align:center'>
+            <a class='btn btn-secondary' href='/creditbook/login'>◀ لديك حساب؟ تسجيل الدخول</a>
+          </p>
         </div>
       </body>
     </html>
@@ -398,7 +526,7 @@ def render_dashboard_html(
     flash_html = _flash_block(flash_key, err_msg)
     add_form = f"""
     <div class='new-cust-block'>
-      <button type='button' class='btn btn-outline btn-new-cust' onclick="document.getElementById('new-cust-panel').classList.toggle('hidden');">
+      <button type='button' class='btn btn-primary btn-new-cust' onclick="document.getElementById('new-cust-panel').classList.toggle('hidden');">
         ➕ عميل جديد
       </button>
       <div id='new-cust-panel' class='hidden web-section new-cust-panel'>
@@ -414,19 +542,23 @@ def render_dashboard_html(
       </div>
     </div>
     """
+    uname = _html_escape(user.full_name or user.username or "مستخدم")
     card = f"""
-          <div class='brand-header'>
+          <div class='brand-header share-report-head'>
             <div class='brand'>
               <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
-              <h2>دفتر الديون</h2>
+              <div class='brand-text-wrap'>
+                <h2>دفتر الديون</h2>
+                <p class='brand-subtitle'>اسم المستخدم: {uname}</p>
+              </div>
             </div>
+            {render_owner_showcase_card(user)}
           </div>
           {flash_html}
           <p class='hint'>إدارة العملاء والمعاملات من المتصفح أو من البوت.</p>
           {add_form}
           <h3 class='web-h3' style='margin-top:8px'>📋 عملائي</h3>
           {body}
-          <div class='acct-showcase-wrap' style='margin-top:20px'>{render_owner_showcase_card(user)}</div>
     """
     return wrap_creditbook_app_shell(user, favicon_href, brand_img, "دفتر الديون — عملائي", None, card)
 
@@ -546,13 +678,6 @@ def render_owner_customer_page(
         if has_more:
             more_btn = f"<a class='btn btn-primary' href='/creditbook/customer/{cust.id}?offset={more_offset}'>➕ عرض المزيد</a>"
 
-        balance_text = "📌 الرصيد الحالي: "
-        if bal > 0:
-            balance_text += f"{bal:.2f}"
-        elif bal < 0:
-            balance_text += f"{abs(bal):.2f}"
-        else:
-            balance_text += "0"
         balance_class = "bal-red" if bal > 0 else ("bal-green" if bal < 0 else "")
 
         cust_disp_phone = format_phone_iq_local_display((cust.phone or "").strip()) if cust.phone else ""
@@ -566,9 +691,10 @@ def render_owner_customer_page(
 
         manage_panel = f"""
         <div class='cust-edit-toggle'>
-          <button type='button' class='btn btn-outline btn-manage-cust' onclick="document.getElementById('cust-manage-panel').classList.toggle('hidden');">
-            ⚙️ إدارة العميل — تعديل الاسم والهاتف أو حذف العميل
+          <button type='button' class='btn btn-primary btn-manage-cust' onclick="document.getElementById('cust-manage-panel').classList.toggle('hidden');">
+            ⚙️ إدارة العميل — تعديل أو حذف
           </button>
+          <p class='hint cust-manage-hint'>اضغط لفتح نموذج تعديل الاسم والهاتف أو حذف العميل نهائياً</p>
         </div>
         <div id='cust-manage-panel' class='hidden web-section cust-manage-panel'>
           <h3 class='web-h3'>تعديل بيانات العميل</h3>
@@ -635,26 +761,35 @@ def render_owner_customer_page(
         </script>
         """
 
+        net_line = f"{_amount_to_str(bal)} د.ع."
         card_inner = f"""
-              <div class='brand-header'>
-                <div class='brand'>
-                  <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
-                  <h2>دفتر الديون</h2>
+              <div class='brand-header share-report-head cust-page-head'>
+                <div class='cust-head-left'>
+                  <div class='brand'>
+                    <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
+                    <div class='brand-text-wrap'>
+                      <h2>دفتر الديون</h2>
+                      <p class='brand-subtitle'>اسم المستخدم: {owner_disp}</p>
+                    </div>
+                  </div>
+                  <div class='cust-head-stats' role='group' aria-label='إجماليات العميل'>
+                    <div class='cust-stat-line'><span class='cust-stat-lbl'>أخذت الكلي</span><span class='cust-stat-val bal-red'>{_amount_to_str(took)} د.ع.</span></div>
+                    <div class='cust-stat-line'><span class='cust-stat-lbl'>أعطيت الكلي</span><span class='cust-stat-val bal-green'>{_amount_to_str(gave)} د.ع.</span></div>
+                    <div class='cust-stat-line'><span class='cust-stat-lbl'>النتيجة</span><span class='cust-stat-val {balance_class}'>{net_line}</span></div>
+                  </div>
+                  <div class='cust-line-identity'>👤 {cust_meta}</div>
                 </div>
+                {render_owner_showcase_card(user)}
               </div>
               <div class='toolbar'>
                 <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
               </div>
               {flash_html}
-              <p style='margin:6px 0 4px;font-weight:700;color:#475569'>👤 {owner_disp}</p>
-              <div class='cust-meta' style='margin-bottom:8px;font-size:1.05rem;font-weight:700;color:#0f172a'>👤 {cust_meta}</div>
-              <div class='cust-bal {balance_class}' style='font-size:1.25rem;margin-bottom:12px'>{balance_text} د.ع.</div>
               {manage_panel}
               {txn_form}
               <h3 class='web-h3'>📜 المعاملات</h3>
               {''.join(tx_rows) if tx_rows else '<p class="hint">لا توجد معاملات بعد.</p>'}
               {more_btn}
-              <div class='acct-showcase-wrap' style='margin-top:20px'>{render_owner_showcase_card(user)}</div>
         """
         return wrap_creditbook_app_shell(
             user,
@@ -715,18 +850,22 @@ def render_tx_edit_page(
             )
 
         inner = f"""
-              <div class='brand-header'>
+              <div class='brand-header share-report-head'>
                 <div class='brand'>
                   <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
-                  <h2>تعديل معاملة</h2>
+                  <div class='brand-text-wrap'>
+                    <h2>تعديل معاملة</h2>
+                    <p class='brand-subtitle'>اسم المستخدم: {owner_disp}</p>
+                  </div>
                 </div>
+                {render_owner_showcase_card(user)}
               </div>
               <div class='toolbar'>
                 <a class='btn btn-secondary' href='{cust_link}'>◀ {_html_escape(cust.name)}</a>
                 <a class='btn btn-secondary' href='/creditbook/dashboard'>العملاء</a>
               </div>
               {flash_html}
-              <p class='hint'>👤 {owner_disp} — النوع الحالي: <strong>{kind_ar}</strong></p>
+              <p class='hint'>النوع الحالي: <strong>{kind_ar}</strong></p>
               {cur_photo}
               <div class='web-section'>
                 <form method='post' action='/creditbook/tx/{tx_id}/update' class='stack-form' enctype='multipart/form-data'>
@@ -757,7 +896,6 @@ def render_tx_edit_page(
                   <button type='submit' class='btn btn-danger'>🗑 حذف المعاملة</button>
                 </form>
               </div>
-              <div class='acct-showcase-wrap' style='margin-top:12px'>{render_owner_showcase_card(user)}</div>
         """
         return wrap_creditbook_app_shell(user, favicon_href, brand_img, f"معاملة #{tx_id}", None, inner)
     finally:

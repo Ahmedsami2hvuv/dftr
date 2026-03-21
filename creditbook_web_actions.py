@@ -22,7 +22,7 @@ from app_models import (
 from handlers.customers import _parse_amount_and_optional_note
 from handlers.partner_link import maybe_queue_partner_tx
 from utils.password import check_password, hash_password
-from utils.phone import is_plausible_iraq_mobile, normalize_phone
+from utils.phone import is_plausible_iraq_mobile, normalize_phone, same_phone
 
 _WEB_PHOTO_SAFE = re.compile(r"^[a-f0-9]{32}\.(jpg|jpeg|png|gif|webp)$", re.I)
 
@@ -359,6 +359,46 @@ def action_user_update_profile(user_id: int, full_name: str, phone_raw: str) -> 
                 return "رقم الهاتف غير صالح."
             u.phone = p
         u.full_name = name
+        db.commit()
+        return None
+    except Exception as e:
+        db.rollback()
+        return str(e)[:200]
+    finally:
+        db.close()
+
+
+def action_register_web(full_name: str, phone_raw: str, password: str, password2: str) -> str | None:
+    """تسجيل مستخدم من الموقع فقط (بدون تيليجرام)."""
+    name = (full_name or "").strip()
+    if not name:
+        return "أدخل الاسم."
+    if (password or "").strip() != (password2 or "").strip():
+        return "تأكيد كلمة المرور غير مطابق."
+    pw = (password or "").strip()
+    if len(pw) < 4:
+        return "كلمة المرور يجب أن تكون 4 أحرف على الأقل."
+    phone = normalize_phone(phone_raw or "")
+    if not phone or not is_plausible_iraq_mobile(phone):
+        return "رقم الهاتف غير صالح."
+    db = SessionLocal()
+    try:
+        ex = db.query(User).filter(User.phone == phone).first()
+        if not ex:
+            for u in db.query(User).filter(User.phone.isnot(None)):
+                if u.phone and same_phone(u.phone, phone):
+                    ex = u
+                    break
+        if ex:
+            return "هذا الرقم مسجل مسبقاً. استخدم تسجيل الدخول."
+        u = User(
+            telegram_id=None,
+            username=None,
+            full_name=name,
+            phone=phone,
+            password_hash=hash_password(pw),
+        )
+        db.add(u)
         db.commit()
         return None
     except Exception as e:
