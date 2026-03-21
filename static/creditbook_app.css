@@ -579,6 +579,25 @@ form.login-form { margin-top: 8px; }
 .btn-report {
   margin-top: 0 !important;
 }
+.new-cust-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.new-cust-actions .btn-report {
+  flex: 0 0 auto;
+}
+.btn-manage-compact {
+  padding: 8px 12px !important;
+  font-size: 0.88rem !important;
+  font-weight: 700;
+  margin-top: 0 !important;
+}
+.btn-cust-share {
+  margin-top: 0 !important;
+}
 .search-hint {
   margin-top: 0;
   margin-bottom: 10px;
@@ -609,8 +628,9 @@ form.login-form { margin-top: 8px; }
 .toolbar-cust-top {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  justify-content: flex-start;
 }
 .share-toolbar {
   flex-direction: column;
@@ -985,12 +1005,60 @@ body.sidebar-open .app-sidebar {
     order: -1;
     max-width: 100%;
   }
+  /* لوحة + تقرير: صف واحد تقريباً كصفحة الفاتورة — العنوان سطر، ثم إحصائيات | صنع بواسطة جنباً إلى جنب */
+  .dashboard-head {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .dashboard-head .dashboard-brand-col {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .dashboard-head .cust-head-stats.dashboard-stats-col {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+    max-width: calc(50% - 6px);
+    box-sizing: border-box;
+  }
+  .dashboard-head .dashboard-showcase-col {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+    max-width: calc(50% - 6px);
+    align-self: stretch;
+  }
   .dashboard-head .owner-showcase {
     order: unset;
     max-width: 100%;
+    width: 100%;
+    padding: 0.55rem 0.65rem;
+    border-radius: 12px;
+    box-sizing: border-box;
   }
-  .dashboard-head {
+  .dashboard-head .owner-badge {
+    font-size: 0.72rem;
+    margin-bottom: 4px;
+  }
+  .dashboard-head .owner-name {
+    font-size: clamp(0.88rem, 3.2vw, 1.05rem);
+    white-space: normal;
+  }
+  .dashboard-head .owner-name-row {
     flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .dashboard-head .owner-phone {
+    font-size: 0.78rem;
+    padding: 5px 9px;
+    align-self: flex-start;
+  }
+  .page-cust .dashboard-head .cust-head-stats {
+    max-width: calc(50% - 6px);
+  }
+  .page-cust .dashboard-head .dashboard-showcase-col {
+    max-width: calc(50% - 6px);
   }
   .brand-header { flex-direction: column; align-items: stretch; }
   .brand { justify-content: center; }

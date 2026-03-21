@@ -24,7 +24,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=7"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=8"
 
 
 def _html_escape(s: str) -> str:
@@ -541,7 +541,6 @@ def render_register_page(
 
 def render_dashboard_html(
     user: User,
-    customers: list[tuple[Customer, float]],
     favicon_href: str,
     brand_img: str,
     flash_key: str | None = None,
@@ -550,27 +549,16 @@ def render_dashboard_html(
 ) -> str:
     uid = user.id
     csrf_c = csrf_token(uid, "cust_create")
-    rows = []
-    for c, bal in customers:
-        phone_disp = format_phone_iq_local_display((c.phone or "").strip()) if c.phone else ""
-        meta = _html_escape(c.name) + (f" — {_html_escape(phone_disp)}" if phone_disp else "")
-        bc = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
-        rows.append(
-            f"""
-            <a class='cust-row' href='/creditbook/customer/{c.id}'>
-              <div class='cust-name'>{_html_escape(c.name)}</div>
-              <div class='cust-meta'>{meta}</div>
-              <div class='cust-bal {bc}'>الرصيد الحالي: {_amount_to_str(bal)} د.ع.</div>
-            </a>
-            """
-        )
-    body = "".join(rows) if rows else "<p class='hint'>لا يوجد عملاء بعد — اضغط «عميل جديد» لإضافة أول عميل.</p>"
+    body = render_dashboard_customer_rows_html(uid, search_q)
     flash_html = _flash_block(flash_key, err_msg)
     add_form = f"""
     <div class='new-cust-block'>
-      <button type='button' class='btn btn-primary btn-new-cust' onclick="document.getElementById('new-cust-panel').classList.toggle('hidden');">
-        ➕ عميل جديد
-      </button>
+      <div class='new-cust-actions'>
+        <button type='button' class='btn btn-primary btn-new-cust' onclick="document.getElementById('new-cust-panel').classList.toggle('hidden');">
+          ➕ عميل جديد
+        </button>
+        <a class='btn btn-secondary btn-report' href='/creditbook/report'>📊 تقرير</a>
+      </div>
       <div id='new-cust-panel' class='hidden web-section new-cust-panel'>
         <h3 class='web-h3'>إضافة عميل</h3>
         <form method='post' action='/creditbook/customer/create' class='stack-form'>
@@ -588,14 +576,10 @@ def render_dashboard_html(
     net_class = "bal-green" if tot_net > 0 else ("bal-red" if tot_net < 0 else "")
     uname = _html_escape(owner_display_name_for_user(user))
     q_esc = _html_escape(search_q or "")
-    q_hint = (
-        "<p class='hint search-hint'>نتائج البحث — يمكنك البحث باسم العميل، الهاتف، الملاحظة، أو جزء من المبلغ.</p>"
-        if (search_q or "").strip()
-        else ""
+    q_hint = "<p class='hint search-hint' id='search-hint-line' hidden>بحث فوري أثناء الكتابة.</p>"
+    clear_search = (
+        "<button type='button' class='btn btn-secondary btn-search-clear' id='dash-q-clear' hidden>مسح</button>"
     )
-    clear_search = ""
-    if (search_q or "").strip():
-        clear_search = "<a class='btn btn-secondary btn-search-clear' href='/creditbook/dashboard'>مسح البحث</a>"
     card = f"""
           <div class='brand-header share-report-head dashboard-head'>
             <div class='dashboard-brand-col'>
@@ -615,20 +599,53 @@ def render_dashboard_html(
           {flash_html}
           <p class='hint'>إدارة العملاء والمعاملات من المتصفح أو من البوت.</p>
           <div class='dashboard-tools'>
-            <form class='dashboard-search' method='get' action='/creditbook/dashboard' role='search'>
+            <div class='dashboard-search' role='search'>
               <label class='visually-hidden' for='dash-q'>بحث في العملاء والمعاملات</label>
-              <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='بحث: اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
-              <button type='submit' class='btn btn-primary'>بحث</button>
+              <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='بحث فوري: اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
               {clear_search}
-            </form>
-            <a class='btn btn-secondary btn-report' href='/creditbook/report'>📊 تقرير المعاملات</a>
+            </div>
           </div>
           {q_hint}
           {add_form}
           <h3 class='web-h3' style='margin-top:8px'>📋 عملائي</h3>
-          {body}
+          <div id='cust-list'>{body}</div>
+          <script>
+          (function() {{
+            var inp = document.getElementById('dash-q');
+            var list = document.getElementById('cust-list');
+            var clr = document.getElementById('dash-q-clear');
+            var hint = document.getElementById('search-hint-line');
+            if (!inp || !list) return;
+            var t = null;
+            function showClear() {{
+              var v = (inp.value || '').trim();
+              if (clr) clr.hidden = !v;
+              if (hint) hint.hidden = !v;
+            }}
+            function load() {{
+              var q = (inp.value || '').trim();
+              fetch('/creditbook/search_customers?q=' + encodeURIComponent(q), {{ credentials: 'same-origin' }})
+                .then(function(r) {{ return r.json(); }})
+                .then(function(data) {{
+                  if (data && data.html !== undefined) list.innerHTML = data.html;
+                }})
+                .catch(function() {{}});
+            }}
+            function debounce() {{
+              clearTimeout(t);
+              t = setTimeout(function() {{ load(); showClear(); }}, 280);
+            }}
+            inp.addEventListener('input', debounce);
+            inp.addEventListener('search', debounce);
+            if (clr) clr.addEventListener('click', function() {{
+              inp.value = '';
+              debounce();
+            }});
+            showClear();
+          }})();
+          </script>
     """
-    return wrap_creditbook_app_shell(user, favicon_href, brand_img, "دفتر الديون — عملائي", None, card)
+    return wrap_creditbook_app_shell(user, favicon_href, brand_img, "دفتر الديون — عملائي", None, card, body_class="page-dashboard")
 
 
 def render_report_all_transactions_page(
@@ -640,6 +657,8 @@ def render_report_all_transactions_page(
     brand_img: str,
 ) -> str:
     """جميع معاملات كل العملاء، مرتبة زمنياً مع ترقيم صفحات."""
+    tot_gave, tot_took, tot_net = load_dashboard_aggregate_totals(user.id)
+    net_class = "bal-green" if tot_net > 0 else ("bal-red" if tot_net < 0 else "")
     uname = _html_escape(owner_display_name_for_user(user))
     tx_rows = []
     for t, cust in rows:
@@ -688,6 +707,11 @@ def render_report_all_transactions_page(
               <div class='brand'>
                 {_brand_home_block(brand_img, uname)}
               </div>
+            </div>
+            <div class='cust-head-stats dashboard-totals dashboard-stats-col' role='group' aria-label='إجمالي كل العملاء'>
+                <div class='cust-stat-line'><span class='cust-stat-lbl'>أخذت</span><span class='cust-stat-val bal-red'>{_amount_to_str(tot_took)} د.ع.</span></div>
+                <div class='cust-stat-line'><span class='cust-stat-lbl'>أعطيت</span><span class='cust-stat-val bal-green'>{_amount_to_str(tot_gave)} د.ع.</span></div>
+                <div class='cust-stat-line'><span class='cust-stat-lbl'>النتيجة</span><span class='cust-stat-val {net_class}'>{_amount_to_str(tot_net)} د.ع.</span></div>
             </div>
             <div class='dashboard-showcase-col'>
               {render_owner_showcase_card(user)}
@@ -891,11 +915,6 @@ def render_owner_customer_page(
         phone_val = _html_escape((cust.phone or "").strip())
 
         manage_panel = f"""
-        <div class='cust-edit-toggle'>
-          <button type='button' class='btn btn-primary btn-manage-cust' onclick="document.getElementById('cust-manage-panel').classList.toggle('hidden');">
-            ⚙️ إدارة العميل — تعديل أو حذف
-          </button>
-        </div>
         <div id='cust-manage-panel' class='hidden web-section cust-manage-panel'>
           <h3 class='web-h3'>تعديل بيانات العميل</h3>
           <p class='hint' style='margin-top:0'>غيّر الاسم أو رقم الهاتف، أو احذف الحقل لإزالة الرقم.</p>
@@ -981,7 +1000,8 @@ def render_owner_customer_page(
               </div>
               <div class='toolbar toolbar-cust-top'>
                 <a class='btn btn-secondary' href='/creditbook/dashboard'>◀ العملاء</a>
-                <a class='btn btn-primary' href='/creditbook/customer/{cust.id}/share'>📤 مشاركة</a>
+                <a class='btn btn-primary btn-cust-share' href='/creditbook/customer/{cust.id}/share'>📤 مشاركة</a>
+                <button type='button' class='btn btn-secondary btn-manage-compact' onclick="var p=document.getElementById('cust-manage-panel'); if(p){{ p.classList.toggle('hidden'); if(!p.classList.contains('hidden')) p.scrollIntoView({{behavior:'smooth',block:'nearest'}}); }}">⚙️ إدارة</button>
               </div>
               {flash_html}
               {manage_panel}
@@ -1157,6 +1177,30 @@ def load_dashboard_rows(user_id: int, q: str | None = None) -> list[tuple[Custom
         return out
     finally:
         db.close()
+
+
+def render_dashboard_customer_rows_html(user_id: int, q: str | None) -> str:
+    """قائمة عملاء HTML فقط — للوحة التحكم وللبحث الفوري."""
+    customers = load_dashboard_rows(user_id, q)
+    rows = []
+    for c, bal in customers:
+        phone_disp = format_phone_iq_local_display((c.phone or "").strip()) if c.phone else ""
+        meta = _html_escape(c.name) + (f" — {_html_escape(phone_disp)}" if phone_disp else "")
+        bc = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
+        rows.append(
+            f"""
+            <a class='cust-row' href='/creditbook/customer/{c.id}'>
+              <div class='cust-name'>{_html_escape(c.name)}</div>
+              <div class='cust-meta'>{meta}</div>
+              <div class='cust-bal {bc}'>الرصيد الحالي: {_amount_to_str(bal)} د.ع.</div>
+            </a>
+            """
+        )
+    if not rows:
+        if (q or "").strip():
+            return "<p class='hint'>لا يوجد عملاء مطابقين للبحث.</p>"
+        return "<p class='hint'>لا يوجد عملاء بعد — اضغط «عميل جديد» لإضافة أول عميل.</p>"
+    return "".join(rows)
 
 
 def load_all_transactions_page(

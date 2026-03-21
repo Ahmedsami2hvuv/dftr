@@ -32,8 +32,8 @@ from creditbook_web import (
     csrf_verify_public,
     get_user_from_cookie_header,
     load_all_transactions_page,
-    load_dashboard_rows,
     owner_display_name_for_user,
+    render_dashboard_customer_rows_html,
     REPORT_PAGE_SIZE,
     render_report_all_transactions_page,
     render_account_page,
@@ -731,20 +731,35 @@ class Handler(BaseHTTPRequestHandler):
             _send_html_page(self, 200, page)
             return
 
+        if path == "/creditbook/search_customers":
+            if not web_user:
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b'{"error":"login"}')
+                return
+            q_raw = (qs.get("q") or [None])[0]
+            search_q = unquote(q_raw).strip() if q_raw else None
+            frag = render_dashboard_customer_rows_html(web_user.id, search_q)
+            payload = json.dumps({"html": frag}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
         if path == "/creditbook/dashboard":
             if not web_user:
                 _redirect(self, "/creditbook/login")
                 return
             q_raw = (qs.get("q") or [None])[0]
             search_q = unquote(q_raw).strip() if q_raw else None
-            rows = load_dashboard_rows(web_user.id, search_q)
             flash_key = (qs.get("flash") or [None])[0]
             err_msg = (qs.get("err") or [None])[0]
             if err_msg:
                 err_msg = unquote(err_msg)
             page = render_dashboard_html(
                 web_user,
-                rows,
                 favicon_href,
                 brand_img_src,
                 flash_key=flash_key,
