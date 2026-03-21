@@ -22,7 +22,7 @@ from app_models import (
 from handlers.customers import _parse_amount_and_optional_note
 from handlers.partner_link import maybe_queue_partner_tx
 from utils.password import check_password, hash_password
-from utils.phone import is_plausible_iraq_mobile, normalize_phone, same_phone
+from utils.phone import is_plausible_iraq_mobile, normalize_phone
 
 _WEB_PHOTO_SAFE = re.compile(r"^[a-f0-9]{32}\.(jpg|jpeg|png|gif|webp)$", re.I)
 
@@ -121,74 +121,7 @@ def action_customer_create(user_id: int, name: str, phone_raw: str) -> tuple[str
         db.close()
 
 
-def _find_user_by_phone_equiv(db, phone_normalized: str) -> User | None:
-    u = db.query(User).filter(User.phone == phone_normalized).first()
-    if u:
-        return u
-    for u in db.query(User).filter(User.phone.isnot(None)):
-        if same_phone(u.phone, phone_normalized):
-            return u
-    return None
-
-
-def action_user_account_update(
-    user_id: int,
-    full_name: str,
-    phone_raw: str,
-    old_password: str,
-    new_password: str,
-    new_password2: str,
-    remove_phone: bool,
-) -> str | None:
-    full_name = (full_name or "").strip()
-    if not full_name:
-        return "أدخل اسماً صحيحاً."
-    old_password = (old_password or "").strip()
-    new_password = (new_password or "").strip()
-    new_password2 = (new_password2 or "").strip()
-    if new_password or new_password2:
-        if new_password != new_password2:
-            return "كلمة المرور الجديدة والتأكيد غير متطابقين."
-        if len(new_password) < 4:
-            return "كلمة المرور يجب أن تكون 4 أحرف على الأقل."
-        if not old_password:
-            return "أدخل كلمة المرور الحالية لتغييرها."
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return "الحساب غير موجود."
-        if new_password:
-            if not user.password_hash or not check_password(old_password, user.password_hash):
-                return "كلمة المرور الحالية غير صحيحة."
-            user.password_hash = hash_password(new_password)
-        user.full_name = full_name
-        if remove_phone:
-            user.phone = None
-        else:
-            pr = (phone_raw or "").strip()
-            if not pr:
-                user.phone = None
-            else:
-                p = normalize_phone(pr)
-                if not is_plausible_iraq_mobile(p):
-                    return "رقم الهاتف غير صالح."
-                other = _find_user_by_phone_equiv(db, p)
-                if other and other.id != user_id:
-                    return "هذا الرقم مرتبط بحساب آخر."
-                user.phone = p
-        db.commit()
-        return None
-    except Exception as e:
-        db.rollback()
-        return str(e)[:200]
-    finally:
-        db.close()
-
-
-def action_customer_update(
-    user_id: int, cid: int, name: str, phone_raw: str, remove_phone: bool = False
-) -> str | None:
+def action_customer_update(user_id: int, cid: int, name: str, phone_raw: str) -> str | None:
     name = (name or "").strip()
     if not name:
         return "أدخل اسماً صحيحاً."
@@ -197,17 +130,14 @@ def action_customer_update(
         cust = _get_customer_owned(db, user_id, cid)
         if not cust:
             return "العميل غير موجود."
-        if remove_phone:
+        phone_raw = (phone_raw or "").strip()
+        if phone_raw.lower() in ("", "حذف", "delete"):
             cust.phone = None
         else:
-            phone_raw = (phone_raw or "").strip()
-            if not phone_raw:
-                cust.phone = None
-            else:
-                p = normalize_phone(phone_raw)
-                if not is_plausible_iraq_mobile(p):
-                    return "رقم الهاتف غير صالح."
-                cust.phone = p
+            p = normalize_phone(phone_raw)
+            if not is_plausible_iraq_mobile(p):
+                return "رقم الهاتف غير صالح، أو اتركه فارغاً لإزالة الرقم."
+            cust.phone = p
         cust.name = name
         db.commit()
         return None
@@ -407,5 +337,56 @@ def action_tx_delete(user_id: int, tx_id: int) -> tuple[str | None, int | None]:
     except Exception as e:
         db.rollback()
         return (str(e)[:200], None)
+    finally:
+        db.close()
+
+
+def action_user_update_profile(user_id: int, full_name: str, phone_raw: str) -> str | None:
+    name = (full_name or "").strip()
+    if not name:
+        return "أدخل اسماً صحيحاً."
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.id == user_id).first()
+        if not u:
+            return "الحساب غير موجود."
+        phone_raw = (phone_raw or "").strip()
+        if not phone_raw:
+            u.phone = None
+        else:
+            p = normalize_phone(phone_raw)
+            if not is_plausible_iraq_mobile(p):
+                return "رقم الهاتف غير صالح."
+            u.phone = p
+        u.full_name = name
+        db.commit()
+        return None
+    except Exception as e:
+        db.rollback()
+        return str(e)[:200]
+    finally:
+        db.close()
+
+
+def action_user_change_password(user_id: int, current: str, new_pw: str, new_pw2: str) -> str | None:
+    if (new_pw or "").strip() != (new_pw2 or "").strip():
+        return "تأكيد كلمة المرور غير مطابق."
+    if len((new_pw or "").strip()) < 4:
+        return "كلمة المرور الجديدة قصيرة جداً."
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.id == user_id).first()
+        if not u:
+            return "الحساب غير موجود."
+        if not u.password_hash:
+            return "لا توجد كلمة مرور لهذا الحساب بعد."
+        if not check_password((current or "").strip(), u.password_hash):
+            return "كلمة المرور الحالية غير صحيحة."
+        u.password_hash = hash_password((new_pw or "").strip())
+        db.commit()
+        return None
+    except Exception as e:
+        db.rollback()
+        return str(e)[:200]
     finally:
         db.close()
