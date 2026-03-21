@@ -207,10 +207,32 @@ def _amount_to_str(x) -> str:
         return str(x)
 
 
+def owner_display_name_for_user(user: User | None, *, empty: str = "مستخدم") -> str:
+    """
+    الاسم الظاهر لصاحب الدفتر: يُفضّل الاسم الكامل (حسابي / الفاتورة) ثم اسم المستخدم.
+    strip() لكل حقل حتى لا يُعتبر اسمٌ من مسافات فقط اسماً صالحاً (كان يسبب «صنع بواسطة» خاطئاً).
+    """
+    if not user:
+        return empty
+    fn = (user.full_name or "").strip()
+    if fn:
+        return fn
+    un = (user.username or "").strip()
+    if un:
+        return un
+    return empty
+
+
 def render_owner_showcase_card(user: User) -> str:
-    """مربع «صنع بواسطة» كما في صفحة تقرير المشاركة."""
-    owner_name = (user.full_name or user.username or "صاحب الحساب").strip() or "صاحب الحساب"
-    owner_phone = (user.phone or "").strip()
+    """مربع «صنع بواسطة» — نفس الاسم ورقم حسابي وصفحة الفاتورة العامة (يُعاد تحميل المستخدم من DB)."""
+    db = SessionLocal()
+    try:
+        row = db.query(User).filter(User.id == user.id).first()
+        who = row or user
+    finally:
+        db.close()
+    owner_name = owner_display_name_for_user(who, empty="صاحب الحساب")
+    owner_phone = (who.phone or "").strip()
     owner_name_esc = _html_escape(owner_name)
     if owner_phone:
         disp = format_phone_iq_local_display(owner_phone)
@@ -243,7 +265,7 @@ def wrap_creditbook_app_shell(
     body_class: str = "",
 ) -> str:
     """هيكل: قائمة جانبية منزلقة (زر ☰) + المحتوى."""
-    disp = _html_escape(user.full_name or user.username or "حسابي")
+    disp = _html_escape(owner_display_name_for_user(user, empty="حسابي"))
     acc_active = " sidebar-link-active" if active_nav == "account" else ""
     head = f"""
     <!doctype html>
@@ -365,7 +387,7 @@ def render_account_page(
           <img class='brand-logo' src="{_html_escape(brand_img)}" width='64' height='64' alt=''/>
           <div class='brand-text-wrap'>
             <h2>حسابي</h2>
-            <p class='brand-user-name'>{_html_escape(user.full_name or user.username or "—")}</p>
+            <p class='brand-user-name'>{_html_escape(owner_display_name_for_user(user, empty="—"))}</p>
           </div>
         </div>
         {render_owner_showcase_card(user)}
@@ -373,7 +395,7 @@ def render_account_page(
       {flash_html}
       <div class='web-section' style='border-top:none;padding-top:0'>
         <h3 class='web-h3'>معلومات الحساب</h3>
-        <p class='acct-summary'><strong>الاسم الظاهر:</strong> {_html_escape((user.full_name or user.username or "—").strip())}</p>
+        <p class='acct-summary'><strong>الاسم الظاهر:</strong> {_html_escape(owner_display_name_for_user(user, empty="—"))}</p>
         <p class='acct-summary'><strong>الهاتف:</strong> {_html_escape(disp_phone)}</p>
       </div>
       <div class='web-section'>
@@ -556,7 +578,7 @@ def render_dashboard_html(
     """
     tot_gave, tot_took, tot_net = load_dashboard_aggregate_totals(user.id)
     net_class = "bal-green" if tot_net > 0 else ("bal-red" if tot_net < 0 else "")
-    uname = _html_escape(user.full_name or user.username or "مستخدم")
+    uname = _html_escape(owner_display_name_for_user(user))
     share_bot = ""
     if BOT_USERNAME:
         bu = BOT_USERNAME.strip().lstrip("@")
@@ -605,7 +627,7 @@ def render_customer_share_page(
     brand_img: str,
 ) -> str:
     """صفحة أزرار المشاركة (نفس أزرار البوت بعد cust_share)."""
-    owner_disp = _html_escape(user.full_name or user.username or "حسابي")
+    owner_disp = _html_escape(owner_display_name_for_user(user, empty="حسابي"))
     warn = ""
     if not using_web:
         warn = (
@@ -765,7 +787,7 @@ def render_owner_customer_page(
         cust_disp_phone = format_phone_iq_local_display((cust.phone or "").strip()) if cust.phone else ""
         cust_meta = _html_escape(cust.name) + (f" — {_html_escape(cust_disp_phone)}" if cust_disp_phone else "")
 
-        owner_disp = _html_escape(user.full_name or user.username or "حسابي")
+        owner_disp = _html_escape(owner_display_name_for_user(user, empty="حسابي"))
         flash_html = _flash_block(flash_key, err_msg)
 
         name_val = _html_escape(cust.name)
@@ -916,7 +938,7 @@ def render_tx_edit_page(
         note_s = _html_escape((tx.note or "").strip())
         kind_ar = "أعطيت 🟢" if tx.kind == "gave" else "أخذت 🔴"
         cust_link = f"/creditbook/customer/{cust.id}"
-        owner_disp = _html_escape(user.full_name or user.username or "حسابي")
+        owner_disp = _html_escape(owner_display_name_for_user(user, empty="حسابي"))
         flash_html = _flash_block(flash_key, err_msg)
 
         dt = tx.created_at

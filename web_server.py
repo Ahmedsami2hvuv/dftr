@@ -30,6 +30,7 @@ from creditbook_web import (
     csrf_verify_public,
     get_user_from_cookie_header,
     load_dashboard_rows,
+    owner_display_name_for_user,
     render_account_page,
     render_customer_share_page,
     render_dashboard_html,
@@ -337,7 +338,7 @@ def _render_page(token: str, offset: int) -> str:
         balance_class = "bal-red" if bal > 0 else ("bal-green" if bal < 0 else "")
 
         owner = cust.user
-        owner_name = (owner.full_name or owner.username or "صاحب الحساب") if owner else "صاحب الحساب"
+        owner_name = owner_display_name_for_user(owner, empty="صاحب الحساب") if owner else "صاحب الحساب"
         owner_phone = (owner.phone or "").strip() if owner else ""
 
         wa_btn = ""
