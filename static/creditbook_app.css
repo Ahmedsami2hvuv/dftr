@@ -569,31 +569,77 @@ form.login-form { margin-top: 8px; }
   gap: 10px;
 }
 
-/* صفحة العميل — خانه النتيجة أوضح، وبطاقة صنع بواسطة بأقصى اليسار */
-.page-cust .brand-header.share-report-head.dashboard-head.cust-page-head {
-  justify-content: flex-start;
-  align-items: flex-start;
-  gap: 10px 14px;
+/* صفحة العميل — مربع النتائج وبطاقة صنع بواسطة بنفس العرض؛ سطر إحصائيات بلا فراغ؛ اسم الصانع سطر واحد */
+@media (min-width: 561px) {
+  .page-cust .brand-header.share-report-head.dashboard-head.cust-page-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px 12px;
+    align-items: stretch;
+  }
+  .page-cust .cust-page-head .dashboard-brand-col {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .page-cust .brand-header.dashboard-head .cust-head-stats.dashboard-stats-col {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin-top: 0;
+    padding: 12px 14px;
+    gap: 10px;
+    box-sizing: border-box;
+    justify-content: center;
+  }
+  .page-cust .cust-page-head .dashboard-showcase-col {
+    grid-column: 3;
+    grid-row: 1;
+    margin-inline-start: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .page-cust .cust-page-head .dashboard-showcase-col .owner-showcase {
+    flex: 1 1 auto;
+    min-height: 100%;
+    box-sizing: border-box;
+  }
 }
-.page-cust .cust-page-head .dashboard-brand-col {
+.page-cust .brand-header.dashboard-head .cust-head-stats.dashboard-stats-col .cust-stat-line {
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 10px;
+  width: 100%;
+  flex-wrap: nowrap;
+  font-size: 1.06rem;
+  line-height: 1.35;
+}
+.page-cust .brand-header.dashboard-head .cust-head-stats.dashboard-stats-col .cust-stat-val {
+  text-align: end;
   flex: 0 1 auto;
   min-width: 0;
 }
-.page-cust .brand-header.dashboard-head .cust-head-stats.dashboard-stats-col {
-  flex: 0 0 auto;
-  min-width: min(100%, 260px);
-  max-width: min(100%, 430px);
-  margin-top: 0;
-  padding: 16px 18px;
-  gap: 12px;
+.page-cust .dashboard-head .owner-name-row {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
-.page-cust .brand-header.dashboard-head .cust-head-stats.dashboard-stats-col .cust-stat-line {
-  font-size: 1.08rem;
-}
-.page-cust .cust-page-head .dashboard-showcase-col {
-  flex: 0 1 min(240px, 44vw);
+.page-cust .dashboard-head .owner-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
   min-width: 0;
-  margin-inline-start: auto;
+  line-height: 1.2;
+}
+.page-cust .dashboard-head .owner-phone,
+.page-cust .dashboard-head a.owner-phone-wa {
+  flex-shrink: 0;
 }
 
 .dashboard-tools {
@@ -1643,10 +1689,21 @@ button.sidebar-link.sidebar-install-btn {
     font-size: clamp(0.88rem, 3.2vw, 1.05rem);
     white-space: normal;
   }
+  .page-cust .dashboard-head .owner-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .dashboard-head .owner-name-row {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
+  }
+  .page-cust .dashboard-head .owner-name-row {
+    flex-direction: row !important;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
   }
   .dashboard-head .owner-phone {
     font-size: 0.78rem;
@@ -1660,17 +1717,17 @@ button.sidebar-link.sidebar-install-btn {
   }
   .brand-header { flex-direction: column; align-items: stretch; }
   .brand { justify-content: center; }
-  /* صفحة عميل: عمود الإحصائيات بعرض المحتوى — لا يُقسَم الصف 50/50 فيُترك فراغاً كبيراً */
+  /* صفحة عميل: عمودا النتائج وصنع بواسطة بنفس العرض */
   .page-cust .brand-header.dashboard-head {
-    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     column-gap: 8px;
   }
   .page-cust .dashboard-head .cust-head-stats.dashboard-stats-col {
-    width: auto !important;
-    max-width: min(100%, 380px);
-    padding: 14px 16px !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 12px 12px !important;
   }
   .page-cust .dashboard-head .dashboard-showcase-col {
-    margin-inline-start: auto;
+    margin-inline-start: 0;
   }
 }
