@@ -963,6 +963,8 @@ class Handler(BaseHTTPRequestHandler):
             err_msg = (qs.get("err") or [None])[0]
             if err_msg:
                 err_msg = unquote(err_msg)
+            q_raw = (qs.get("q") or [None])[0]
+            search_q = unquote(q_raw).strip() if q_raw else None
             page = render_owner_customer_page(
                 web_user,
                 cid,
@@ -972,6 +974,7 @@ class Handler(BaseHTTPRequestHandler):
                 brand_img_src,
                 flash_key=flash_key,
                 err_msg=err_msg,
+                search_q=search_q,
             )
             if page is None:
                 self.send_response(404)

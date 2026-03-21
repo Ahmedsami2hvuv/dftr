@@ -807,6 +807,34 @@ form.login-form { margin-top: 8px; }
   align-items: center;
   justify-content: flex-start;
 }
+/* بحث داخل صفحة العميل — تصفية المعاملات */
+.cust-tx-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+  box-sizing: border-box;
+}
+.cust-tx-search input[type="search"] {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  font-size: 16px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.btn-cust-search-submit,
+.btn-cust-search-clear {
+  margin-top: 0 !important;
+  flex: 0 0 auto;
+}
 .share-toolbar {
   flex-direction: column;
   align-items: stretch;

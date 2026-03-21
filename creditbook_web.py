@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=11"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=12"
 
 
 def _html_escape(s: str) -> str:
@@ -984,8 +984,11 @@ def render_owner_customer_page(
     brand_img: str,
     flash_key: str | None = None,
     err_msg: str | None = None,
+    search_q: str | None = None,
 ) -> str | None:
-    """صفحة عميل من منظور صاحب الدفتر + نماذج التعديل."""
+    """صفحة عميل من منظور صاحب الدفتر + نماذج التعديل. search_q يصفّي قائمة المعاملات (ملاحظة أو مبلغ)."""
+    from sqlalchemy import String, cast, or_
+
     db = SessionLocal()
     try:
         cust = (
@@ -1005,16 +1008,21 @@ def render_owner_customer_page(
         took = sum(float(t.amount or 0) for t in cust.transactions if t.kind == "took")
         bal = gave - took
 
-        total = (
-            db.query(CustomerTransaction)
-            .filter(CustomerTransaction.customer_id == cust.id)
-            .count()
-        )
+        sq = (search_q or "").strip()
+        tx_base = db.query(CustomerTransaction).filter(CustomerTransaction.customer_id == cust.id)
+        if sq:
+            like_pat = f"%{sq}%"
+            tx_base = tx_base.filter(
+                or_(
+                    CustomerTransaction.note.ilike(like_pat),
+                    cast(CustomerTransaction.amount, String).ilike(like_pat),
+                )
+            )
+
+        total = tx_base.count()
 
         txs = (
-            db.query(CustomerTransaction)
-            .filter(CustomerTransaction.customer_id == cust.id)
-            .order_by(CustomerTransaction.created_at.desc())
+            tx_base.order_by(CustomerTransaction.created_at.desc())
             .offset(offset)
             .limit(TX_PAGE_SIZE)
             .all()
@@ -1077,9 +1085,13 @@ def render_owner_customer_page(
                 """
             )
 
+        q_esc = _html_escape(sq)
+        q_url = quote(sq, safe="") if sq else ""
+        q_suffix = f"&q={q_url}" if sq else ""
+
         more_btn = ""
         if has_more:
-            more_btn = f"<a class='btn btn-primary' href='/creditbook/customer/{cust.id}?offset={more_offset}'>➕ عرض المزيد</a>"
+            more_btn = f"<a class='btn btn-primary' href='/creditbook/customer/{cust.id}?offset={more_offset}{q_suffix}'>➕ عرض المزيد</a>"
 
         balance_class = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
 
@@ -1158,6 +1170,25 @@ def render_owner_customer_page(
         """
 
         net_line = f"{_amount_to_str(bal)} د.ع."
+        empty_tx_hint = (
+            "<p class='hint'>لا توجد معاملات مطابقة للبحث.</p>"
+            if sq and not tx_rows
+            else ('<p class="hint">لا توجد معاملات بعد.</p>' if not tx_rows else "")
+        )
+        clear_search = (
+            f"<a class='btn btn-secondary btn-cust-search-clear' href='/creditbook/customer/{cust.id}'>مسح البحث</a>"
+            if sq
+            else ""
+        )
+        search_block = f"""
+              <form method='get' action='/creditbook/customer/{cust.id}' class='cust-tx-search' role='search'>
+                <label class='visually-hidden' for='cust-tx-q'>بحث في معاملات هذا العميل</label>
+                <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='بحث في المعاملات: ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
+                <button type='submit' class='btn btn-secondary btn-cust-search-submit'>بحث</button>
+                {clear_search}
+              </form>
+        """
+
         card_inner = f"""
               <div class='brand-header share-report-head dashboard-head cust-page-head'>
                 <div class='dashboard-brand-col'>
@@ -1183,7 +1214,8 @@ def render_owner_customer_page(
               {manage_panel}
               {txn_form}
               <h3 class='web-h3'>📜 المعاملات</h3>
-              {''.join(tx_rows) if tx_rows else '<p class="hint">لا توجد معاملات بعد.</p>'}
+              {search_block}
+              {''.join(tx_rows) if tx_rows else empty_tx_hint}
               {more_btn}
         """
         return wrap_creditbook_app_shell(
