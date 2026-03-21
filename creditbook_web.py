@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=17"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=18"
 
 
 def _html_escape(s: str) -> str:
@@ -934,7 +934,7 @@ def render_report_all_transactions_page(
     else:
         filter_hint.append("ترتيب: الأحدث أولاً")
     filter_hint_s = " — ".join(filter_hint) if filter_hint else ""
-    default_filter_hint = "اختر الفلتر ثم «تطبيق الفلتر». استخدم «عرض المزيد» لصفحات إضافية."
+    default_filter_hint = "تُحدَّث النتائج تلقائياً عند تغيير الفلتر. استخدم «عرض المزيد» لصفحات إضافية."
 
     inner = f"""
           <div class='brand-header share-report-head dashboard-head'>
@@ -984,10 +984,35 @@ def render_report_all_transactions_page(
               </div>
             </div>
             <div class='report-filters-actions'>
-              <button type='submit' class='btn btn-primary'>تطبيق الفلتر</button>
               <a class='btn btn-secondary' href='/creditbook/report'>إعادة ضبط</a>
             </div>
           </form>
+          <script>
+          (function() {{
+            var form = document.querySelector('form.report-filters');
+            if (!form) return;
+            var sq = document.getElementById('rep-sq');
+            var repDate = document.getElementById('rep-date');
+            var timer;
+            function submitForm() {{
+              var off = form.querySelector('input[name="offset"]');
+              if (off) off.value = '0';
+              form.submit();
+            }}
+            function debounceSq() {{
+              clearTimeout(timer);
+              timer = setTimeout(submitForm, 350);
+            }}
+            if (sq) {{
+              sq.addEventListener('input', debounceSq);
+              sq.addEventListener('search', debounceSq);
+            }}
+            form.querySelectorAll('input[type="radio"]').forEach(function(el) {{
+              el.addEventListener('change', submitForm);
+            }});
+            if (repDate) repDate.addEventListener('change', submitForm);
+          }})();
+          </script>
           <p class='hint'>{_html_escape(filter_hint_s) if filter_hint_s else _html_escape(default_filter_hint)}</p>
           {count_note}
           {''.join(tx_rows) if tx_rows else '<p class="hint">لا توجد معاملات مطابقة.</p>'}
@@ -1064,6 +1089,134 @@ def _owner_kind_class(kind: str) -> str:
     return "bal-green" if kind == "gave" else "bal-red"
 
 
+def _customer_tx_list_html_fragment(
+    db,
+    cust: Customer,
+    owner_user_id: int,
+    search_q: str | None,
+    offset: int,
+) -> str:
+    """قائمة معاملات العميل + زر المزيد — للصفحة الكاملة وللبحث الفوري (JSON)."""
+    from sqlalchemy import String, cast, or_
+
+    sq = (search_q or "").strip()
+    tx_base = db.query(CustomerTransaction).filter(CustomerTransaction.customer_id == cust.id)
+    if sq:
+        like_pat = f"%{sq}%"
+        tx_base = tx_base.filter(
+            or_(
+                CustomerTransaction.note.ilike(like_pat),
+                cast(CustomerTransaction.amount, String).ilike(like_pat),
+            )
+        )
+
+    total = tx_base.count()
+
+    txs = (
+        tx_base.order_by(CustomerTransaction.created_at.desc())
+        .offset(offset)
+        .limit(TX_PAGE_SIZE)
+        .all()
+    )
+
+    all_txs_asc = (
+        db.query(CustomerTransaction)
+        .filter(CustomerTransaction.customer_id == cust.id)
+        .order_by(CustomerTransaction.created_at.asc(), CustomerTransaction.id.asc())
+        .all()
+    )
+    gave = sum(float(t.amount or 0) for t in cust.transactions if t.kind == "gave")
+    took = sum(float(t.amount or 0) for t in cust.transactions if t.kind == "took")
+    bal = gave - took
+
+    running = 0.0
+    running_after_by_tx = {}
+    for rt in all_txs_asc:
+        amt = float(rt.amount or 0)
+        if rt.kind == "gave":
+            running += amt
+        else:
+            running -= amt
+        running_after_by_tx[rt.id] = running
+
+    has_more = offset + TX_PAGE_SIZE < total
+    more_offset = offset + TX_PAGE_SIZE
+
+    tx_rows = []
+    for t in txs:
+        dt = t.created_at.strftime("%Y-%m-%d %H:%M")
+        note = (t.note or "").strip()
+        note_html = (
+            f"<div class='tx-note-black'><span class='tx-note-label'>ملاحظة:</span> {_html_escape(note)}</div>"
+            if note
+            else ""
+        )
+        photo_html = ""
+        if getattr(t, "photo_file_id", None):
+            fid = quote(str(t.photo_file_id), safe="")
+            photo_html = (
+                f"<a class='tx-inline-photo' href='/creditbook/photo-view/{fid}' target='_blank' rel='noopener' title='صورة'>"
+                f"<img class='photo' src='/creditbook/photo/{fid}' alt=''/></a>"
+            )
+        remain = running_after_by_tx.get(t.id, bal)
+        remain_class = "bal-green" if remain > 0 else ("bal-red" if remain < 0 else "")
+        kc = _owner_kind_class(t.kind)
+        kind_word = _owner_kind_word(t.kind)
+        tx_rows.append(
+            f"""
+                <div class='tx tx-row-{t.kind}'>
+                  <div class='tx-line-main'>
+                    <span class='tx-kind-amt {kc}'><span class='tx-kind-txt'>{kind_word}</span> {_amount_to_str(t.amount)} د.ع.</span>
+                    <span class='tx-sep' aria-hidden='true'>·</span>
+                    <span class='tx-date' dir='ltr'>{dt}</span>
+                    <span class='tx-sep' aria-hidden='true'>·</span>
+                    <span class='tx-remain {remain_class}'>الرصيد بعدها: {_amount_to_str(remain)} د.ع.</span>
+                    <span class='tx-sep' aria-hidden='true'>·</span>
+                    <a class='tx-edit-btn' href='/creditbook/tx/{t.id}'><span class='tx-edit-ico'>✎</span> تعديل</a>
+                    {photo_html}
+                  </div>
+                  {note_html}
+                </div>
+                """
+        )
+
+    q_url = quote(sq, safe="") if sq else ""
+    q_suffix = f"&q={q_url}" if sq else ""
+
+    more_btn = ""
+    if has_more:
+        more_btn = f"<a class='btn btn-primary' href='/creditbook/customer/{cust.id}?offset={more_offset}{q_suffix}'>➕ عرض المزيد</a>"
+
+    empty_tx_hint = (
+        "<p class='hint'>لا توجد معاملات مطابقة.</p>"
+        if sq and not tx_rows
+        else ('<p class="hint">لا توجد معاملات بعد.</p>' if not tx_rows else "")
+    )
+    body = ("".join(tx_rows) if tx_rows else empty_tx_hint) + more_btn
+    return body
+
+
+def render_customer_tx_list_fragment(
+    owner_user_id: int,
+    customer_id: int,
+    search_q: str | None,
+    offset: int = 0,
+) -> str | None:
+    """HTML لقائمة معاملات عميل — للاستجابة JSON؛ None إن لم يُعثر على العميل."""
+    db = SessionLocal()
+    try:
+        cust = (
+            db.query(Customer)
+            .filter(Customer.id == customer_id, Customer.user_id == owner_user_id)
+            .first()
+        )
+        if not cust:
+            return None
+        return _customer_tx_list_html_fragment(db, cust, owner_user_id, search_q, offset)
+    finally:
+        db.close()
+
+
 def render_owner_customer_page(
     user: User,
     customer_id: int,
@@ -1076,8 +1229,6 @@ def render_owner_customer_page(
     search_q: str | None = None,
 ) -> str | None:
     """صفحة عميل من منظور صاحب الدفتر + نماذج التعديل. search_q يصفّي قائمة المعاملات (ملاحظة أو مبلغ)."""
-    from sqlalchemy import String, cast, or_
-
     db = SessionLocal()
     try:
         cust = (
@@ -1098,89 +1249,8 @@ def render_owner_customer_page(
         bal = gave - took
 
         sq = (search_q or "").strip()
-        tx_base = db.query(CustomerTransaction).filter(CustomerTransaction.customer_id == cust.id)
-        if sq:
-            like_pat = f"%{sq}%"
-            tx_base = tx_base.filter(
-                or_(
-                    CustomerTransaction.note.ilike(like_pat),
-                    cast(CustomerTransaction.amount, String).ilike(like_pat),
-                )
-            )
-
-        total = tx_base.count()
-
-        txs = (
-            tx_base.order_by(CustomerTransaction.created_at.desc())
-            .offset(offset)
-            .limit(TX_PAGE_SIZE)
-            .all()
-        )
-
-        all_txs_asc = (
-            db.query(CustomerTransaction)
-            .filter(CustomerTransaction.customer_id == cust.id)
-            .order_by(CustomerTransaction.created_at.asc(), CustomerTransaction.id.asc())
-            .all()
-        )
-        running = 0.0
-        running_after_by_tx = {}
-        for rt in all_txs_asc:
-            amt = float(rt.amount or 0)
-            if rt.kind == "gave":
-                running += amt
-            else:
-                running -= amt
-            running_after_by_tx[rt.id] = running
-
-        has_more = offset + TX_PAGE_SIZE < total
-        more_offset = offset + TX_PAGE_SIZE
-
-        tx_rows = []
-        for t in txs:
-            dt = t.created_at.strftime("%Y-%m-%d %H:%M")
-            note = (t.note or "").strip()
-            note_html = (
-                f"<div class='tx-note-black'><span class='tx-note-label'>ملاحظة:</span> {_html_escape(note)}</div>"
-                if note
-                else ""
-            )
-            photo_html = ""
-            if getattr(t, "photo_file_id", None):
-                fid = quote(str(t.photo_file_id), safe="")
-                photo_html = (
-                    f"<a class='tx-inline-photo' href='/creditbook/photo-view/{fid}' target='_blank' rel='noopener' title='صورة'>"
-                    f"<img class='photo' src='/creditbook/photo/{fid}' alt=''/></a>"
-                )
-            remain = running_after_by_tx.get(t.id, bal)
-            remain_class = "bal-green" if remain > 0 else ("bal-red" if remain < 0 else "")
-            kc = _owner_kind_class(t.kind)
-            kind_word = _owner_kind_word(t.kind)
-            tx_rows.append(
-                f"""
-                <div class='tx tx-row-{t.kind}'>
-                  <div class='tx-line-main'>
-                    <span class='tx-kind-amt {kc}'><span class='tx-kind-txt'>{kind_word}</span> {_amount_to_str(t.amount)} د.ع.</span>
-                    <span class='tx-sep' aria-hidden='true'>·</span>
-                    <span class='tx-date' dir='ltr'>{dt}</span>
-                    <span class='tx-sep' aria-hidden='true'>·</span>
-                    <span class='tx-remain {remain_class}'>الرصيد بعدها: {_amount_to_str(remain)} د.ع.</span>
-                    <span class='tx-sep' aria-hidden='true'>·</span>
-                    <a class='tx-edit-btn' href='/creditbook/tx/{t.id}'><span class='tx-edit-ico'>✎</span> تعديل</a>
-                    {photo_html}
-                  </div>
-                  {note_html}
-                </div>
-                """
-            )
-
         q_esc = _html_escape(sq)
-        q_url = quote(sq, safe="") if sq else ""
-        q_suffix = f"&q={q_url}" if sq else ""
-
-        more_btn = ""
-        if has_more:
-            more_btn = f"<a class='btn btn-primary' href='/creditbook/customer/{cust.id}?offset={more_offset}{q_suffix}'>➕ عرض المزيد</a>"
+        cust_tx_list_html = _customer_tx_list_html_fragment(db, cust, owner_user_id, search_q, offset)
 
         balance_class = "bal-green" if bal > 0 else ("bal-red" if bal < 0 else "")
 
@@ -1259,26 +1329,63 @@ def render_owner_customer_page(
         """
 
         net_line = f"{_amount_to_str(bal)} د.ع."
-        empty_tx_hint = (
-            "<p class='hint'>لا توجد معاملات مطابقة.</p>"
-            if sq and not tx_rows
-            else ('<p class="hint">لا توجد معاملات بعد.</p>' if not tx_rows else "")
-        )
-        clear_in_field = (
-            f"<a class='cust-search-clear-inline' href='/creditbook/customer/{cust.id}' "
-            f"aria-label='مسح' title='مسح'>✕</a>"
-            if sq
-            else ""
-        )
         search_block = f"""
-              <form method='get' action='/creditbook/customer/{cust.id}' class='cust-tx-search' role='search'>
+              <div class='cust-tx-search' role='search' data-cust-id='{cust.id}'>
                 <label class='visually-hidden' for='cust-tx-q'>تصفية معاملات هذا العميل</label>
-                <div class='cust-search-field-wrap{" cust-search-field-wrap--has-clear" if sq else ""}'>
+                <div class='cust-search-field-wrap{" cust-search-field-wrap--has-clear" if sq else ""}' id='cust-search-field-wrap'>
                   <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
-                  {clear_in_field}
+                  <button type='button' class='cust-search-clear-inline' id='cust-tx-clear' aria-label='مسح' title='مسح'{" hidden" if not sq else ""}>✕</button>
                 </div>
-                <button type='submit' class='btn btn-secondary btn-cust-search-submit'>تطبيق</button>
-              </form>
+              </div>
+        """
+        cust_tx_live_script = f"""
+        <script>
+        (function() {{
+          var root = document.querySelector('.cust-tx-search[data-cust-id="{cust.id}"]');
+          var list = document.getElementById('cust-tx-list');
+          var inp = document.getElementById('cust-tx-q');
+          var clearBtn = document.getElementById('cust-tx-clear');
+          var fieldWrap = document.getElementById('cust-search-field-wrap');
+          if (!root || !list || !inp) return;
+          var cid = root.getAttribute('data-cust-id');
+          var timer;
+          function syncClear() {{
+            var v = (inp.value || '').trim();
+            if (clearBtn) clearBtn.hidden = !v;
+            if (fieldWrap) fieldWrap.classList.toggle('cust-search-field-wrap--has-clear', !!v);
+          }}
+          function pushUrl(q) {{
+            try {{
+              var base = '/creditbook/customer/' + cid;
+              var url = q ? base + '?q=' + encodeURIComponent(q) : base;
+              if (history.replaceState) history.replaceState(null, '', url);
+            }} catch (e) {{}}
+          }}
+          function fetchFrag() {{
+            var q = (inp.value || '').trim();
+            syncClear();
+            pushUrl(q);
+            list.classList.add('cust-tx-list--loading');
+            fetch('/creditbook/customer/' + cid + '/tx_search?q=' + encodeURIComponent(q), {{ credentials: 'same-origin' }})
+              .then(function(r) {{ if (!r.ok) throw new Error(); return r.json(); }})
+              .then(function(data) {{ list.innerHTML = data.html || ''; }})
+              .catch(function() {{}})
+              .finally(function() {{ list.classList.remove('cust-tx-list--loading'); }});
+          }}
+          function debounced() {{
+            clearTimeout(timer);
+            timer = setTimeout(fetchFrag, 320);
+          }}
+          inp.addEventListener('input', debounced);
+          inp.addEventListener('search', debounced);
+          if (clearBtn) clearBtn.addEventListener('click', function() {{
+            inp.value = '';
+            syncClear();
+            fetchFrag();
+          }});
+          syncClear();
+        }})();
+        </script>
         """
 
         card_inner = f"""
@@ -1307,8 +1414,10 @@ def render_owner_customer_page(
               {txn_form}
               <h3 class='web-h3'>📜 المعاملات</h3>
               {search_block}
-              {''.join(tx_rows) if tx_rows else empty_tx_hint}
-              {more_btn}
+              <div id='cust-tx-list' class='cust-tx-list'>
+              {cust_tx_list_html}
+              </div>
+              {cust_tx_live_script}
         """
         return wrap_creditbook_app_shell(
             user,

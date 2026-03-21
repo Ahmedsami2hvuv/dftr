@@ -883,7 +883,8 @@ form.login-form { margin-top: 8px; }
 .cust-search-field-wrap--has-clear input[type="search"] {
   padding-inline-end: 44px;
 }
-a.cust-search-clear-inline {
+a.cust-search-clear-inline,
+button.cust-search-clear-inline {
   position: absolute;
   inset-inline-end: 6px;
   top: 50%;
@@ -900,13 +901,23 @@ a.cust-search-clear-inline {
   text-decoration: none !important;
   transition: background 0.15s ease, color 0.15s ease;
 }
-a.cust-search-clear-inline:hover {
+button.cust-search-clear-inline {
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+a.cust-search-clear-inline:hover,
+button.cust-search-clear-inline:hover {
   background: #cbd5e1;
   color: #0f172a !important;
 }
-.btn-cust-search-submit {
-  margin-top: 0 !important;
-  flex: 0 0 auto;
+.cust-tx-list {
+  transition: opacity 0.15s ease;
+}
+.cust-tx-list--loading {
+  opacity: 0.55;
+  pointer-events: none;
 }
 /* صفحة تعديل المعاملة — نوع المعاملة + زر التغيير */
 .tx-kind-edit-row {

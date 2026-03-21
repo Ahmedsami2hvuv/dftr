@@ -43,6 +43,7 @@ from creditbook_web import (
     render_feedback_page,
     render_login_page,
     render_logout_confirm_page,
+    render_customer_tx_list_fragment,
     render_owner_customer_page,
     render_register_page,
     render_tx_edit_page,
@@ -1009,6 +1010,36 @@ class Handler(BaseHTTPRequestHandler):
                 brand_img_src,
             )
             _send_html_page(self, 200, page)
+            return
+
+        cust_tx_search_m = re.match(r"^/creditbook/customer/(?P<cid>\d+)/tx_search$", path)
+        if cust_tx_search_m:
+            if not web_user:
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b'{"error":"login"}')
+                return
+            cid = int(cust_tx_search_m.group("cid"))
+            q_raw = (qs.get("q") or [None])[0]
+            search_q = unquote(q_raw).strip() if q_raw else None
+            o_raw = (qs.get("offset") or ["0"])[0]
+            try:
+                tx_off = max(0, int(o_raw))
+            except ValueError:
+                tx_off = 0
+            frag = render_customer_tx_list_fragment(web_user.id, cid, search_q, tx_off)
+            if frag is None:
+                self.send_response(404)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b'{"error":"not_found"}')
+                return
+            payload = json.dumps({"html": frag}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(payload)
             return
 
         cust_m = re.match(r"^/creditbook/customer/(?P<cid>\d+)$", path)
