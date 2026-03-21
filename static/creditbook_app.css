@@ -568,6 +568,27 @@ form.login-form { margin-top: 8px; }
   align-items: stretch;
   gap: 10px;
 }
+
+/* صفحة العميل — تقليل الفراغ الأفقي بين خانه النتيجة (إحصائيات) وبطاقة صنع بواسطة */
+.page-cust .brand-header.share-report-head.dashboard-head.cust-page-head {
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 8px 12px;
+}
+.page-cust .cust-page-head .dashboard-brand-col {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.page-cust .brand-header.dashboard-head .cust-head-stats.dashboard-stats-col {
+  flex: 0 0 auto;
+  max-width: min(100%, 290px);
+  margin-top: 0;
+}
+.page-cust .cust-page-head .dashboard-showcase-col {
+  flex: 0 1 min(260px, 46vw);
+  min-width: 0;
+}
+
 .dashboard-tools {
   display: flex;
   flex-wrap: wrap;
@@ -1632,4 +1653,13 @@ button.sidebar-link.sidebar-install-btn {
   }
   .brand-header { flex-direction: column; align-items: stretch; }
   .brand { justify-content: center; }
+  /* صفحة عميل: عمود الإحصائيات بعرض المحتوى — لا يُقسَم الصف 50/50 فيُترك فراغاً كبيراً */
+  .page-cust .brand-header.dashboard-head {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    column-gap: 8px;
+  }
+  .page-cust .dashboard-head .cust-head-stats.dashboard-stats-col {
+    width: auto !important;
+    max-width: min(100%, 280px);
+  }
 }
