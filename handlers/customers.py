@@ -1529,27 +1529,53 @@ def _local_input_file_for_web_photo(p, name: str):
         return InputFile(BytesIO(p.read_bytes()), filename=name)
 
 
+def _web_tx_public_photo_url(photo_file_id: str) -> str | None:
+    """رابط مباشر لمعاينة صورة معاملة الموقع (يعمل من المتصفح ومن تيليجرام)."""
+    s = str(photo_file_id)
+    if not s.startswith("web:"):
+        return None
+    base = public_web_base_url_for_telegram_fetch()
+    if not base:
+        return None
+    return f"{base}/creditbook/photo/{quote(s, safe='')}"
+
+
+def _web_tx_local_path_name(photo_file_id: str) -> tuple | None:
+    from creditbook_web_actions import is_safe_web_photo_name
+
+    s = str(photo_file_id)
+    if not s.startswith("web:"):
+        return None
+    name = s[4:]
+    if not is_safe_web_photo_name(name):
+        return None
+    p = WEB_TX_UPLOAD_DIR / name
+    if not p.is_file():
+        return None
+    return p, name
+
+
 def _photo_args_for_telegram_send(photo_file_id: str | None) -> list:
-    """قائمة مرشّحات لـ send_photo: file_id، أو رابط HTTPS للصورة، أو ملف محلي."""
+    """قائمة مرشّحات لـ send_photo: file_id، أو رابط HTTPS، أو رفع من القرص."""
     if not photo_file_id:
         return []
     s = str(photo_file_id)
     if not s.startswith("web:"):
         return [s]
+    name = s[4:]
     from creditbook_web_actions import is_safe_web_photo_name
 
-    name = s[4:]
     if not is_safe_web_photo_name(name):
         return []
     p = WEB_TX_UPLOAD_DIR / name
     out = []
-    # 1) رفع الملف من القرص أولاً (لا يعتمد على WEB_BASE_URL)
+    # 1) رابط HTTPS — تيليجرام يحمّل الصورة من موقعك (أقل مشاكل مع مكتبة PTB)
+    url = _web_tx_public_photo_url(s)
+    if url:
+        out.append(url)
+    # 2) رفع من القرص إن وُجد (نفس الحاوية / Volume)
     if p.is_file():
         out.append(_local_input_file_for_web_photo(p, name))
-    # 2) رابط HTTPS عام (خوادم تيليجرام) — يُستنتج من RAILWAY_PUBLIC_DOMAIN إن كان WEB_BASE_URL لا يزال localhost
-    base = public_web_base_url_for_telegram_fetch()
-    if base:
-        out.append(f"{base}/creditbook/photo/{quote(s, safe='')}")
     return out
 
 
@@ -1626,9 +1652,36 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
                 break
             except Exception:
                 continue
+        # أحياناً تيليجرام يرفض send_photo لكن يقبل الملف كمستند
         if not sent_photo:
-            if getattr(tx, "photo_file_id", None) and str(tx.photo_file_id).startswith("web:"):
-                text = text + "\n\n⚠️ الصورة المرفقة من الموقع غير متاحة (تحقق من رابط الموقع أو الملف على السيرفر)."
+            pmeta = _web_tx_local_path_name(str(tx.photo_file_id or ""))
+            if pmeta:
+                plocal, fname = pmeta
+                try:
+                    await context.bot.send_document(
+                        chat_id=update.effective_user.id,
+                        document=InputFile(BytesIO(plocal.read_bytes()), filename=fname),
+                        caption=_cap,
+                    )
+                    sent_photo = True
+                except Exception:
+                    pass
+        if not sent_photo:
+            pfi = getattr(tx, "photo_file_id", None)
+            if pfi and str(pfi).startswith("web:"):
+                vurl = _web_tx_public_photo_url(str(pfi))
+                if vurl:
+                    text = (
+                        text
+                        + "\n\n📎 لم يُعَدّ عرض الصورة داخل تيليجرام.\n"
+                        + "افتح الرابط التالي لمعاينتها في المتصفح:\n"
+                        + vurl
+                    )
+                else:
+                    text = text + (
+                        "\n\n⚠️ الصورة من الموقع: لم يُضبط رابط عام للموقع "
+                        "(WEB_BASE_URL أو TELEGRAM_PHOTO_BASE_URL في Railway)."
+                    )
             await context.bot.send_message(
                 chat_id=update.effective_user.id,
                 text=text,
