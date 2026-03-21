@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=15"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=16"
 
 
 def _html_escape(s: str) -> str:
@@ -769,7 +769,8 @@ def render_dashboard_html(
     sel = lambda v: " selected" if sc == v else ""
     q_hint = "<p class='hint search-hint' id='search-hint-line' hidden>بحث فوري أثناء الكتابة.</p>"
     clear_search = (
-        "<button type='button' class='btn btn-secondary btn-search-clear' id='dash-q-clear' hidden>مسح</button>"
+        "<button type='button' class='dash-search-clear-inline' id='dash-q-clear' hidden "
+        "aria-label='مسح البحث' title='مسح'>✕</button>"
     )
     card = f"""
           <div class='brand-header share-report-head dashboard-head'>
@@ -800,8 +801,10 @@ def render_dashboard_html(
                 <option value='cust'{sel("cust")}>أسماء فقط</option>
                 <option value='txn'{sel("txn")}>معاملات فقط</option>
               </select>
-              <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='بحث: اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
-              {clear_search}
+              <div class='dashboard-search-field-wrap'>
+                <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='بحث: اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off' class='dash-search-input'/>
+                {clear_search}
+              </div>
             </div>
           </div>
           <div id='cust-list'>{body}</div>
@@ -1265,17 +1268,20 @@ def render_owner_customer_page(
             if sq and not tx_rows
             else ('<p class="hint">لا توجد معاملات بعد.</p>' if not tx_rows else "")
         )
-        clear_search = (
-            f"<a class='btn btn-secondary btn-cust-search-clear' href='/creditbook/customer/{cust.id}'>مسح البحث</a>"
+        clear_in_field = (
+            f"<a class='cust-search-clear-inline' href='/creditbook/customer/{cust.id}' "
+            f"aria-label='مسح البحث' title='مسح البحث'>✕</a>"
             if sq
             else ""
         )
         search_block = f"""
               <form method='get' action='/creditbook/customer/{cust.id}' class='cust-tx-search' role='search'>
                 <label class='visually-hidden' for='cust-tx-q'>بحث في معاملات هذا العميل</label>
-                <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='بحث في المعاملات: ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
+                <div class='cust-search-field-wrap{" cust-search-field-wrap--has-clear" if sq else ""}'>
+                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='بحث في المعاملات: ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
+                  {clear_in_field}
+                </div>
                 <button type='submit' class='btn btn-secondary btn-cust-search-submit'>بحث</button>
-                {clear_search}
               </form>
         """
 
