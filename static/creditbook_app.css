@@ -574,8 +574,8 @@ form.login-form { margin-top: 8px; }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 14px;
-  margin: 10px 0 12px;
+  gap: 6px 10px;
+  margin: 6px 0 8px;
   justify-content: space-between;
 }
 .dashboard-cust-title {
@@ -584,15 +584,15 @@ form.login-form { margin-top: 8px; }
 .dashboard-search-inline {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  flex: 1 1 220px;
+  flex: 1 1 200px;
   min-width: 0;
   justify-content: flex-end;
 }
 .dashboard-search-field-wrap {
   position: relative;
-  flex: 1 1 160px;
+  flex: 1 1 140px;
   min-width: 0;
   display: block;
 }
@@ -600,27 +600,27 @@ form.login-form { margin-top: 8px; }
 .dashboard-search-field-wrap .dash-search-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 12px 14px;
-  padding-inline-end: 44px;
-  border-radius: 12px;
+  padding: 7px 10px;
+  padding-inline-end: 38px;
+  border-radius: 10px;
   border: 1px solid #cbd5e1;
-  font-size: 16px;
+  font-size: 14px;
   font-family: inherit;
 }
 .dash-search-clear-inline {
   position: absolute;
-  inset-inline-end: 6px;
+  inset-inline-end: 4px;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   margin: 0;
   padding: 0;
   border: none;
-  border-radius: 8px;
+  border-radius: 7px;
   background: #e2e8f0;
   color: #475569;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -640,10 +640,10 @@ form.login-form { margin-top: 8px; }
   display: none !important;
 }
 .dash-scope-select {
-  padding: 10px 12px;
-  border-radius: 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
   border: 1px solid #cbd5e1;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   font-family: inherit;
   background: #fff;
@@ -844,50 +844,50 @@ form.login-form { margin-top: 8px; }
   align-items: center;
   justify-content: flex-start;
 }
-/* بحث داخل صفحة العميل — تصفية المعاملات */
+/* تصفية معاملات العميل — فورية بدون زر إرسال */
 .cust-tx-search {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  margin: 0 0 14px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
   box-sizing: border-box;
 }
 .cust-search-field-wrap {
   position: relative;
-  flex: 1 1 200px;
+  flex: 1 1 180px;
   min-width: 0;
   display: block;
 }
 .cust-search-field-wrap input[type="search"] {
   width: 100%;
   box-sizing: border-box;
-  padding: 11px 14px;
-  border-radius: 12px;
+  padding: 7px 10px;
+  border-radius: 10px;
   border: 1px solid #cbd5e1;
-  font-size: 16px;
+  font-size: 14px;
   font-family: inherit;
 }
 .cust-search-field-wrap--has-clear input[type="search"] {
-  padding-inline-end: 44px;
+  padding-inline-end: 38px;
 }
 a.cust-search-clear-inline {
   position: absolute;
-  inset-inline-end: 6px;
+  inset-inline-end: 4px;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
   background: #e2e8f0;
   color: #475569 !important;
   font-size: 1rem;
   font-weight: 700;
-  line-height: 32px;
+  line-height: 28px;
   text-align: center;
   text-decoration: none !important;
   transition: background 0.15s ease, color 0.15s ease;
@@ -895,10 +895,6 @@ a.cust-search-clear-inline {
 a.cust-search-clear-inline:hover {
   background: #cbd5e1;
   color: #0f172a !important;
-}
-.btn-cust-search-submit {
-  margin-top: 0 !important;
-  flex: 0 0 auto;
 }
 /* صفحة تعديل المعاملة — نوع المعاملة + زر التغيير */
 .tx-kind-edit-row {

@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=16"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=17"
 
 
 def _html_escape(s: str) -> str:
@@ -767,10 +767,10 @@ def render_dashboard_html(
     uname = _html_escape(owner_display_name_for_user(user))
     q_esc = _html_escape(search_q or "")
     sel = lambda v: " selected" if sc == v else ""
-    q_hint = "<p class='hint search-hint' id='search-hint-line' hidden>بحث فوري أثناء الكتابة.</p>"
+    q_hint = "<p class='hint search-hint' id='search-hint-line' hidden>تصفية فورية أثناء الكتابة.</p>"
     clear_search = (
         "<button type='button' class='dash-search-clear-inline' id='dash-q-clear' hidden "
-        "aria-label='مسح البحث' title='مسح'>✕</button>"
+        "aria-label='مسح النص' title='مسح'>✕</button>"
     )
     card = f"""
           <div class='brand-header share-report-head dashboard-head'>
@@ -795,14 +795,14 @@ def render_dashboard_html(
           <div class='dashboard-cust-heading-row'>
             <h3 class='web-h3 dashboard-cust-title'>📋 عملائي</h3>
             <div class='dashboard-search-inline' role='search'>
-              <label class='visually-hidden' for='dash-q'>بحث في العملاء والمعاملات</label>
-              <select id='dash-scope' class='dash-scope-select' aria-label='نطاق البحث'>
+              <label class='visually-hidden' for='dash-q'>تصفية العملاء والمعاملات</label>
+              <select id='dash-scope' class='dash-scope-select' aria-label='نطاق التصفية'>
                 <option value='all'{sel("all")}>الكل</option>
                 <option value='cust'{sel("cust")}>أسماء فقط</option>
                 <option value='txn'{sel("txn")}>معاملات فقط</option>
               </select>
               <div class='dashboard-search-field-wrap'>
-                <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='بحث: اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off' class='dash-search-input'/>
+                <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='اسم، هاتف، ملاحظة، مبلغ…' dir='auto' autocomplete='off' class='dash-search-input'/>
                 {clear_search}
               </div>
             </div>
@@ -1270,18 +1270,17 @@ def render_owner_customer_page(
         )
         clear_in_field = (
             f"<a class='cust-search-clear-inline' href='/creditbook/customer/{cust.id}' "
-            f"aria-label='مسح البحث' title='مسح البحث'>✕</a>"
+            f"aria-label='مسح النص' title='مسح'>✕</a>"
             if sq
             else ""
         )
         search_block = f"""
               <form method='get' action='/creditbook/customer/{cust.id}' class='cust-tx-search' role='search'>
-                <label class='visually-hidden' for='cust-tx-q'>بحث في معاملات هذا العميل</label>
+                <label class='visually-hidden' for='cust-tx-q'>تصفية معاملات هذا العميل</label>
                 <div class='cust-search-field-wrap{" cust-search-field-wrap--has-clear" if sq else ""}'>
-                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='بحث في المعاملات: ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
+                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='ملاحظة، مبلغ…' dir='auto' autocomplete='off'/>
                   {clear_in_field}
                 </div>
-                <button type='submit' class='btn btn-secondary btn-cust-search-submit'>بحث</button>
               </form>
         """
 
