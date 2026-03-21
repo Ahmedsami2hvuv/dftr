@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=23"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=24"
 
 
 def _html_escape(s: str) -> str:
@@ -1588,11 +1588,18 @@ def render_tx_edit_page(
                   <span class='hint' style='margin:0'>نوع المعاملة:</span>
                   <strong class='tx-kind-current'>{kind_ar}</strong>
                 </div>
-                <form method='post' action='/creditbook/tx/{tx_id}/toggle_kind' class='tx-kind-toggle-form'
-                      onsubmit="return confirm('هل أنت متأكد من تغيير نوع المعاملة بين أعطيت وأخذت؟');">
-                  <input type='hidden' name='csrf' value='{_html_escape(csrf_k)}'/>
-                  <button type='submit' class='btn btn-secondary btn-tx-toggle-kind'>🔁 تغيير النوع</button>
-                </form>
+                <div class='tx-kind-edit-btns'>
+                  <form method='post' action='/creditbook/tx/{tx_id}/toggle_kind' class='tx-kind-toggle-form'
+                        onsubmit="return confirm('هل أنت متأكد من تغيير نوع المعاملة بين أعطيت وأخذت؟');">
+                    <input type='hidden' name='csrf' value='{_html_escape(csrf_k)}'/>
+                    <button type='submit' class='btn btn-secondary btn-tx-toggle-kind'>🔁 تغيير النوع</button>
+                  </form>
+                  <form method='post' action='/creditbook/tx/{tx_id}/delete' class='tx-kind-delete-form'
+                        onsubmit="return confirm('هل أنت متأكد من حذف هذه المعاملة نهائياً؟ لا يمكن التراجع.');">
+                    <input type='hidden' name='csrf' value='{_html_escape(csrf_x)}'/>
+                    <button type='submit' class='btn btn-danger btn-tx-delete-top'>🗑 حذف المعاملة</button>
+                  </form>
+                </div>
               </div>
               {cur_photo}
               <div class='web-section'>
@@ -1610,11 +1617,6 @@ def render_tx_edit_page(
                 </form>
                 <div class='tx-edit-actions-row'>
                   <button type='submit' form='tx-update-form' class='btn btn-primary'>حفظ التعديلات</button>
-                  <form method='post' action='/creditbook/tx/{tx_id}/delete' class='tx-edit-delete-form'
-                        onsubmit="return confirm('هل أنت متأكد من حذف هذه المعاملة نهائياً؟ لا يمكن التراجع.');">
-                    <input type='hidden' name='csrf' value='{_html_escape(csrf_x)}'/>
-                    <button type='submit' class='btn btn-danger'>🗑 حذف المعاملة</button>
-                  </form>
                 </div>
               </div>
         """

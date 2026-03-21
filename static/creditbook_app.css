@@ -993,10 +993,18 @@ button.cust-search-clear-inline:hover {
 .tx-kind-current {
   font-size: 1.05rem;
 }
-.tx-kind-toggle-form {
+.tx-kind-edit-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.tx-kind-toggle-form,
+.tx-kind-delete-form {
   margin: 0;
 }
-.btn-tx-toggle-kind {
+.btn-tx-toggle-kind,
+.btn-tx-delete-top {
   margin-top: 0 !important;
 }
 
@@ -1012,10 +1020,6 @@ button.cust-search-clear-inline:hover {
   align-items: center;
   gap: 10px 12px;
   margin-top: 4px;
-}
-.page-tx-edit .tx-edit-delete-form {
-  margin: 0;
-  display: inline-block;
 }
 .page-tx-edit .tx-edit-actions-row .btn {
   margin-top: 0 !important;
