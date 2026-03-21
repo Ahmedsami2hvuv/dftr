@@ -1,0 +1,3 @@
+# تثبيت Python 3.12 بدل 3.13 — يتجنب فشل mise على بعض بيئات Railway
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.12"
