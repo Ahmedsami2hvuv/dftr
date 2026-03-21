@@ -1530,7 +1530,7 @@ def _local_input_file_for_web_photo(p, name: str):
 
 
 def _web_tx_public_photo_url(photo_file_id: str) -> str | None:
-    """رابط مباشر لمعاينة صورة معاملة الموقع (يعمل من المتصفح ومن تيليجرام)."""
+    """رابط الصورة المباشر /creditbook/photo/ — تيليجرام يحمّله عند send_photo بالرابط."""
     s = str(photo_file_id)
     if not s.startswith("web:"):
         return None
@@ -1538,6 +1538,17 @@ def _web_tx_public_photo_url(photo_file_id: str) -> str | None:
     if not base:
         return None
     return f"{base}/creditbook/photo/{quote(s, safe='')}"
+
+
+def _creditbook_tx_photo_browser_url(photo_file_id: str | None) -> str | None:
+    """نفس مسار معاينة الموقع /creditbook/photo-view/ (صورة تيليجرام أو web:)."""
+    fid = (photo_file_id or "").strip()
+    if not fid:
+        return None
+    base = public_web_base_url_for_telegram_fetch()
+    if not base:
+        return None
+    return f"{base}/creditbook/photo-view/{quote(fid, safe='')}"
 
 
 def _web_tx_local_path_name(photo_file_id: str) -> tuple | None:
@@ -1686,19 +1697,19 @@ async def cust_tx_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, tx_
                         pass
         if not sent_photo:
             pfi = getattr(tx, "photo_file_id", None)
-            if pfi and str(pfi).startswith("web:"):
-                vurl = _web_tx_public_photo_url(str(pfi))
+            if pfi:
+                vurl = _creditbook_tx_photo_browser_url(str(pfi))
                 if vurl:
                     text = (
                         text
                         + "\n\n📎 لم يُعَدّ عرض الصورة داخل تيليجرام.\n"
-                        + "افتح الرابط التالي لمعاينتها في المتصفح:\n"
+                        + "افتح الرابط (نفس معاينة الموقع):\n"
                         + vurl
                     )
-                else:
+                elif str(pfi).startswith("web:"):
                     text = text + (
                         "\n\n⚠️ الصورة من الموقع: لم يُضبط رابط عام للموقع "
-                        "(WEB_BASE_URL أو TELEGRAM_PHOTO_BASE_URL في Railway)."
+                        "(WEB_BASE_URL في Railway)."
                     )
             await context.bot.send_message(
                 chat_id=update.effective_user.id,
