@@ -15,6 +15,8 @@ class Customer(Base):
     name = Column(String(255), nullable=False)
     phone = Column(String(32), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # آخر نشاط: معاملة أو تعديل بيانات — للترتيب في الموقع والبوت
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="customers")
     transactions = relationship(

@@ -1661,25 +1661,27 @@ def _dashboard_customer_search_sort_key(cust: Customer, q: str) -> tuple:
     أولوية التطابق عند البحث (أصغر = أعلى في القائمة):
     0 اسم مطابق تماماً — 1 يبدأ الاسم بالاستعلام — 2 كلمة في الاسم تبدأ بالاستعلام —
     3 يحتوي الاسم على الاستعلام — 4 الهاتف — 5 تطابق من معاملة فقط (ملاحظة/مبلغ).
+    اللاحق: الأحدث نشاطاً أولاً (updated_at تنازلياً عبر قيمة سالبة للوقت).
     """
     q = (q or "").strip().lower()
     name = (cust.name or "").lower()
     phone = (cust.phone or "").lower()
+    ts = -(cust.updated_at or cust.created_at).timestamp()
     if not q:
-        return (0, name)
+        return (0, name, ts)
     if q in name:
         if name == q:
-            return (0, 0, name)
+            return (0, 0, name, ts)
         if name.startswith(q):
-            return (1, 0, name)
+            return (1, 0, name, ts)
         pos = name.find(q)
         prev_ok = pos == 0 or name[pos - 1] in " \t\n،؛,/،"
         if prev_ok:
-            return (2, pos, name)
-        return (3, pos, name)
+            return (2, pos, name, ts)
+        return (3, pos, name, ts)
     if q in phone:
-        return (4, 0, name)
-    return (5, 0, name)
+        return (4, 0, name, ts)
+    return (5, 0, name, ts)
 
 
 def load_dashboard_rows(
@@ -1688,7 +1690,7 @@ def load_dashboard_rows(
     scope: str | None = None,
 ) -> list[tuple[Customer, float]]:
     """قائمة العملاء مع الرصيد. q يُصفّى حسب scope: all (كل شيء)، cust (اسم/هاتف)، txn (معاملات فقط)."""
-    from sqlalchemy import String, cast, or_
+    from sqlalchemy import String, cast, func, or_
 
     q = (q or "").strip()
     sc = (scope or "all").lower()
@@ -1727,7 +1729,10 @@ def load_dashboard_rows(
             customers = base.all()
             customers = sorted(customers, key=lambda c: _dashboard_customer_search_sort_key(c, q))
         else:
-            customers = base.order_by(Customer.name.asc()).all()
+            customers = base.order_by(
+                func.coalesce(Customer.updated_at, Customer.created_at).desc(),
+                Customer.id.desc(),
+            ).all()
         out = []
         for c in customers:
             gave = sum(float(t.amount or 0) for t in c.transactions if t.kind == "gave")

@@ -829,25 +829,19 @@ async def cust_cat_del_do_click(update: Update, context: ContextTypes.DEFAULT_TY
     await menu_customer_categories(update, context, int(back_cid))
 
 
-def _customers_ordered_by_usage_least_first(
+def _customers_ordered_by_activity_oldest_first(
     db, user_id: int, *, name_ilike: str | None = None, limit: int | None = None
 ):
     """
-    قائمة عملاء المستخدم: الأقل معاملاتاً أولاً (أعلى الشاشة)، الأكثر معاملاتاً آخراً (أسفل).
+    قائمة عملاء المستخدم للبوت: الأقدم نشاطاً أولاً (أعلى الشاشة)، الأحدث نشاطاً أسفل (أقرب للإبهام).
     """
-    txn_n = (
-        db.query(
-            CustomerTransaction.customer_id.label("cid"),
-            func.count(CustomerTransaction.id).label("n"),
-        )
-        .group_by(CustomerTransaction.customer_id)
-        .subquery()
-    )
     q = (
         db.query(Customer)
-        .outerjoin(txn_n, Customer.id == txn_n.c.cid)
         .filter(Customer.user_id == user_id)
-        .order_by(func.coalesce(txn_n.c.n, 0).asc(), Customer.id.asc())
+        .order_by(
+            func.coalesce(Customer.updated_at, Customer.created_at).asc(),
+            Customer.id.asc(),
+        )
     )
     if name_ilike is not None:
         q = q.filter(Customer.name.ilike(f"%{name_ilike}%"))
@@ -893,7 +887,7 @@ async def reply_customer_search_results(
                 reply_markup=kb_main_menu(),
             )
             return
-        matches = _customers_ordered_by_usage_least_first(
+        matches = _customers_ordered_by_activity_oldest_first(
             db, user.id, name_ilike=q, limit=25
         )
         if not matches:
@@ -1039,7 +1033,7 @@ async def _edit_quick_customer_picker(query, context: ContextTypes.DEFAULT_TYPE)
             )
             _clear_quick_amount_flow(context)
             return
-        customers = _customers_ordered_by_usage_least_first(
+        customers = _customers_ordered_by_activity_oldest_first(
             db, user.id, limit=40
         )
         amt = context.user_data.get("quick_amount")
@@ -1171,7 +1165,7 @@ async def menu_customers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=kb_main_menu(),
             )
             return
-        customers = _customers_ordered_by_usage_least_first(db, user.id)
+        customers = _customers_ordered_by_activity_oldest_first(db, user.id)
         keyboard: list[list[InlineKeyboardButton]] = []
         total_out = 0.0  # أعطيت (gave)
         total_in = 0.0   # أخذت (took)

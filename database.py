@@ -118,3 +118,54 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+
+        # آخر نشاط للعميل — ترتيب القائمة في الموقع والبوت
+        try:
+            conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("UPDATE customers SET updated_at = created_at WHERE updated_at IS NULL"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(
+                text(
+                    "UPDATE customers AS c SET updated_at = s.mx FROM ("
+                    "SELECT customer_id, MAX(created_at) AS mx FROM customer_transactions GROUP BY customer_id"
+                    ") AS s WHERE c.id = s.customer_id AND s.mx > COALESCE(c.updated_at, c.created_at)"
+                )
+            )
+            conn.commit()
+        except Exception:
+            pass
+
+    _register_customer_activity_listeners_once()
+
+
+_customer_activity_listeners_registered = False
+
+
+def _register_customer_activity_listeners_once() -> None:
+    """عند إضافة/تعديل/حذف معاملة نحدّث updated_at للعميل (للترتيب)."""
+    global _customer_activity_listeners_registered
+    if _customer_activity_listeners_registered:
+        return
+    from datetime import datetime
+
+    from sqlalchemy import event, text
+
+    from app_models.ledger import CustomerTransaction
+
+    def _bump_customer(mapper, connection, target):
+        connection.execute(
+            text("UPDATE customers SET updated_at = :ts WHERE id = :cid"),
+            {"cid": target.customer_id, "ts": datetime.utcnow()},
+        )
+
+    event.listen(CustomerTransaction, "after_insert", _bump_customer)
+    event.listen(CustomerTransaction, "after_update", _bump_customer)
+    event.listen(CustomerTransaction, "after_delete", _bump_customer)
+    _customer_activity_listeners_registered = True
