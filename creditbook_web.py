@@ -1427,9 +1427,9 @@ def render_owner_customer_page(
         net_line = f"{_amount_to_str(bal)} د.ع."
         search_block = f"""
               <div class='cust-tx-search' role='search' data-cust-id='{cust.id}'>
-                <label class='visually-hidden' for='cust-tx-q'>تصفية معاملات هذا العميل</label>
+                <label class='visually-hidden' for='cust-tx-q'>بحث في معاملات هذا العميل</label>
                 <div class='cust-search-field-wrap{" cust-search-field-wrap--has-clear" if sq else ""}' id='cust-search-field-wrap'>
-                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='ملاحظة، مبلغ…' dir='rtl' autocomplete='off'/>
+                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='ابحث هنا: مبلغ، ملاحظة، تاريخ، أو أي نص…' dir='rtl' autocomplete='off' title='تصفية معاملات هذا العميل بالمبلغ أو الملاحظة أو جزء من التاريخ'/>
                   <button type='button' class='cust-search-clear-inline' id='cust-tx-clear' aria-label='مسح' title='مسح'{" hidden" if not sq else ""}>✕</button>
                 </div>
               </div>
