@@ -224,8 +224,8 @@ def _pwa_manifest_json_bytes() -> bytes:
         "scope": "/creditbook/",
         "display": "standalone",
         "orientation": "portrait-primary",
-        "background_color": "#ecfdf5",
-        "theme_color": "#0f766e",
+        "background_color": "#0a0f1c",
+        "theme_color": "#0891b2",
         "lang": "ar",
         "dir": "rtl",
         "icons": [
@@ -471,17 +471,26 @@ def _render_page(token: str, offset: int) -> str:
             <title>{title}</title>
             <style>
               body {{
-                font-family: 'Tajawal', Arial, sans-serif;
-                background: linear-gradient(160deg, #ecfdf5 0%, #f0fdfa 35%, #f7f7f7 100%);
+                font-family: 'Tajawal', system-ui, sans-serif;
+                color: #e8eef7;
+                background: #04060d;
+                background-image:
+                  radial-gradient(ellipse 100% 70% at 50% -15%, rgba(34, 211, 238, 0.14), transparent 52%),
+                  radial-gradient(ellipse 70% 45% at 95% 30%, rgba(167, 139, 250, 0.08), transparent 45%),
+                  linear-gradient(180deg, #060912 0%, #0a0f1a 100%);
                 padding: 16px;
                 margin: 0;
+                min-height: 100vh;
+                box-sizing: border-box;
               }}
               .card {{
-                background: #fff;
+                background: rgba(15, 23, 42, 0.58);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
                 border-radius: 20px;
                 padding: 20px;
-                box-shadow: 0 8px 32px rgba(15, 118, 110, 0.1), 0 1px 4px rgba(0,0,0,0.06);
-                border: 1px solid rgba(13, 148, 136, 0.12);
+                box-shadow: 0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(56, 189, 248, 0.22), inset 0 1px 0 rgba(255,255,255,0.06);
+                border: 1px solid rgba(56, 189, 248, 0.2);
               }}
               /* في RTL: يمين = الشعار والعنوان، يسار = بطاقة صغيرة «صنع بواسطة» */
               .brand-header {{
@@ -504,13 +513,13 @@ def _render_page(token: str, offset: int) -> str:
                 margin: 0;
                 font-size: clamp(1.35rem, 4vw, 1.95rem);
                 font-weight: 900;
-                color: #0f172a;
                 line-height: 1.2;
-                letter-spacing: -0.03em;
-                background: linear-gradient(120deg, #0f766e, #0d9488, #14b8a6);
+                letter-spacing: -0.02em;
+                background: linear-gradient(120deg, #67e8f9 0%, #22d3ee 35%, #a78bfa 72%, #c4b5fd 100%);
                 -webkit-background-clip: text;
                 background-clip: text;
                 -webkit-text-fill-color: transparent;
+                filter: drop-shadow(0 0 20px rgba(34, 211, 238, 0.25));
               }}
               .brand-logo {{
                 width: 64px;
@@ -518,21 +527,23 @@ def _render_page(token: str, offset: int) -> str:
                 border-radius: 18px;
                 object-fit: cover;
                 flex-shrink: 0;
-                box-shadow: 0 8px 24px rgba(13, 148, 136, 0.35);
-                border: 3px solid rgba(255,255,255,0.95);
+                box-shadow: 0 0 28px rgba(34, 211, 238, 0.2), 0 0 0 2px rgba(167, 139, 250, 0.35);
+                border: 2px solid rgba(255,255,255,0.12);
               }}
               /* افتراضي = موبايل: صف واحد للاسم + الرقم، صندوق مضغوط */
               .owner-showcase {{
                 flex: 0 1 auto;
                 max-width: min(100%, 92vw);
                 min-width: 0;
-                background: linear-gradient(145deg, #0d9488 0%, #0f766e 55%, #115e59 100%);
+                background: linear-gradient(145deg, #0e7490 0%, #0891b2 38%, #6366f1 100%);
                 color: #fff;
                 padding: 8px 10px;
                 border-radius: 12px;
+                border: 1px solid rgba(167, 139, 250, 0.45);
                 box-shadow:
-                  0 6px 18px rgba(15, 118, 110, 0.35),
-                  inset 0 1px 0 rgba(255,255,255,0.15);
+                  0 8px 28px rgba(34, 211, 238, 0.25),
+                  inset 0 1px 0 rgba(255,255,255,0.15),
+                  0 0 0 1px rgba(34, 211, 238, 0.2);
                 position: relative;
                 overflow: hidden;
               }}
@@ -631,40 +642,40 @@ def _render_page(token: str, offset: int) -> str:
                 z-index: 1;
               }}
               .balance {{ font-size: 18px; margin: 8px 0 16px 0; font-weight: 700; }}
-              .bal-red {{ color: #c62828; }}
-              .bal-green {{ color: #2e7d32; }}
-              .tx {{ background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 12px; margin: 10px 0; }}
-              .top {{ color: #666; font-size: 12px; }}
+              .bal-red {{ color: #f87171; }}
+              .bal-green {{ color: #4ade80; }}
+              .tx {{ background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 12px; padding: 12px; margin: 10px 0; }}
+              .top {{ color: #94a3b8; font-size: 12px; }}
               .tx-content {{ margin-top: 6px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }}
               .tx-text {{ flex: 1; min-width: 0; }}
               .main {{ margin-top: 6px; font-size: 15px; font-weight: 700; }}
               .remain {{ margin-top: 6px; font-size: 13px; }}
-              .remain.bal-red {{ color: #c62828; }}
-              .remain.bal-green {{ color: #2e7d32; }}
-              .note {{ margin-top: 6px; color: #444; font-size: 13px; }}
+              .remain.bal-red {{ color: #f87171; }}
+              .remain.bal-green {{ color: #4ade80; }}
+              .note {{ margin-top: 6px; color: #94a3b8; font-size: 13px; }}
               .photo-wrap {{ flex: 0 0 auto; margin-top: 2px; }}
-              .photo {{ width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; cursor: pointer; }}
+              .photo {{ width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.25); cursor: pointer; }}
               .btn {{
                 display: inline-block;
-                padding: 10px 16px;
+                padding: 10px 18px;
                 color: #fff;
                 text-decoration: none;
                 border-radius: 999px;
                 margin-top: 10px;
                 font-weight: 700;
                 font-size: 14px;
-                box-shadow: 0 6px 14px rgba(0,0,0,.14);
-                transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+                box-shadow: 0 4px 18px rgba(0,0,0,.35);
+                transition: transform .15s ease, box-shadow .2s ease, filter .15s ease;
               }}
               .btn:hover {{
-                transform: translateY(-1px);
-                box-shadow: 0 9px 18px rgba(0,0,0,.18);
-                opacity: .95;
+                transform: translateY(-2px);
+                box-shadow: 0 0 28px rgba(34, 211, 238, 0.2), 0 8px 24px rgba(0,0,0,.35);
+                filter: brightness(1.06);
               }}
-              .wa {{ background: linear-gradient(135deg, #22c55e, #15803d); margin-inline-start: 8px; }}
-              .bot {{ background: linear-gradient(135deg, #3b82f6, #1d4ed8); }}
+              .wa {{ background: linear-gradient(135deg, #25d366, #059669); margin-inline-start: 8px; box-shadow: 0 4px 20px rgba(34, 197, 94, 0.35); }}
+              .bot {{ background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 4px 20px rgba(99, 102, 241, 0.35); }}
               .meta {{ margin-bottom: 10px; line-height: 1.5; }}
-              .customer-line {{ font-size: 15px; color: #334155; font-weight: 600; }}
+              .customer-line {{ font-size: 15px; color: #cbd5e1; font-weight: 600; }}
               .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }}
               /* حاسوب: بطاقة أكبر، الاسم فوق والرقم تحت */
               @media (min-width: 561px) {{

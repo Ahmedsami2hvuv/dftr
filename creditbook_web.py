@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=30"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=31"
 
 
 def _html_escape(s: str) -> str:
@@ -305,7 +305,7 @@ def _pwa_meta_block(brand_img: str) -> str:
     title_esc = _html_escape("دفتر الديون")
     return (
         f"<link rel='manifest' href='/creditbook/manifest.webmanifest'/>"
-        f"<meta name='theme-color' content='#0f766e'/>"
+        f"<meta name='theme-color' content='#0891b2'/>"
         f"<meta name='mobile-web-app-capable' content='yes'/>"
         f"<meta name='apple-mobile-web-app-capable' content='yes'/>"
         f"<meta name='apple-mobile-web-app-status-bar-style' content='default'/>"
