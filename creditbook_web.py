@@ -579,7 +579,7 @@ def render_account_page(
         <summary class='acct-txhist-summary'>📜 سجل الحذف والتعديل <span class='acct-txhist-summary-hint'>استعادة أو تجاهل — بحث فوري</span></summary>
         <div class='acct-txhist-body'>
           <label class='visually-hidden' for='acct-txhist-q'>بحث في السجل</label>
-          <input type='search' id='acct-txhist-q' class='acct-txhist-q' placeholder='اسم عميل، مبلغ، ملاحظة…' dir='rtl' autocomplete='off'/>
+          <input type='search' id='acct-txhist-q' class='acct-txhist-q' placeholder='بحث — اسم عميل، مبلغ، ملاحظة…' dir='rtl' autocomplete='off'/>
           <div id='acct-txhist-list' class='acct-txhist-list'>{tx_hist_initial}</div>
         </div>
       </details>
@@ -890,7 +890,7 @@ def render_dashboard_html(
                 <option value='txn'{sel("txn")}>معاملات فقط</option>
               </select>
               <div class='dashboard-search-field-wrap'>
-                <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='اسم، هاتف، ملاحظة، مبلغ…' dir='rtl' autocomplete='off' class='dash-search-input'/>
+                <input type='search' id='dash-q' name='q' value='{q_esc}' placeholder='بحث — اسم، هاتف، ملاحظة، مبلغ…' dir='rtl' autocomplete='off' class='dash-search-input'/>
                 {clear_search}
               </div>
             </div>
@@ -1069,7 +1069,7 @@ def render_report_all_transactions_page(
               </div>
               <div class='report-search-wrap'>
                 <label for='rep-sq'>تصفية النتائج</label>
-                <input type='search' id='rep-sq' name='sq' value='{sq_esc}' placeholder='اسم عميل، ملاحظة، مبلغ…' dir='rtl' autocomplete='off'/>
+                <input type='search' id='rep-sq' name='sq' value='{sq_esc}' placeholder='بحث — اسم عميل، ملاحظة، مبلغ…' dir='rtl' autocomplete='off'/>
                 <p class='hint'>تصفية الصفوف المعروضة حسب الاسم أو الملاحظة أو المبلغ.</p>
               </div>
             </div>
@@ -1429,7 +1429,7 @@ def render_owner_customer_page(
               <div class='cust-tx-search' role='search' data-cust-id='{cust.id}'>
                 <label class='visually-hidden' for='cust-tx-q'>بحث في معاملات هذا العميل</label>
                 <div class='cust-search-field-wrap{" cust-search-field-wrap--has-clear" if sq else ""}' id='cust-search-field-wrap'>
-                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='ابحث هنا: مبلغ، ملاحظة، تاريخ، أو أي نص…' dir='rtl' autocomplete='off' title='تصفية معاملات هذا العميل بالمبلغ أو الملاحظة أو جزء من التاريخ'/>
+                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='بحث — مبلغ، ملاحظة، تاريخ، أو أي نص…' dir='rtl' autocomplete='off' title='تصفية معاملات هذا العميل بالمبلغ أو الملاحظة أو جزء من التاريخ'/>
                   <button type='button' class='cust-search-clear-inline' id='cust-tx-clear' aria-label='مسح' title='مسح'{" hidden" if not sq else ""}>✕</button>
                 </div>
               </div>
