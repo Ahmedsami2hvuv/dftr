@@ -224,8 +224,8 @@ def _pwa_manifest_json_bytes() -> bytes:
         "scope": "/creditbook/",
         "display": "standalone",
         "orientation": "portrait-primary",
-        "background_color": "#0a0f1c",
-        "theme_color": "#0891b2",
+        "background_color": "#f0fdfa",
+        "theme_color": "#14b8a6",
         "lang": "ar",
         "dir": "rtl",
         "icons": [
@@ -472,25 +472,27 @@ def _render_page(token: str, offset: int) -> str:
             <style>
               body {{
                 font-family: 'Tajawal', system-ui, sans-serif;
-                color: #e8eef7;
-                background: #04060d;
+                color: #1e293b;
+                color-scheme: light;
+                background: #f4f9fb;
                 background-image:
-                  radial-gradient(ellipse 100% 70% at 50% -15%, rgba(34, 211, 238, 0.14), transparent 52%),
-                  radial-gradient(ellipse 70% 45% at 95% 30%, rgba(167, 139, 250, 0.08), transparent 45%),
-                  linear-gradient(180deg, #060912 0%, #0a0f1a 100%);
+                  radial-gradient(ellipse 90% 60% at 50% -10%, rgba(186, 230, 253, 0.65), transparent 55%),
+                  radial-gradient(ellipse 60% 45% at 100% 20%, rgba(196, 181, 253, 0.22), transparent 50%),
+                  radial-gradient(ellipse 50% 40% at 0% 90%, rgba(167, 243, 208, 0.35), transparent 50%),
+                  linear-gradient(165deg, #f0fdfa 0%, #f8fafc 38%, #f0f9ff 72%, #faf5ff 100%);
                 padding: 16px;
                 margin: 0;
                 min-height: 100vh;
                 box-sizing: border-box;
               }}
               .card {{
-                background: rgba(15, 23, 42, 0.58);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
+                background: rgba(255, 255, 255, 0.82);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
                 border-radius: 20px;
                 padding: 20px;
-                box-shadow: 0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(56, 189, 248, 0.22), inset 0 1px 0 rgba(255,255,255,0.06);
-                border: 1px solid rgba(56, 189, 248, 0.2);
+                box-shadow: 0 8px 32px rgba(14, 165, 233, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.65) inset;
+                border: 1px solid rgba(125, 211, 252, 0.45);
               }}
               /* في RTL: يمين = الشعار والعنوان، يسار = بطاقة صغيرة «صنع بواسطة» */
               .brand-header {{
@@ -515,11 +517,10 @@ def _render_page(token: str, offset: int) -> str:
                 font-weight: 900;
                 line-height: 1.2;
                 letter-spacing: -0.02em;
-                background: linear-gradient(120deg, #67e8f9 0%, #22d3ee 35%, #a78bfa 72%, #c4b5fd 100%);
+                background: linear-gradient(120deg, #0d9488 0%, #0ea5e9 42%, #6366f1 78%, #8b5cf6 100%);
                 -webkit-background-clip: text;
                 background-clip: text;
                 -webkit-text-fill-color: transparent;
-                filter: drop-shadow(0 0 20px rgba(34, 211, 238, 0.25));
               }}
               .brand-logo {{
                 width: 64px;
@@ -527,23 +528,22 @@ def _render_page(token: str, offset: int) -> str:
                 border-radius: 18px;
                 object-fit: cover;
                 flex-shrink: 0;
-                box-shadow: 0 0 28px rgba(34, 211, 238, 0.2), 0 0 0 2px rgba(167, 139, 250, 0.35);
-                border: 2px solid rgba(255,255,255,0.12);
+                box-shadow: 0 4px 20px rgba(45, 212, 191, 0.12), 0 0 0 2px rgba(186, 230, 253, 0.8);
+                border: 2px solid rgba(255,255,255,0.9);
               }}
               /* افتراضي = موبايل: صف واحد للاسم + الرقم، صندوق مضغوط */
               .owner-showcase {{
                 flex: 0 1 auto;
                 max-width: min(100%, 92vw);
                 min-width: 0;
-                background: linear-gradient(145deg, #0e7490 0%, #0891b2 38%, #6366f1 100%);
+                background: linear-gradient(145deg, #14b8a6 0%, #0d9488 42%, #5eead4 100%);
                 color: #fff;
                 padding: 8px 10px;
                 border-radius: 12px;
-                border: 1px solid rgba(167, 139, 250, 0.45);
+                border: 1px solid rgba(255, 255, 255, 0.35);
                 box-shadow:
-                  0 8px 28px rgba(34, 211, 238, 0.25),
-                  inset 0 1px 0 rgba(255,255,255,0.15),
-                  0 0 0 1px rgba(34, 211, 238, 0.2);
+                  0 8px 24px rgba(13, 148, 136, 0.22),
+                  inset 0 1px 0 rgba(255,255,255,0.22);
                 position: relative;
                 overflow: hidden;
               }}
@@ -600,30 +600,25 @@ def _render_page(token: str, offset: int) -> str:
                 color: #ecfdf5 !important;
                 text-decoration: none;
                 padding: 6px 11px;
-                background: rgba(0,0,0,0.22);
+                background: rgba(0,0,0,0.18);
                 border-radius: 999px;
-                border: 1px solid rgba(254, 202, 202, 0.55);
+                border: 1px solid rgba(255, 255, 255, 0.35);
                 flex-shrink: 0;
                 white-space: nowrap;
                 transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
                 position: relative;
                 z-index: 1;
-                box-shadow:
-                  0 0 10px rgba(239, 68, 68, 0.95),
-                  0 0 22px rgba(220, 38, 38, 0.65),
-                  0 2px 8px rgba(127, 29, 29, 0.45);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.12);
               }}
               .owner-phone:hover {{
-                background: rgba(0,0,0,0.25);
+                background: rgba(0,0,0,0.26);
                 transform: scale(1.02);
               }}
               .owner-showcase a.owner-phone-wa.creditbook-showcase-phone {{
-                box-shadow:
-                  0 0 10px rgba(239, 68, 68, 0.32),
-                  0 0 20px rgba(248, 113, 113, 0.22) !important;
-                background: rgba(254, 226, 226, 0.22) !important;
-                border-color: rgba(252, 165, 165, 0.5);
-                text-shadow: 0 0 8px rgba(254, 202, 202, 0.75), 0 0 16px rgba(239, 68, 68, 0.28);
+                box-shadow: 0 0 14px rgba(255, 255, 255, 0.2) !important;
+                background: rgba(0, 0, 0, 0.2) !important;
+                border-color: rgba(232, 212, 139, 0.55);
+                text-shadow: 0 1px 4px rgba(0,0,0,0.2);
               }}
               .owner-phone-wa::before {{
                 content: "";
@@ -642,17 +637,17 @@ def _render_page(token: str, offset: int) -> str:
                 z-index: 1;
               }}
               .balance {{ font-size: 18px; margin: 8px 0 16px 0; font-weight: 700; }}
-              .bal-red {{ color: #f87171; }}
-              .bal-green {{ color: #4ade80; }}
-              .tx {{ background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 12px; padding: 12px; margin: 10px 0; }}
-              .top {{ color: #94a3b8; font-size: 12px; }}
+              .bal-red {{ color: #b91c1c; }}
+              .bal-green {{ color: #15803d; }}
+              .tx {{ background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 12px; padding: 12px; margin: 10px 0; }}
+              .top {{ color: #64748b; font-size: 12px; }}
               .tx-content {{ margin-top: 6px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }}
               .tx-text {{ flex: 1; min-width: 0; }}
               .main {{ margin-top: 6px; font-size: 15px; font-weight: 700; }}
               .remain {{ margin-top: 6px; font-size: 13px; }}
-              .remain.bal-red {{ color: #f87171; }}
-              .remain.bal-green {{ color: #4ade80; }}
-              .note {{ margin-top: 6px; color: #94a3b8; font-size: 13px; }}
+              .remain.bal-red {{ color: #b91c1c; }}
+              .remain.bal-green {{ color: #15803d; }}
+              .note {{ margin-top: 6px; color: #64748b; font-size: 13px; }}
               .photo-wrap {{ flex: 0 0 auto; margin-top: 2px; }}
               .photo {{ width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.25); cursor: pointer; }}
               .btn {{
@@ -664,18 +659,18 @@ def _render_page(token: str, offset: int) -> str:
                 margin-top: 10px;
                 font-weight: 700;
                 font-size: 14px;
-                box-shadow: 0 4px 18px rgba(0,0,0,.35);
+                box-shadow: 0 4px 14px rgba(14, 116, 144, 0.18);
                 transition: transform .15s ease, box-shadow .2s ease, filter .15s ease;
               }}
               .btn:hover {{
                 transform: translateY(-2px);
-                box-shadow: 0 0 28px rgba(34, 211, 238, 0.2), 0 8px 24px rgba(0,0,0,.35);
-                filter: brightness(1.06);
+                box-shadow: 0 8px 24px rgba(14, 165, 233, 0.15), 0 4px 20px rgba(45, 212, 191, 0.12);
+                filter: brightness(1.03);
               }}
-              .wa {{ background: linear-gradient(135deg, #25d366, #059669); margin-inline-start: 8px; box-shadow: 0 4px 20px rgba(34, 197, 94, 0.35); }}
-              .bot {{ background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 4px 20px rgba(99, 102, 241, 0.35); }}
+              .wa {{ background: linear-gradient(135deg, #34d399, #059669); margin-inline-start: 8px; box-shadow: 0 4px 18px rgba(5, 150, 105, 0.22); }}
+              .bot {{ background: linear-gradient(135deg, #818cf8, #6366f1); box-shadow: 0 4px 18px rgba(99, 102, 241, 0.22); }}
               .meta {{ margin-bottom: 10px; line-height: 1.5; }}
-              .customer-line {{ font-size: 15px; color: #cbd5e1; font-weight: 600; }}
+              .customer-line {{ font-size: 15px; color: #334155; font-weight: 600; }}
               .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }}
               /* حاسوب: بطاقة أكبر، الاسم فوق والرقم تحت */
               @media (min-width: 561px) {{
