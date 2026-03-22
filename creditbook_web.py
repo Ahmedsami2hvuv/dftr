@@ -1148,15 +1148,15 @@ def render_customer_share_page(
         </div>
         {render_owner_showcase_card(user)}
       </div>
+      <div class='toolbar'>
+        <a class='btn btn-secondary' href='/creditbook/customer/{customer_id}'>◀ رجوع للعميل</a>
+      </div>
       <p class='hint' style='margin-top:0'>استخدم الأزرار أدناه — نفس رسالة البوت.</p>
       {warn}
       <pre class='share-preview-box'>{_html_escape(share_preview_plain)}</pre>
       <div class='toolbar share-toolbar'>
         <a class='btn btn-primary' href="{_html_escape(view_url)}" target='_blank' rel='noopener'>فتح صفحة المعاملات</a>
         <a class='btn btn-wa' href="{_html_escape(wa_url)}" target='_blank' rel='noopener'>فتح واتساب وإرسال الرسالة</a>
-      </div>
-      <div class='toolbar'>
-        <a class='btn btn-secondary' href='/creditbook/customer/{customer_id}'>◀ رجوع للعميل</a>
       </div>
     """
     return wrap_creditbook_app_shell(
