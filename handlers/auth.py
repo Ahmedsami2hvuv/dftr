@@ -263,6 +263,18 @@ async def auth_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return FORGOT_PHONE
 
 
+async def auth_forgot_start_deeplink(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رابط الموقع t.me/bot?start=forgot — يبدأ نفس محادثة نسيت كلمة المرور."""
+    context.user_data["auth_action"] = "forgot"
+    context.user_data.pop("force_login", None)
+    _clear_quick_amount_state(context)
+    await update.message.reply_text(
+        "نسيت كلمة المرور 🔑\n\nأرسل رقم هاتفك المسجل في الحساب:",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀ القائمة الرئيسية", callback_data="main_menu")]]),
+    )
+    return FORGOT_PHONE
+
+
 async def forgot_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.contact:
         phone_raw = update.message.contact.phone_number or ""

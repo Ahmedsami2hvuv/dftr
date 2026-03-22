@@ -47,6 +47,7 @@ from handlers.auth import (
     auth_register,
     auth_login,
     auth_forgot,
+    auth_forgot_start_deeplink,
     auth_logout_confirm,
     auth_logout_do,
     auth_change_password_start,
@@ -270,7 +271,34 @@ def main():
     except Exception as e:
         logger.warning("تعذر تشغيل الموقع: %s", e)
 
-    # أولوية أعلى لـ /start حتى لا تلتقطه محادثة أخرى وتُظهر قائمة قديمة
+    # محادثة نسيت كلمة المرور — قبل /start حتى يُلتقط /start forgot (رابط من الموقع)
+    forgot_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(auth_forgot, pattern="^auth_forgot$"),
+            MessageHandler(filters.TEXT & filters.Regex(r"^/start(@\S+)?\s+forgot\s*$"), auth_forgot_start_deeplink),
+        ],
+        states={
+            FORGOT_PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_phone),
+                MessageHandler(filters.CONTACT, forgot_phone),
+            ],
+            FORGOT_WAIT: [CallbackQueryHandler(forgot_enter_code_click, pattern="^forgot_enter_code$")],
+            FORGOT_CODE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_code),
+                CallbackQueryHandler(forgot_back_phone_click, pattern="^forgot_back_phone$"),
+                CallbackQueryHandler(forgot_copy_code_click, pattern="^forgot_copy_code$"),
+            ],
+            FORGOT_NEW_PASSWORD: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_new_password),
+            ],
+            FORGOT_NEW_PASSWORD_CONFIRM: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_new_password_confirm),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_auth)],
+        per_message=False,
+    )
+    app.add_handler(forgot_conv, group=-1)
     app.add_handler(CommandHandler("start", cmd_start), group=-1)
 
     # محادثة التسجيل — per_message=False حتى يُقبل رسالة الاسم/الرقم بعد الضغط على الزر
@@ -303,32 +331,6 @@ def main():
         per_message=False,
     )
     app.add_handler(login_conv)
-
-    # محادثة نسيت كلمة المرور: رقم الهاتف -> زر استلام الرمز -> إدخال الرمز
-    forgot_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(auth_forgot, pattern="^auth_forgot$")],
-        states={
-            FORGOT_PHONE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_phone),
-                MessageHandler(filters.CONTACT, forgot_phone),
-            ],
-            FORGOT_WAIT: [CallbackQueryHandler(forgot_enter_code_click, pattern="^forgot_enter_code$")],
-            FORGOT_CODE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_code),
-                CallbackQueryHandler(forgot_back_phone_click, pattern="^forgot_back_phone$"),
-                CallbackQueryHandler(forgot_copy_code_click, pattern="^forgot_copy_code$"),
-            ],
-            FORGOT_NEW_PASSWORD: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_new_password),
-            ],
-            FORGOT_NEW_PASSWORD_CONFIRM: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, forgot_new_password_confirm),
-            ],
-        },
-        fallbacks=[CommandHandler("cancel", cancel_auth)],
-        per_message=False,
-    )
-    app.add_handler(forgot_conv)
 
     chpwd_conv = ConversationHandler(
         entry_points=[

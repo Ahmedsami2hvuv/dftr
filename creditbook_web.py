@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=32"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=33"
 
 
 def _html_escape(s: str) -> str:
@@ -750,6 +750,7 @@ def render_login_page(
               <button type='submit' class='btn btn-primary login-btn-main'>تسجيل الدخول</button>
               <a class='login-btn-register' href='/creditbook/register'>إنشاء حساب جديد</a>
             </div>
+            {f"<div class='login-forgot-wrap'><a class='login-forgot-link' href='https://t.me/{BOT_USERNAME}?start=forgot' target='_blank' rel='noopener'>نسيت الرمز؟</a><p class='login-forgot-hint'>يفتح البوت لاستعادة الرمز عبر واتساب (نفس رقم حسابك).</p></div>" if BOT_USERNAME else ""}
           </form>
           <p class='login-register-note'>ليس لديك حساب؟ اضغط «إنشاء حساب جديد» بجانب زر الدخول — بالاسم والهاتف وكلمة المرور (بدون تيليجرام).</p>
           {f"<p style='margin-top:16px;text-align:center'><a class='btn btn-bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>فتح البوت في تيليجرام</a></p>" if BOT_USERNAME else ""}
