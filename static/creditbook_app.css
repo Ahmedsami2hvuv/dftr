@@ -410,6 +410,12 @@ form.login-form { margin-top: 8px; }
   margin: 0 0 10px;
   font-size: 1rem;
 }
+/* المبلغ: أرقام LTR مع محاذاة لليمين في الواجهة العربية */
+.txn-panel input.txn-amt-input,
+.txn-panel input#amt[name="amount"] {
+  text-align: right;
+  direction: ltr;
+}
 .web-check {
   display: flex;
   align-items: center;

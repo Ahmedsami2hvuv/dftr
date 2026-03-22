@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=29"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=30"
 
 
 def _html_escape(s: str) -> str:
@@ -1391,7 +1391,7 @@ def render_owner_customer_page(
               <input type='hidden' name='kind' id='txn-kind-field' value=''/>
               <p id='txn-kind-hint' class='txn-kind-hint'></p>
               <label for='amt'>المبلغ (د.ع.)</label>
-              <input type='text' id='amt' name='amount' required placeholder='مثال: 775.25' dir='ltr' autocomplete='off'/>
+              <input type='text' id='amt' name='amount' class='txn-amt-input' required placeholder='مثال: 775.25' dir='ltr' inputmode='decimal' autocomplete='off'/>
               <label for='tnote'>ملاحظة (اختياري)</label>
               <textarea id='tnote' name='note' rows='2' placeholder='نص أو سطران (مبلغ ثم ملاحظة)'></textarea>
               <label for='txn_dt'>تاريخ ووقت المعاملة (اختياري — إن تُرك فارغاً يُستخدم الوقت الحالي)</label>
@@ -1414,6 +1414,12 @@ def render_owner_customer_page(
             ? '🔴 أخذت — استلمت من العميل'
             : '🟢 أعطيت — سلّمت للعميل';
           p.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }});
+          var amt = document.getElementById('amt');
+          if (amt) {{
+            setTimeout(function () {{
+              try {{ amt.focus({{ preventScroll: true }}); }} catch (e) {{ amt.focus(); }}
+            }}, 280);
+          }}
         }}
         </script>
         """
