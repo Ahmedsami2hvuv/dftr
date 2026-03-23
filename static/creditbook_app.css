@@ -198,7 +198,7 @@ form.login-form { margin-top: 8px; }
   padding: 10px 12px;
   margin: 10px 0;
 }
-/* نوع + مبلغ · تاريخ · الباقي بعدها · تعديل · صورة */
+/* نوع + مبلغ · تاريخ · الباقي · تعديل · صورة */
 .tx-line-main {
   display: flex;
   flex-wrap: wrap;

@@ -1267,7 +1267,7 @@ def _customer_tx_list_html_fragment(
                     <span class='tx-sep' aria-hidden='true'>·</span>
                     <span class='tx-date' dir='ltr'>{dt}</span>
                     <span class='tx-sep' aria-hidden='true'>·</span>
-                    <span class='tx-remain {remain_class}'>الباقي بعدها: {_amount_to_str(remain)} د.ع.</span>
+                    <span class='tx-remain {remain_class}'>الباقي: {_amount_to_str(remain)} د.ع.</span>
                     <span class='tx-sep' aria-hidden='true'>·</span>
                     <a class='tx-edit-btn' href='/creditbook/tx/{t.id}'><span class='tx-edit-ico'>✎</span> تعديل</a>
                     {photo_html}
