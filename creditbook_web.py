@@ -1377,8 +1377,6 @@ def render_owner_customer_page(
 
         txn_form = f"""
         <div class='web-section'>
-          <h3 class='web-h3'>➕ معاملة جديدة</h3>
-          <p class='hint'>اختر نوع المعاملة ثم املأ المبلغ والملاحظة والتاريخ (اختياري) ويمكنك إرفاق صورة.</p>
           <div class='txn-kind-row'>
             <button type='button' class='btn btn-took' onclick="showNewTxn('took')">🔴 أخذت</button>
             <button type='button' class='btn btn-gave' onclick="showNewTxn('gave')">🟢 أعطيت</button>
