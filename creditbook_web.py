@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=39"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=40"
 
 
 def _html_escape(s: str) -> str:
@@ -1390,7 +1390,7 @@ def render_owner_customer_page(
             <button type='button' class='btn btn-gave' onclick="showNewTxn('gave')">🟢 أعطيت</button>
           </div>
           <div id='new-txn-panel' class='hidden txn-panel'>
-            <form method='post' action='/creditbook/customer/{cust.id}/txn_add' class='stack-form' enctype='multipart/form-data'
+            <form id='cust-new-txn-form' method='post' action='/creditbook/customer/{cust.id}/txn_add' class='stack-form' enctype='multipart/form-data'
                   onsubmit="var k=document.getElementById('txn-kind-field'); if(!k||!k.value){{ alert('اضغط «أخذت» أو «أعطيت» أولاً'); return false; }} return true;">
               <input type='hidden' name='csrf' value='{_html_escape(csrf_t)}'/>
               <input type='hidden' name='kind' id='txn-kind-field' value=''/>
@@ -1426,6 +1426,33 @@ def render_owner_customer_page(
             }}, 280);
           }}
         }}
+        (function () {{
+          function bindEnterSubmit() {{
+            var form = document.getElementById('cust-new-txn-form');
+            var amt = document.getElementById('amt');
+            var tnote = document.getElementById('tnote');
+            if (!form || !amt || !tnote) return;
+            function submit() {{
+              if (typeof form.requestSubmit === 'function') form.requestSubmit();
+              else {{
+                var btn = form.querySelector('button[type="submit"]');
+                if (btn) btn.click(); else form.submit();
+              }}
+            }}
+            amt.addEventListener('keydown', function (e) {{
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              submit();
+            }});
+            tnote.addEventListener('keydown', function (e) {{
+              if (e.key !== 'Enter' || e.shiftKey) return;
+              e.preventDefault();
+              submit();
+            }});
+          }}
+          if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindEnterSubmit);
+          else bindEnterSubmit();
+        }})();
         </script>
         """
 
@@ -1632,6 +1659,35 @@ def render_tx_edit_page(
                   <button type='submit' form='tx-update-form' class='btn btn-primary'>حفظ التعديلات</button>
                 </div>
               </div>
+              <script>
+              (function () {{
+                function bindTxEditEnter() {{
+                  var form = document.getElementById('tx-update-form');
+                  var amt = document.getElementById('txamt');
+                  var note = document.getElementById('txnote');
+                  if (!form || !amt || !note) return;
+                  function submit() {{
+                    if (typeof form.requestSubmit === 'function') form.requestSubmit();
+                    else {{
+                      var b = document.querySelector('button[form="tx-update-form"]');
+                      if (b) b.click();
+                    }}
+                  }}
+                  amt.addEventListener('keydown', function (e) {{
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    submit();
+                  }});
+                  note.addEventListener('keydown', function (e) {{
+                    if (e.key !== 'Enter' || e.shiftKey) return;
+                    e.preventDefault();
+                    submit();
+                  }});
+                }}
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindTxEditEnter);
+                else bindTxEditEnter();
+              }})();
+              </script>
         """
         return wrap_creditbook_app_shell(
             user, favicon_href, brand_img, f"معاملة #{tx_id}", None, inner, body_class="page-tx-edit"
