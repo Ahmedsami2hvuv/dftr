@@ -10,7 +10,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
-from config import BOT_USERNAME, WEB_BASE_URL, WEB_TX_UPLOAD_DIR
+from config import BOT_USERNAME, WEB_BASE_URL, WEB_TX_UPLOAD_DIR, customer_share_message_footer
 from database import SessionLocal
 from app_models import (
     Customer,
@@ -666,7 +666,8 @@ def build_customer_share_urls(
             f"{msg_balance}\n"
             "ــــــــــــــــــــــــ\n"
             f"{link_hint}\n"
-            f"{view_url}"
+            f"{view_url}\n\n"
+            f"{customer_share_message_footer()}"
         )
         wa_text = share_text
         wa_num = cust.phone and _wa_number(cust.phone)

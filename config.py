@@ -100,3 +100,25 @@ def web_session_secret() -> str:
     if raw:
         return raw
     return hashlib.sha256(("dftr_web_sess_v1:" + BOT_TOKEN).encode("utf-8")).hexdigest()
+
+
+def customer_share_message_footer() -> str:
+    """
+    نص يُلحق بنهاية رسالة مشاركة الفاتورة/الرصيد (واتساب ومعاينة الموقع والبوت).
+    """
+    bot_u = (BOT_USERNAME or "").strip().lstrip("@")
+    bot_line = f"https://t.me/{bot_u}" if bot_u else "— (لم يُضبط BOT_USERNAME)"
+
+    base = (WEB_BASE_URL or "").strip().rstrip("/")
+    if base and not base.startswith(("http://", "https://")):
+        base = "https://" + base.lstrip("/")
+    web_line = f"{base}/creditbook" if base else "— (لم يُضبط WEB_BASE_URL)"
+
+    return (
+        "ــــــــــــــــــــــــ\n"
+        "هذه الفاتورة تم إنشاؤها عبر بوت دفتر الديون.\n\n"
+        "هل تود فتح دفتر لك؟ انقر على الرابط:\n"
+        f"{bot_line}\n\n"
+        "إن لم تكن تملك تليجرام انقر على الرابط:\n"
+        f"{web_line}"
+    )

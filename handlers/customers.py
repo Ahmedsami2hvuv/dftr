@@ -15,7 +15,12 @@ from database import SessionLocal
 from app_models import User, Customer, CustomerTransaction, ShareLink, CustomerCategory
 from app_models.partner import PartnerLink, PartnerPendingTx, CustomerPaymentReminder
 from utils.phone import is_plausible_iraq_mobile, normalize_phone, wa_number
-from config import WEB_BASE_URL, WEB_TX_UPLOAD_DIR, public_web_base_url_for_telegram_fetch
+from config import (
+    WEB_BASE_URL,
+    WEB_TX_UPLOAD_DIR,
+    customer_share_message_footer,
+    public_web_base_url_for_telegram_fetch,
+)
 from handlers.inline_nav import kb_main_menu, kb_menu_customers, kb_tx_detail
 
 (
@@ -3004,7 +3009,8 @@ async def cust_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{msg_balance}\n"
             "ــــــــــــــــــــــــ\n"
             f"{link_hint}\n"
-            f"{view_url}"
+            f"{view_url}\n\n"
+            f"{customer_share_message_footer()}"
         )
         # زر يفتح واتساب على محادثة رقم العميل مع النص جاهز
         # نخلي رابط الصفحة بسطر لوحده حتى واتساب يتعامل معه كرابط تلقائي.
