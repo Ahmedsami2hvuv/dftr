@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=37"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=38"
 
 
 def _html_escape(s: str) -> str:
@@ -1272,7 +1272,7 @@ def _customer_tx_list_html_fragment(
                     <span class='tx-sep' aria-hidden='true'>·</span>
                     <span class='tx-date' dir='ltr'>{dt}</span>
                     <span class='tx-sep' aria-hidden='true'>·</span>
-                    <span class='tx-remain {remain_class}'>الرصيد بعدها: {_amount_to_str(remain)} د.ع.</span>
+                    <span class='tx-remain {remain_class}'>الباقي بعدها: {_amount_to_str(remain)} د.ع.</span>
                     <span class='tx-sep' aria-hidden='true'>·</span>
                     <a class='tx-edit-btn' href='/creditbook/tx/{t.id}'><span class='tx-edit-ico'>✎</span> تعديل</a>
                     {photo_html}
@@ -1504,7 +1504,7 @@ def render_owner_customer_page(
                 <div class='cust-head-stats dashboard-stats-col' role='group' aria-label='إجماليات العميل'>
                     <div class='cust-stat-line'><span class='cust-stat-lbl'>أخذت</span><span class='cust-stat-val bal-red'>{_amount_to_str(took)} د.ع.</span></div>
                     <div class='cust-stat-line'><span class='cust-stat-lbl'>أعطيت</span><span class='cust-stat-val bal-green'>{_amount_to_str(gave)} د.ع.</span></div>
-                    <div class='cust-stat-line'><span class='cust-stat-lbl'>النتيجة</span><span class='cust-stat-val {balance_class}'>{net_line}</span></div>
+                    <div class='cust-stat-line'><span class='cust-stat-lbl'>الباقي</span><span class='cust-stat-val {balance_class}'>{net_line}</span></div>
                 </div>
                 <div class='dashboard-showcase-col'>
                   {render_owner_showcase_card(user)}
@@ -1767,7 +1767,7 @@ def render_dashboard_customer_rows_html(
             f"""
             <a class='cust-row' href='/creditbook/customer/{c.id}'>
               <div class='cust-name'>{_html_escape(c.name)}</div>
-              <div class='cust-bal {bc}'>الرصيد الحالي: {_amount_to_str(bal)} د.ع.</div>
+              <div class='cust-bal {bc}'>الباقي الحالي: {_amount_to_str(bal)} د.ع.</div>
             </a>
             """
         )

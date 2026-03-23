@@ -410,7 +410,7 @@ def _render_page(token: str, offset: int) -> str:
                   <div class='top'>{dt}</div>
                   <div class='tx-content'>
                     <div class='tx-text'>
-                      <div class='remain {remain_class}'>الرصيد الحالي: {_amount_to_str(remain)} د.ع.</div>
+                      <div class='remain {remain_class}'>الباقي الحالي: {_amount_to_str(remain)} د.ع.</div>
                       <div class='main {tx_kind_class}'>{_kind_icon(t.kind)} {_kind_label(t.kind)} - {_amount_to_str(t.amount)} د.ع.</div>
                       {note_html}
                     </div>
@@ -425,7 +425,7 @@ def _render_page(token: str, offset: int) -> str:
             # offset button keep same token
             more_btn = f"<a class='btn' href='/creditbook/balance/{token}?lang=ar&offset={more_offset}'>➕ عرض الباقيات</a>"
 
-        balance_text = "الرصيد الحالي: "
+        balance_text = "الباقي الحالي: "
         if bal > 0:
             balance_text += f"{bal:.2f}"
         elif bal < 0:
