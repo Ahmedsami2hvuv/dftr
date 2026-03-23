@@ -379,7 +379,19 @@ def _render_page(token: str, offset: int) -> str:
         for t in txs:
             dt = t.created_at.strftime("%Y-%m-%d %H:%M")
             note = (t.note or "").strip()
-            note_html = f"<div class='note'>ملاحظة: {note}</div>" if note else "<div class='note'>ملاحظة: —</div>"
+            if note:
+                note_esc = _html_escape(note)
+                note_html = (
+                    f"<aside class='tx-note-block' aria-label='ملاحظة المعاملة'>"
+                    f"<span class='tx-note-label'>ملاحظة</span>"
+                    f"<div class='tx-note-text'>{note_esc}</div></aside>"
+                )
+            else:
+                note_html = (
+                    "<aside class='tx-note-block tx-note-block--empty' aria-label='ملاحظة المعاملة'>"
+                    "<span class='tx-note-label'>ملاحظة</span>"
+                    "<div class='tx-note-text tx-note-text--empty'>—</div></aside>"
+                )
             photo_html = ""
             if getattr(t, "photo_file_id", None):
                 fid = quote(str(t.photo_file_id), safe="")
@@ -645,7 +657,37 @@ def _render_page(token: str, offset: int) -> str:
               .remain {{ margin-top: 6px; font-size: 13px; }}
               .remain.bal-red {{ color: #b91c1c; }}
               .remain.bal-green {{ color: #15803d; }}
-              .note {{ margin-top: 6px; color: #64748b; font-size: 13px; }}
+              .tx-note-block {{
+                margin-top: 8px;
+                padding: 10px 12px 12px;
+                border-radius: 12px;
+                background: linear-gradient(145deg, rgba(15, 118, 110, 0.08) 0%, rgba(241, 245, 249, 0.92) 48%, rgba(255, 255, 255, 0.95) 100%);
+                border: 1px solid rgba(45, 212, 191, 0.32);
+                border-inline-start: 4px solid #0d9488;
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 2px 10px rgba(15, 118, 110, 0.07);
+                text-align: start;
+              }}
+              .tx-note-block--empty {{ opacity: 0.92; }}
+              .tx-note-label {{
+                display: inline-block;
+                font-size: 0.72rem;
+                font-weight: 800;
+                letter-spacing: 0.05em;
+                color: #0f766e;
+                margin-bottom: 6px;
+                padding: 3px 10px;
+                border-radius: 8px;
+                background: rgba(13, 148, 136, 0.16);
+                border: 1px solid rgba(13, 148, 136, 0.28);
+              }}
+              .tx-note-text {{
+                font-size: 0.95rem;
+                line-height: 1.6;
+                color: #1e293b;
+                white-space: pre-wrap;
+                word-break: break-word;
+              }}
+              .tx-note-text--empty {{ color: #94a3b8; font-style: normal; }}
               .photo-wrap {{ flex: 0 0 auto; margin-top: 2px; }}
               .photo {{ width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.25); cursor: pointer; }}
               .btn {{

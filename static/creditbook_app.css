@@ -298,28 +298,51 @@ form.login-form { margin-top: 8px; }
   vertical-align: middle;
   display: block;
 }
-.tx-note-line {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--cb-border-dim);
-  font-size: 13px;
-  color: var(--cb-text-dim);
-  line-height: 1.4;
-  word-break: break-word;
-}
-.tx-note-label {
-  font-weight: 700;
-  color: var(--cb-text);
-  margin-inline-end: 6px;
-}
-.tx-note-black {
+/* ملاحظة المعاملة — كتلة واضحة (عميل، تقرير، سجل) */
+.tx-note-block {
   margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--cb-border-dim);
-  font-size: 14px;
+  padding: 10px 12px 12px;
+  border-radius: 12px;
+  background: linear-gradient(
+    145deg,
+    rgba(15, 118, 110, 0.08) 0%,
+    rgba(241, 245, 249, 0.92) 48%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  border: 1px solid rgba(45, 212, 191, 0.32);
+  border-inline-start: 4px solid #0d9488;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 2px 10px rgba(15, 118, 110, 0.07);
+  text-align: start;
+}
+.tx-note-block .tx-note-label {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #0f766e;
+  margin-bottom: 6px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(13, 148, 136, 0.16);
+  border: 1px solid rgba(13, 148, 136, 0.28);
+}
+.tx-note-text {
+  font-size: 0.95rem;
+  line-height: 1.6;
   color: var(--cb-text);
-  line-height: 1.45;
+  white-space: pre-wrap;
   word-break: break-word;
+}
+.tx-note-block--compact {
+  margin-top: 8px;
+  padding: 8px 10px 10px;
+  border-radius: 10px;
+}
+.tx-note-block--compact .tx-note-text {
+  font-size: 0.88rem;
+  line-height: 1.52;
 }
 /* صفحة المشاركة العامة قد تستخدم الكلاسات القديمة */
 .top { color: var(--cb-text-dim); font-size: 12px; }
@@ -1299,13 +1322,6 @@ button.cust-search-clear-inline:hover {
   font-size: 0.9rem;
   color: var(--cb-text-dim);
   margin-bottom: 4px;
-}
-.acct-txhist-note {
-  font-size: 0.88rem;
-  color: var(--cb-text-dim);
-  margin: 6px 0 8px;
-  line-height: 1.45;
-  word-break: break-word;
 }
 .acct-txhist-actions {
   display: flex;

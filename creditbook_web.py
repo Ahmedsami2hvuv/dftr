@@ -25,11 +25,34 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=36"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=37"
 
 
 def _html_escape(s: str) -> str:
     return html.escape(s or "", quote=True)
+
+
+def _tx_note_block_html(
+    note: str | None,
+    *,
+    max_len: int | None = None,
+    extra_class: str = "",
+) -> str:
+    """مربع ملاحظة المعاملة في الواجهة (قائمة عميل، تقرير، سجل الحساب)."""
+    text = (note or "").strip()
+    if max_len is not None and len(text) > max_len:
+        text = text[:max_len] + "…"
+    if not text:
+        return ""
+    cls = "tx-note-block"
+    if extra_class.strip():
+        cls = cls + " " + extra_class.strip()
+    return (
+        f'<aside class="{_html_escape(cls)}" aria-label="ملاحظة المعاملة">'
+        "<span class=\"tx-note-label\">ملاحظة</span>"
+        f"<div class=\"tx-note-text\">{_html_escape(text)}</div>"
+        "</aside>"
+    )
 
 
 def _find_user_by_phone(db, phone_normalized: str) -> User | None:
@@ -520,9 +543,7 @@ def render_tx_history_rows_html(user_id: int, q: str | None, csrf_token: str) ->
         kind_ar = "أخذت" if h.kind == "took" else "أعطيت"
         dt_s = h.txn_created_at.strftime("%Y-%m-%d %H:%M") if h.txn_created_at else "—"
         note_s = (h.note or "").strip()
-        note_html = (
-            f"<div class='acct-txhist-note'>{_html_escape(note_s[:800])}</div>" if note_s else ""
-        )
+        note_html = _tx_note_block_html(note_s, max_len=800, extra_class="tx-note-block--compact")
         cust_esc = _html_escape(cust_name or "")
         amt_s = _amount_to_str(h.amount)
         hid = int(h.id)
@@ -957,11 +978,7 @@ def render_report_all_transactions_page(
     for t, cust in rows:
         dt = t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else ""
         note = (t.note or "").strip()
-        note_html = (
-            f"<div class='tx-note-black'><span class='tx-note-label'>ملاحظة:</span> {_html_escape(note)}</div>"
-            if note
-            else ""
-        )
+        note_html = _tx_note_block_html(note)
         photo_html = ""
         if getattr(t, "photo_file_id", None):
             fid = quote(str(t.photo_file_id), safe="")
@@ -1235,11 +1252,7 @@ def _customer_tx_list_html_fragment(
     for t in txs:
         dt = t.created_at.strftime("%Y-%m-%d %H:%M")
         note = (t.note or "").strip()
-        note_html = (
-            f"<div class='tx-note-black'><span class='tx-note-label'>ملاحظة:</span> {_html_escape(note)}</div>"
-            if note
-            else ""
-        )
+        note_html = _tx_note_block_html(note)
         photo_html = ""
         if getattr(t, "photo_file_id", None):
             fid = quote(str(t.photo_file_id), safe="")
