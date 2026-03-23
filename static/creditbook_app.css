@@ -710,20 +710,11 @@ form.login-form { margin-top: 8px; }
   flex: 0 1 auto;
   min-width: 0;
 }
-.page-cust .dashboard-head .owner-name-row {
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.page-cust .dashboard-head .owner-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1 1 auto;
-  min-width: 0;
-  line-height: 1.2;
+/* صفحة عميل: اسم صانع الدفتر بأسطر كاملة (لا قصّ) — البنية الحالية owner-showcase-name */
+.page-cust .dashboard-head .owner-showcase-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 .page-cust .dashboard-head .owner-phone,
 .page-cust .dashboard-head a.owner-phone-wa {
@@ -1613,6 +1604,10 @@ button.sidebar-link.sidebar-install-btn {
   margin-top: 8px;
 }
 .owner-showcase {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   flex: 0 1 auto;
   max-width: min(100%, 92vw);
   min-width: 0;
@@ -1642,7 +1637,26 @@ button.sidebar-link.sidebar-install-btn {
   font-weight: 800;
   letter-spacing: 0.06em;
   opacity: 0.92;
-  margin-bottom: 6px;
+  margin-bottom: 0;
+  position: relative;
+  z-index: 1;
+}
+.owner-showcase-name {
+  font-size: clamp(1.05rem, 3.5vw, 1.3rem);
+  font-weight: 800;
+  line-height: 1.35;
+  margin: 0;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.12);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  position: relative;
+  z-index: 1;
+}
+.owner-showcase-phone {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   position: relative;
   z-index: 1;
 }
@@ -1715,12 +1729,15 @@ button.sidebar-link.sidebar-install-btn {
   }
   .owner-badge {
     font-size: 0.92rem;
-    margin-bottom: 10px;
+    margin-bottom: 0;
   }
   .owner-name-row {
     flex-direction: column;
     align-items: stretch;
     gap: 14px;
+  }
+  .owner-showcase-name {
+    font-size: clamp(1.34rem, 2.05vw, 1.68rem);
   }
   .owner-name {
     font-size: clamp(1.34rem, 2.05vw, 1.68rem);
@@ -1809,27 +1826,22 @@ button.sidebar-link.sidebar-install-btn {
   }
   .dashboard-head .owner-badge {
     font-size: 0.72rem;
-    margin-bottom: 4px;
+    margin-bottom: 0;
+  }
+  .dashboard-head .owner-showcase-name {
+    font-size: clamp(0.88rem, 3.2vw, 1.05rem);
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
   .dashboard-head .owner-name {
     font-size: clamp(0.88rem, 3.2vw, 1.05rem);
     white-space: normal;
   }
-  .page-cust .dashboard-head .owner-name {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
   .dashboard-head .owner-name-row {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
-  }
-  .page-cust .dashboard-head .owner-name-row {
-    flex-direction: row !important;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: space-between;
   }
   .dashboard-head .owner-phone {
     font-size: 0.78rem;

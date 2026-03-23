@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=34"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=36"
 
 
 def _html_escape(s: str) -> str:
@@ -282,10 +282,8 @@ def render_owner_showcase_card(user: User) -> str:
     return f"""
     <div class='owner-showcase'>
       <div class='owner-badge'>صنع بواسطة</div>
-      <div class='owner-name-row'>
-        <div class='owner-name'>{owner_name_esc}</div>
-        {phone_html}
-      </div>
+      <div class='owner-showcase-name'>{owner_name_esc}</div>
+      <div class='owner-showcase-phone'>{phone_html}</div>
     </div>
     """
 
