@@ -36,6 +36,12 @@ if _raw_base and not _raw_base.startswith(("http://", "https://")):
 
 WEB_BASE_URL = _raw_base.rstrip("/")
 
+# رابط صفحة تسجيل الدخول في تذييل رسالة المشاركة (واتساب) — لمن لا يملك تليجرام
+SHARE_MESSAGE_WEB_LOGIN_URL = get_env(
+    "SHARE_MESSAGE_WEB_LOGIN_URL",
+    "https://dftr-production.up.railway.app/creditbook/login",
+).rstrip("/")
+
 
 def _url_looks_local(u: str) -> bool:
     ul = (u or "").lower()
@@ -109,10 +115,7 @@ def customer_share_message_footer() -> str:
     bot_u = (BOT_USERNAME or "").strip().lstrip("@")
     bot_line = f"https://t.me/{bot_u}" if bot_u else "— (لم يُضبط BOT_USERNAME)"
 
-    base = (WEB_BASE_URL or "").strip().rstrip("/")
-    if base and not base.startswith(("http://", "https://")):
-        base = "https://" + base.lstrip("/")
-    web_line = f"{base}/creditbook" if base else "— (لم يُضبط WEB_BASE_URL)"
+    web_line = SHARE_MESSAGE_WEB_LOGIN_URL or "— (لم يُضبط SHARE_MESSAGE_WEB_LOGIN_URL)"
 
     return (
         "ــــــــــــــــــــــــ\n"
