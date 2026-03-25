@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=40"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=41"
 
 
 def _html_escape(s: str) -> str:
@@ -1190,6 +1190,46 @@ def _owner_kind_class(kind: str) -> str:
     return "bal-green" if kind == "gave" else "bal-red"
 
 
+def _customer_peer_suggest_html(
+    db,
+    owner_user_id: int,
+    current_cust_id: int,
+    sq: str,
+) -> str:
+    """روابط سريعة لعملاء آخرين يطابق البحث (اسم أو هاتف) — نفس صاحب الدفتر."""
+    sq = (sq or "").strip()
+    if not sq:
+        return ""
+    from sqlalchemy import or_
+
+    like_pat = f"%{sq}%"
+    others = (
+        db.query(Customer)
+        .filter(Customer.user_id == owner_user_id)
+        .filter(Customer.id != current_cust_id)
+        .filter(
+            or_(
+                Customer.name.ilike(like_pat),
+                Customer.phone.ilike(like_pat),
+            )
+        )
+        .order_by(Customer.name.asc())
+        .limit(12)
+        .all()
+    )
+    if not others:
+        return ""
+    links = "".join(
+        f"<a class='cust-peer-link' href='/creditbook/customer/{c.id}'>{_html_escape(c.name)}</a>"
+        for c in others
+    )
+    return (
+        "<div class='cust-search-peer-suggest'>"
+        "<p class='cust-search-peer-title'>فتح عميل آخر</p>"
+        f"<div class='cust-search-peer-links'>{links}</div></div>"
+    )
+
+
 def _customer_tx_list_html_fragment(
     db,
     cust: Customer,
@@ -1208,6 +1248,8 @@ def _customer_tx_list_html_fragment(
             or_(
                 CustomerTransaction.note.ilike(like_pat),
                 cast(CustomerTransaction.amount, String).ilike(like_pat),
+                cast(CustomerTransaction.created_at, String).ilike(like_pat),
+                cast(CustomerTransaction.id, String).ilike(like_pat),
             )
         )
 
@@ -1289,7 +1331,8 @@ def _customer_tx_list_html_fragment(
         if sq and not tx_rows
         else ('<p class="hint">لا توجد معاملات بعد.</p>' if not tx_rows else "")
     )
-    body = ("".join(tx_rows) if tx_rows else empty_tx_hint) + more_btn
+    suggest_html = _customer_peer_suggest_html(db, owner_user_id, cust.id, sq)
+    body = suggest_html + ("".join(tx_rows) if tx_rows else empty_tx_hint) + more_btn
     return body
 
 
@@ -1396,7 +1439,36 @@ def render_owner_customer_page(
               <input type='hidden' name='kind' id='txn-kind-field' value=''/>
               <p id='txn-kind-hint' class='txn-kind-hint'></p>
               <label for='amt'>المبلغ (د.ع.)</label>
-              <input type='text' id='amt' name='amount' class='txn-amt-input' required placeholder='مثال: 775.25' dir='ltr' inputmode='decimal' autocomplete='off'/>
+              <div class='txn-amt-row'>
+                <input type='text' id='amt' name='amount' class='txn-amt-input' required placeholder='مثال: 775.25' dir='ltr' inputmode='decimal' autocomplete='off'/>
+                <button type='button' class='btn btn-secondary txn-calc-toggle' id='txn-calc-btn' aria-expanded='false' aria-controls='txn-calc-panel' title='حاسبة'>🧮</button>
+              </div>
+              <div id='txn-calc-panel' class='txn-calc-panel hidden' role='dialog' aria-label='حاسبة المبلغ'>
+                <div class='txn-calc-display' id='txn-calc-display'>0</div>
+                <div class='txn-calc-grid'>
+                  <button type='button' class='txn-calc-key' data-calc='C'>مسح</button>
+                  <button type='button' class='txn-calc-key' data-calc='BS'>⌫</button>
+                  <button type='button' class='txn-calc-key' data-calc='/'>÷</button>
+                  <button type='button' class='txn-calc-key' data-calc='*'>×</button>
+                  <button type='button' class='txn-calc-key' data-calc='7'>7</button>
+                  <button type='button' class='txn-calc-key' data-calc='8'>8</button>
+                  <button type='button' class='txn-calc-key' data-calc='9'>9</button>
+                  <button type='button' class='txn-calc-key' data-calc='-'>−</button>
+                  <button type='button' class='txn-calc-key' data-calc='4'>4</button>
+                  <button type='button' class='txn-calc-key' data-calc='5'>5</button>
+                  <button type='button' class='txn-calc-key' data-calc='6'>6</button>
+                  <button type='button' class='txn-calc-key' data-calc='+'>+</button>
+                  <button type='button' class='txn-calc-key' data-calc='1'>1</button>
+                  <button type='button' class='txn-calc-key' data-calc='2'>2</button>
+                  <button type='button' class='txn-calc-key' data-calc='3'>3</button>
+                  <button type='button' class='txn-calc-key' data-calc='='>=</button>
+                  <button type='button' class='txn-calc-key' data-calc='0'>0</button>
+                  <button type='button' class='txn-calc-key' data-calc='.'>.</button>
+                </div>
+                <div class='txn-calc-foot'>
+                  <button type='button' class='btn btn-primary' id='txn-calc-insert'>إدراج في المبلغ</button>
+                </div>
+              </div>
               <label for='tnote'>ملاحظة (اختياري)</label>
               <textarea id='tnote' name='note' rows='2' placeholder='نص أو سطران (مبلغ ثم ملاحظة)'></textarea>
               <label for='txn_dt'>تاريخ ووقت المعاملة (اختياري — إن تُرك فارغاً يُستخدم الوقت الحالي)</label>
@@ -1453,15 +1525,103 @@ def render_owner_customer_page(
           if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindEnterSubmit);
           else bindEnterSubmit();
         }})();
+        (function () {{
+          var expr = '0';
+          var fresh = false;
+          var disp = document.getElementById('txn-calc-display');
+          var panel = document.getElementById('txn-calc-panel');
+          var btnToggle = document.getElementById('txn-calc-btn');
+          var amtInp = document.getElementById('amt');
+          function render() {{ if (disp) disp.textContent = expr; }}
+          function setE(s) {{ expr = s || '0'; render(); }}
+          function evalLine(s) {{
+            var t = (s || '').replace(/×/g, '*').replace(/÷/g, '/');
+            if (!/^[-+*/().0-9]+$/.test(t)) return null;
+            try {{ var v = Function('"use strict"; return (' + t + ')')(); }} catch (e) {{ return null; }}
+            if (typeof v !== 'number' || !isFinite(v)) return null;
+            return Math.round(v * 10000) / 10000;
+          }}
+          if (btnToggle && panel) {{
+            btnToggle.addEventListener('click', function (e) {{
+              e.preventDefault();
+              panel.classList.toggle('hidden');
+              var on = !panel.classList.contains('hidden');
+              btnToggle.setAttribute('aria-expanded', on ? 'true' : 'false');
+            }});
+          }}
+          if (panel) {{
+            panel.addEventListener('click', function (ev) {{
+              var t = ev.target;
+              if (!t || !t.getAttribute) return;
+              var act = t.getAttribute('data-calc');
+              if (!act) return;
+              ev.preventDefault();
+              if (act === 'C') {{ fresh = false; setE('0'); return; }}
+              if (act === 'BS') {{
+                fresh = false;
+                setE(expr.length <= 1 ? '0' : expr.slice(0, -1));
+                return;
+              }}
+              if (act === '=') {{
+                var n = evalLine(expr);
+                if (n === null) return;
+                setE(String(n));
+                fresh = true;
+                return;
+              }}
+              if ('0123456789'.indexOf(act) >= 0) {{
+                if (fresh) {{ setE(act); fresh = false; return; }}
+                if (expr === '0') setE(act);
+                else setE(expr + act);
+                return;
+              }}
+              if (act === '.') {{
+                if (fresh) {{ setE('0.'); fresh = false; return; }}
+                var lastOp = expr.slice(-1);
+                if ('+-*/'.indexOf(lastOp) >= 0) {{ setE(expr + '0.'); return; }}
+                if (expr === '0') {{ setE('0.'); return; }}
+                var parts = expr.split(/[-+*/]/);
+                var lastSeg = parts[parts.length - 1] || '';
+                if (lastSeg.indexOf('.') >= 0) return;
+                setE(expr + '.');
+                return;
+              }}
+              if ('+-*/'.indexOf(act) >= 0) {{
+                fresh = false;
+                var last = expr.slice(-1);
+                if ('+-*/'.indexOf(last) >= 0) setE(expr.slice(0, -1) + act);
+                else setE(expr + act);
+                return;
+              }}
+            }});
+          }}
+          var ins = document.getElementById('txn-calc-insert');
+          if (ins && amtInp) {{
+            ins.addEventListener('click', function (e) {{
+              e.preventDefault();
+              var n = evalLine(expr);
+              if (n !== null) {{
+                var s = String(n);
+                if (s.indexOf('.') >= 0) {{
+                  s = parseFloat(s).toFixed(4).replace(/\\.?0+$/, '');
+                }}
+                amtInp.value = s;
+              }} else {{
+                amtInp.value = expr;
+              }}
+              amtInp.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            }});
+          }}
+        }})();
         </script>
         """
 
         net_line = f"{_amount_to_str(bal)} د.ع."
         search_block = f"""
               <div class='cust-tx-search' role='search' data-cust-id='{cust.id}'>
-                <label class='visually-hidden' for='cust-tx-q'>بحث في معاملات هذا العميل</label>
+                <label class='visually-hidden' for='cust-tx-q'>بحث في المعاملات أو الانتقال لعميل آخر</label>
                 <div class='cust-search-field-wrap{" cust-search-field-wrap--has-clear" if sq else ""}' id='cust-search-field-wrap'>
-                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='بحث — مبلغ، ملاحظة، تاريخ، أو أي نص…' dir='rtl' autocomplete='off' title='تصفية معاملات هذا العميل بالمبلغ أو الملاحظة أو جزء من التاريخ'/>
+                  <input type='search' id='cust-tx-q' name='q' value='{q_esc}' placeholder='بحث — معاملات، تاريخ، مبلغ، ملاحظة، أو اسم عميل للانتقال…' dir='rtl' autocomplete='off' title='بحث في معاملات هذا العميل؛ اكتب اسم عميل آخر للانتقال إليه'/>
                   <button type='button' class='cust-search-clear-inline' id='cust-tx-clear' aria-label='مسح' title='مسح'{" hidden" if not sq else ""}>✕</button>
                 </div>
               </div>
