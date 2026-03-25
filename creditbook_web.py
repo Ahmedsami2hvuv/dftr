@@ -1614,6 +1614,8 @@ def render_owner_customer_page(
                 amtInp.value = expr;
               }}
               amtInp.dispatchEvent(new Event('input', {{ bubbles: true }}));
+              if (panel) panel.classList.add('hidden');
+              if (btnToggle) btnToggle.setAttribute('aria-expanded', 'false');
             }});
           }}
         }})();
