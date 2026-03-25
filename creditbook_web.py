@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=42"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=43"
 
 
 def _html_escape(s: str) -> str:
@@ -990,7 +990,7 @@ def render_report_all_transactions_page(
               <div class='tx-line-main'>
                 <a class='report-cust-name' href='{cust_link}'>{_html_escape(cust.name)}</a>
                 <span class='tx-sep' aria-hidden='true'>·</span>
-                <span class='tx-kind-amt {kc}'><span class='tx-kind-txt'>{kind_word}</span> {_amount_to_str(t.amount)} د.ع.</span>
+                <span class='tx-kind-amt tx-kind-pill {kc}'><span class='tx-kind-txt'>{kind_word}</span><span class='tx-kind-amt-val'>{_amount_to_str(t.amount)}</span><span class='tx-kind-cur'> د.ع.</span></span>
                 <span class='tx-sep' aria-hidden='true'>·</span>
                 <span class='tx-date' dir='ltr'>{dt}</span>
                 <span class='tx-sep' aria-hidden='true'>·</span>
@@ -1298,18 +1298,17 @@ def _customer_tx_list_html_fragment(
                 f"<img class='photo' src='/creditbook/photo/{fid}' alt=''/></a>"
             )
         remain = running_after_by_tx.get(t.id, bal)
-        remain_class = "bal-green" if remain > 0 else ("bal-red" if remain < 0 else "")
         kc = _owner_kind_class(t.kind)
         kind_word = _owner_kind_word(t.kind)
         tx_rows.append(
             f"""
                 <div class='tx tx-row-{t.kind}'>
                   <div class='tx-line-main'>
-                    <span class='tx-kind-amt {kc}'><span class='tx-kind-txt'>{kind_word}</span> {_amount_to_str(t.amount)} د.ع.</span>
+                    <span class='tx-kind-amt tx-kind-pill {kc}'><span class='tx-kind-txt'>{kind_word}</span><span class='tx-kind-amt-val'>{_amount_to_str(t.amount)}</span><span class='tx-kind-cur'> د.ع.</span></span>
                     <span class='tx-sep' aria-hidden='true'>·</span>
                     <span class='tx-date' dir='ltr'>{dt}</span>
                     <span class='tx-sep' aria-hidden='true'>·</span>
-                    <span class='tx-remain {remain_class}'>الباقي: {_amount_to_str(remain)} د.ع.</span>
+                    <span class='tx-remain tx-remain-box'><span class='tx-remain-lbl'>الباقي</span><span class='tx-remain-num' dir='ltr'>{_amount_to_str(remain)}</span><span class='tx-remain-cur'> د.ع.</span></span>
                     <span class='tx-sep' aria-hidden='true'>·</span>
                     <a class='tx-edit-btn' href='/creditbook/tx/{t.id}'><span class='tx-edit-ico'>✎</span> تعديل</a>
                     {photo_html}
