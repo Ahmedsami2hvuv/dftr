@@ -590,6 +590,9 @@ form.login-form { margin-top: 8px; }
 .txn-calc-key-zero {
   grid-column: span 2;
 }
+.txn-calc-key-span2 {
+  grid-column: span 2;
+}
 .txn-calc-row-big {
   display: grid;
   grid-template-columns: 1fr 1fr;
