@@ -518,6 +518,23 @@ form.login-form { margin-top: 8px; }
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 10px;
+  direction: ltr;
+}
+.txn-calc-key-zero {
+  grid-column: span 2;
+}
+.txn-calc-row-big {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+  direction: ltr;
+}
+.txn-calc-key--big {
+  min-height: 56px;
+  font-size: 1.5rem;
+  font-weight: 900;
+  padding: 14px 10px;
 }
 .txn-calc-key {
   margin: 0;

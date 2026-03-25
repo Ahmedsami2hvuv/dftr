@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=41"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=42"
 
 
 def _html_escape(s: str) -> str:
@@ -1448,8 +1448,8 @@ def render_owner_customer_page(
                 <div class='txn-calc-grid'>
                   <button type='button' class='txn-calc-key' data-calc='C'>مسح</button>
                   <button type='button' class='txn-calc-key' data-calc='BS'>⌫</button>
-                  <button type='button' class='txn-calc-key' data-calc='/'>÷</button>
                   <button type='button' class='txn-calc-key' data-calc='*'>×</button>
+                  <button type='button' class='txn-calc-key' data-calc='/'>/</button>
                   <button type='button' class='txn-calc-key' data-calc='7'>7</button>
                   <button type='button' class='txn-calc-key' data-calc='8'>8</button>
                   <button type='button' class='txn-calc-key' data-calc='9'>9</button>
@@ -1457,13 +1457,17 @@ def render_owner_customer_page(
                   <button type='button' class='txn-calc-key' data-calc='4'>4</button>
                   <button type='button' class='txn-calc-key' data-calc='5'>5</button>
                   <button type='button' class='txn-calc-key' data-calc='6'>6</button>
-                  <button type='button' class='txn-calc-key' data-calc='+'>+</button>
+                  <button type='button' class='txn-calc-key' data-calc='*'>×</button>
                   <button type='button' class='txn-calc-key' data-calc='1'>1</button>
                   <button type='button' class='txn-calc-key' data-calc='2'>2</button>
                   <button type='button' class='txn-calc-key' data-calc='3'>3</button>
-                  <button type='button' class='txn-calc-key' data-calc='='>=</button>
-                  <button type='button' class='txn-calc-key' data-calc='0'>0</button>
+                  <button type='button' class='txn-calc-key' data-calc='/'>/</button>
+                  <button type='button' class='txn-calc-key txn-calc-key-zero' data-calc='0'>0</button>
                   <button type='button' class='txn-calc-key' data-calc='.'>.</button>
+                </div>
+                <div class='txn-calc-row-big' role='group' aria-label='جمع ويساوي'>
+                  <button type='button' class='txn-calc-key txn-calc-key--big' data-calc='+'>+</button>
+                  <button type='button' class='txn-calc-key txn-calc-key--big' data-calc='='>=</button>
                 </div>
                 <div class='txn-calc-foot'>
                   <button type='button' class='btn btn-primary' id='txn-calc-insert'>إدراج في المبلغ</button>
