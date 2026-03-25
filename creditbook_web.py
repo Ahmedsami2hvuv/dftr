@@ -25,7 +25,7 @@ SESSION_DAYS = 30
 TX_PAGE_SIZE = 15
 REPORT_PAGE_SIZE = 25
 # زيادة الرقم عند تغيير CSS حتى يُحمّل الملف الجديد بدون كاش قديم
-CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=43"
+CREDITBOOK_CSS_HREF = "/creditbook/static/creditbook_app.css?v=44"
 
 
 def _html_escape(s: str) -> str:
@@ -1442,7 +1442,7 @@ def render_owner_customer_page(
                 <input type='text' id='amt' name='amount' class='txn-amt-input' required placeholder='مثال: 775.25' dir='ltr' inputmode='decimal' autocomplete='off'/>
                 <button type='button' class='btn btn-secondary txn-calc-toggle' id='txn-calc-btn' aria-expanded='false' aria-controls='txn-calc-panel' title='حاسبة'>🧮</button>
               </div>
-              <div id='txn-calc-panel' class='txn-calc-panel hidden' role='dialog' aria-label='حاسبة المبلغ'>
+              <div id='txn-calc-panel' class='txn-calc-panel hidden' role='dialog' aria-label='حاسبة المبلغ' dir='ltr' lang='en'>
                 <div class='txn-calc-display' id='txn-calc-display'>0</div>
                 <div class='txn-calc-grid'>
                   <button type='button' class='txn-calc-key' data-calc='C'>مسح</button>

@@ -562,6 +562,9 @@ form.login-form { margin-top: 8px; }
   border: 1px solid rgba(45, 212, 191, 0.35);
   background: linear-gradient(165deg, rgba(240, 253, 250, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
   box-shadow: var(--cb-glow-soft);
+  /* عزل اتجاه الحاسبة عن RTL الصفحة حتى لا تنعكس أعمدة الشبكة بصرياً */
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 .txn-calc-display {
   font-size: 1.25rem;
@@ -582,6 +585,7 @@ form.login-form { margin-top: 8px; }
   gap: 6px;
   margin-bottom: 10px;
   direction: ltr;
+  unicode-bidi: isolate;
 }
 .txn-calc-key-zero {
   grid-column: span 2;
@@ -589,15 +593,17 @@ form.login-form { margin-top: 8px; }
 .txn-calc-row-big {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
+  margin-top: 6px;
   margin-bottom: 10px;
   direction: ltr;
+  unicode-bidi: isolate;
 }
 .txn-calc-key--big {
-  min-height: 56px;
-  font-size: 1.5rem;
+  min-height: 64px;
+  font-size: 1.65rem;
   font-weight: 900;
-  padding: 14px 10px;
+  padding: 16px 12px;
 }
 .txn-calc-key {
   margin: 0;
