@@ -1218,7 +1218,17 @@ def _customer_peer_suggest_html(
         .all()
     )
     if not others:
-        return ""
+        csrf_c = _html_escape(csrf_token(owner_user_id, "cust_create"))
+        name_esc = _html_escape(sq)
+        return (
+            "<div class='cust-search-peer-suggest'>"
+            "<p class='cust-search-peer-title'>لا يوجد عميل مطابق. يمكنك إنشاء عميل جديد بهذا الاسم:</p>"
+            "<form method='post' action='/creditbook/customer/create' class='stack-form cust-inline-create-form'>"
+            f"<input type='hidden' name='csrf' value='{csrf_c}'/>"
+            f"<input type='hidden' name='name' value='{name_esc}'/>"
+            "<button type='submit' class='btn btn-secondary'>➕ إنشاء عميل جديد</button>"
+            "</form></div>"
+        )
     links = "".join(
         f"<a class='cust-peer-link' href='/creditbook/customer/{c.id}'>{_html_escape(c.name)}</a>"
         for c in others
@@ -1989,7 +1999,18 @@ def render_dashboard_customer_rows_html(
         )
     if not rows:
         if (q or "").strip():
-            return "<p class='hint'>لا يوجد عملاء مطابقين.</p>"
+            qv = (q or "").strip()
+            csrf_c = _html_escape(csrf_token(user_id, "cust_create"))
+            q_esc = _html_escape(qv)
+            return (
+                "<div class='dash-search-empty'>"
+                "<p class='hint'>لا يوجد عملاء مطابقين.</p>"
+                "<form method='post' action='/creditbook/customer/create' class='stack-form cust-inline-create-form'>"
+                f"<input type='hidden' name='csrf' value='{csrf_c}'/>"
+                f"<input type='hidden' name='name' value='{q_esc}'/>"
+                "<button type='submit' class='btn btn-secondary'>➕ إنشاء عميل جديد بهذا الاسم</button>"
+                "</form></div>"
+            )
         return "<p class='hint'>لا يوجد عملاء بعد — اضغط «عميل جديد» لإضافة أول عميل.</p>"
     return "".join(rows)
 
