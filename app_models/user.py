@@ -18,9 +18,6 @@ class User(Base):
     reset_code_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # تفضيلات المظهر: light, dark, auto
-    theme_preference = Column(String(20), default="light")
-
     ledger_entries = relationship("LedgerEntry", back_populates="user")
     ledger_categories = relationship("LedgerCategory", back_populates="user")
     debts_given = relationship("Debt", foreign_keys="Debt.from_user_id", back_populates="from_user")
