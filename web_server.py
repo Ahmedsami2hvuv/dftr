@@ -472,35 +472,55 @@ def _render_page(token: str, offset: int) -> str:
           <head>
             <meta charset='utf-8'/>
             <meta name='viewport' content='width=device-width, initial-scale=1'/>
+            <meta id='meta-theme-color' name='theme-color' content='#14b8a6'/>
             <link rel='icon' href='{_html_escape(favicon_href)}' type='image/png'/>
             <link rel='preconnect' href='https://fonts.googleapis.com'/>
             <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin/>
             <link href='https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap' rel='stylesheet'/>
             <title>{title}</title>
+            <script>
+            (function() {{
+              try {{
+                var theme = localStorage.getItem('dftr_theme') || 'auto';
+                var isNight = false;
+                if (theme === 'auto') {{
+                  var h = new Date().getHours();
+                  isNight = h >= 18 || h < 6;
+                  document.documentElement.setAttribute('data-theme', isNight ? 'dark' : 'light');
+                }} else {{
+                  document.documentElement.setAttribute('data-theme', theme);
+                }}
+                var meta = document.getElementById('meta-theme-color');
+                var isDark = theme === 'dark' || (theme === 'auto' && isNight);
+                if (meta) meta.setAttribute('content', isDark ? '#0f172a' : '#14b8a6');
+              }} catch(e) {{}}
+            }})();
+            </script>
             <style>
               body {{
                 font-family: 'Tajawal', system-ui, sans-serif;
-                color: #1e293b;
+                color: var(--page-text, #1e293b);
                 color-scheme: light;
-                background: #f4f9fb;
-                background-image:
+                background: var(--page-bg, #f4f9fb);
+                background-image: var(--page-bg-img, 
                   radial-gradient(ellipse 90% 60% at 50% -10%, rgba(186, 230, 253, 0.65), transparent 55%),
                   radial-gradient(ellipse 60% 45% at 100% 20%, rgba(196, 181, 253, 0.22), transparent 50%),
                   radial-gradient(ellipse 50% 40% at 0% 90%, rgba(167, 243, 208, 0.35), transparent 50%),
-                  linear-gradient(165deg, #f0fdfa 0%, #f8fafc 38%, #f0f9ff 72%, #faf5ff 100%);
+                  linear-gradient(165deg, #f0fdfa 0%, #f8fafc 38%, #f0f9ff 72%, #faf5ff 100%)
+                );
                 padding: 16px;
                 margin: 0;
                 min-height: 100vh;
                 box-sizing: border-box;
               }}
               .card {{
-                background: rgba(255, 255, 255, 0.82);
+                background: var(--card-bg, rgba(255, 255, 255, 0.82));
                 backdrop-filter: blur(14px);
                 -webkit-backdrop-filter: blur(14px);
                 border-radius: 20px;
                 padding: 20px;
-                box-shadow: 0 8px 32px rgba(14, 165, 233, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.65) inset;
-                border: 1px solid rgba(125, 211, 252, 0.45);
+                box-shadow: var(--card-glow, 0 8px 32px rgba(14, 165, 233, 0.1)), var(--card-glow-inner, 0 0 0 1px rgba(255, 255, 255, 0.65) inset);
+                border: 1px solid var(--card-border, rgba(125, 211, 252, 0.45));
               }}
               /* في RTL: يمين = الشعار والعنوان، يسار = بطاقة صغيرة «صنع بواسطة» */
               .brand-header {{
@@ -645,8 +665,8 @@ def _render_page(token: str, offset: int) -> str:
               .balance {{ font-size: 18px; margin: 8px 0 16px 0; font-weight: 700; }}
               .bal-red {{ color: #b91c1c; }}
               .bal-green {{ color: #15803d; }}
-              .tx {{ background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 12px; padding: 12px; margin: 10px 0; }}
-              .top {{ color: #64748b; font-size: 12px; }}
+              .tx {{ background: var(--tx-bg, rgba(255, 255, 255, 0.72)); border: 1px solid var(--tx-border, rgba(148, 163, 184, 0.28)); border-radius: 12px; padding: 12px; margin: 10px 0; }}
+              .top {{ color: var(--tx-mute, #64748b); font-size: 12px; }}
               .tx-content {{ margin-top: 6px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }}
               .tx-text {{ flex: 1; min-width: 0; }}
               .main {{ margin-top: 6px; font-size: 15px; font-weight: 700; }}
@@ -656,24 +676,24 @@ def _render_page(token: str, offset: int) -> str:
               .tx-note-black {{
                 margin-top: 10px;
                 padding-top: 8px;
-                border-top: 1px dashed #cbd5e1;
+                border-top: 1px dashed var(--tx-border, #cbd5e1);
                 line-height: 1.5;
                 word-break: break-word;
               }}
               .tx-note-label {{
                 font-weight: 800;
-                color: #6d28d9;
+                color: var(--note-label, #6d28d9);
                 margin-inline-end: 6px;
                 font-size: 1.02rem;
               }}
               .tx-note-body {{
                 font-size: 1.08rem;
                 font-weight: 600;
-                color: #5b21b6;
+                color: var(--note-body, #5b21b6);
                 white-space: pre-wrap;
                 word-break: break-word;
               }}
-              .note {{ margin-top: 6px; color: #64748b; font-size: 13px; }}
+              .note {{ margin-top: 6px; color: var(--tx-mute, #64748b); font-size: 13px; }}
               .photo-wrap {{ flex: 0 0 auto; margin-top: 2px; }}
               .photo {{ width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.25); cursor: pointer; }}
               .btn {{
@@ -726,6 +746,28 @@ def _render_page(token: str, offset: int) -> str:
                 .owner-showcase {{ order: -1; max-width: 100%; }}
                 .brand {{ justify-content: center; }}
               }}
+              [data-theme="dark"] {
+                color-scheme: dark;
+                --page-text: #f8fafc;
+                --page-bg: #0f172a;
+                --page-bg-img: radial-gradient(ellipse 90% 60% at 50% -10%, rgba(14, 165, 233, 0.2), transparent 55%), radial-gradient(ellipse 60% 45% at 100% 20%, rgba(99, 102, 241, 0.15), transparent 50%), radial-gradient(ellipse 50% 40% at 0% 90%, rgba(45, 212, 191, 0.15), transparent 50%), linear-gradient(165deg, #0f172a 0%, #1e293b 38%, #0f172a 72%, #1e293b 100%);
+                --card-bg: rgba(30, 41, 59, 0.82);
+                --card-glow: 0 8px 32px rgba(14, 165, 233, 0.15);
+                --card-glow-inner: 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+                --card-border: rgba(56, 189, 248, 0.25);
+                --tx-bg: rgba(30, 41, 59, 0.65);
+                --tx-border: rgba(71, 85, 105, 0.4);
+                --tx-mute: #94a3b8;
+                --note-label: #a78bfa;
+                --note-body: #c4b5fd;
+              }
+              [data-theme="dark"] .brand h2 {
+                background: linear-gradient(120deg, #2dd4bf 0%, #38bdf8 42%, #818cf8 78%, #a78bfa 100%);
+                -webkit-background-clip: text;
+                background-clip: text;
+                -webkit-text-fill-color: transparent;
+              }
+              [data-theme="dark"] .customer-line { color: #f8fafc; }
             </style>
           </head>
           <body>

@@ -316,17 +316,35 @@ def _support_whatsapp_href() -> str:
 
 
 def _pwa_meta_block(brand_img: str) -> str:
-    """وسوم Web App Manifest وألوان الثيم لأيقونة الشاشة الرئيسية."""
+    """وسوم Web App Manifest وألوان الثيم لأيقونة الشاشة الرئيسية، بالإضافة لسكربت الثيم."""
     icon = _html_escape(brand_img)
     title_esc = _html_escape("دفتر الديون")
     return (
         f"<link rel='manifest' href='/creditbook/manifest.webmanifest'/>"
-        f"<meta name='theme-color' content='#14b8a6'/>"
+        f"<meta id='meta-theme-color' name='theme-color' content='#14b8a6'/>"
         f"<meta name='mobile-web-app-capable' content='yes'/>"
         f"<meta name='apple-mobile-web-app-capable' content='yes'/>"
         f"<meta name='apple-mobile-web-app-status-bar-style' content='default'/>"
         f"<meta name='apple-mobile-web-app-title' content='{title_esc}'/>"
         f"<link rel='apple-touch-icon' href='{icon}'/>"
+        f"<script>"
+        f"(function() {{"
+        f"  try {{"
+        f"    var theme = localStorage.getItem('dftr_theme') || 'auto';"
+        f"    var isNight = false;"
+        f"    if (theme === 'auto') {{"
+        f"      var h = new Date().getHours();"
+        f"      isNight = h >= 18 || h < 6;"
+        f"      document.documentElement.setAttribute('data-theme', isNight ? 'dark' : 'light');"
+        f"    }} else {{"
+        f"      document.documentElement.setAttribute('data-theme', theme);"
+        f"    }}"
+        f"    var meta = document.getElementById('meta-theme-color');"
+        f"    var isDark = theme === 'dark' || (theme === 'auto' && isNight);"
+        f"    if (meta) meta.setAttribute('content', isDark ? '#0f172a' : '#14b8a6');"
+        f"  }} catch(e) {{}}"
+        f"}})();"
+        f"</script>"
     )
 
 
@@ -443,6 +461,13 @@ def wrap_creditbook_app_shell(
                 <span class='sidebar-brand-txt'>دفتر الديون</span>
               </a>
               <p class='sidebar-user'><span class='sidebar-user-name'>{disp}</span></p>
+              <div class='sidebar-theme-wrap'>
+                <div class='sidebar-theme-toggles'>
+                  <button type='button' class='theme-btn' data-theme-val='light' title='نهاري'>☀️ نهاري</button>
+                  <button type='button' class='theme-btn' data-theme-val='dark' title='ليلي'>🌙 ليلي</button>
+                  <button type='button' class='theme-btn' data-theme-val='auto' title='حسب الوقت'>🕒 تلقائي</button>
+                </div>
+              </div>
               <nav class='sidebar-nav'>
                 <a class='sidebar-link{home_active} sidebar-close-link' href='/creditbook/dashboard'>🏠 الصفحة الرئيسية</a>
                 <a class='sidebar-link{acc_active} sidebar-close-link' href='/creditbook/account'>حسابي</a>
@@ -494,6 +519,36 @@ def wrap_creditbook_app_shell(
           var links = document.querySelectorAll('.sidebar-close-link');
           for (var i = 0; i < links.length; i++) {{
             links[i].addEventListener('click', function() {{ setOpen(false); }});
+          }}
+          var themeBtns = document.querySelectorAll('.theme-btn');
+          function updateActiveThemeBtn() {{
+            var ct = localStorage.getItem('dftr_theme') || 'auto';
+            for(var i=0; i<themeBtns.length; i++) {{
+              if (themeBtns[i].getAttribute('data-theme-val') === ct) {{
+                themeBtns[i].classList.add('active');
+              }} else {{
+                themeBtns[i].classList.remove('active');
+              }}
+            }}
+          }}
+          updateActiveThemeBtn();
+          for(var i=0; i<themeBtns.length; i++) {{
+            themeBtns[i].addEventListener('click', function() {{
+              var val = this.getAttribute('data-theme-val');
+              localStorage.setItem('dftr_theme', val);
+              updateActiveThemeBtn();
+              var isNight = false;
+              if (val === 'auto') {{
+                var h = new Date().getHours();
+                isNight = h >= 18 || h < 6;
+                document.documentElement.setAttribute('data-theme', isNight ? 'dark' : 'light');
+              }} else {{
+                document.documentElement.setAttribute('data-theme', val);
+              }}
+              var meta = document.getElementById('meta-theme-color');
+              var isDark = val === 'dark' || (val === 'auto' && isNight);
+              if (meta) meta.setAttribute('content', isDark ? '#0f172a' : '#14b8a6');
+            }});
           }}
         }})();
         </script>
