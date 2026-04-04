@@ -57,6 +57,15 @@ def init_db():
             except Exception:
                 pass
 
+        # إزالة قيد NOT NULL من تيليجرام_id للسماح بالتسجيل من خلال الموقع فقط
+        try:
+            conn.execute(
+                text("ALTER TABLE users ALTER COLUMN telegram_id DROP NOT NULL")
+            )
+            conn.commit()
+        except Exception:
+            pass
+
         # عمود صورة للمعاملات
         try:
             conn.execute(
