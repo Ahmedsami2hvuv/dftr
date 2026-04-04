@@ -746,7 +746,7 @@ def _render_page(token: str, offset: int) -> str:
                 .owner-showcase {{ order: -1; max-width: 100%; }}
                 .brand {{ justify-content: center; }}
               }}
-              [data-theme="dark"] {
+              [data-theme="dark"] {{
                 color-scheme: dark;
                 --page-text: #f8fafc;
                 --page-bg: #0f172a;
@@ -760,14 +760,14 @@ def _render_page(token: str, offset: int) -> str:
                 --tx-mute: #94a3b8;
                 --note-label: #a78bfa;
                 --note-body: #c4b5fd;
-              }
-              [data-theme="dark"] .brand h2 {
+              }}
+              [data-theme="dark"] .brand h2 {{
                 background: linear-gradient(120deg, #2dd4bf 0%, #38bdf8 42%, #818cf8 78%, #a78bfa 100%);
                 -webkit-background-clip: text;
                 background-clip: text;
                 -webkit-text-fill-color: transparent;
-              }
-              [data-theme="dark"] .customer-line { color: #f8fafc; }
+              }}
+              [data-theme="dark"] .customer-line {{ color: #f8fafc; }}
             </style>
           </head>
           <body>
@@ -878,7 +878,7 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(data)
             return
 
-        if path == "/creditbook/app":
+        if path == "/creditbook/app" or path == "/":
             loc = "/creditbook/dashboard" if web_user else "/creditbook/login"
             _redirect(self, loc)
             return
