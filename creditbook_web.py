@@ -471,6 +471,7 @@ def wrap_creditbook_app_shell(
               <nav class='sidebar-nav'>
                 <a class='sidebar-link{home_active} sidebar-close-link' href='/creditbook/dashboard'>🏠 الصفحة الرئيسية</a>
                 <a class='sidebar-link{acc_active} sidebar-close-link' href='/creditbook/account'>حسابي</a>
+                <a class='sidebar-link sidebar-close-link' href='https://youtu.be/hlA9VMxBoB4?si=qSNuzV6UnUlPP6H_' target='_blank' rel='noopener'>📺 طريقة الاستخدام</a>
                 <a class='sidebar-link sidebar-close-link' href='/creditbook/feedback'>💬 إرسال مشكلة أو اقتراح</a>
                 {support_wa_html}
                 <a class='sidebar-link sidebar-link-logout sidebar-close-link' href='/creditbook/logout_confirm'>تسجيل الخروج</a>
@@ -822,6 +823,7 @@ def render_login_page(
             {f"<div class='login-forgot-wrap'><a class='login-forgot-link' href='https://t.me/{BOT_USERNAME}?start=forgot' target='_blank' rel='noopener'>نسيت الرمز؟</a><p class='login-forgot-hint'>يفتح البوت لاستعادة الرمز عبر واتساب (نفس رقم حسابك).</p></div>" if BOT_USERNAME else ""}
           </form>
           <p class='login-register-note'>ليس لديك حساب؟ اضغط «إنشاء حساب جديد» بجانب زر الدخول — بالاسم والهاتف وكلمة المرور (بدون تيليجرام).</p>
+          <p style='margin-top:16px;text-align:center'><a class='btn btn-secondary' style='display:inline-flex;align-items:center;justify-content:center;gap:6px;' href='https://youtu.be/hlA9VMxBoB4?si=qSNuzV6UnUlPP6H_' target='_blank' rel='noopener'>📺 طريقة الاستخدام (فيديو)</a></p>
           {f"<p style='margin-top:16px;text-align:center'><a class='btn btn-bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>فتح البوت في تيليجرام</a></p>" if BOT_USERNAME else ""}
         </div>
         {_pwa_register_sw_script()}
@@ -949,6 +951,9 @@ def render_dashboard_html(
           </div>
           {flash_html}
           <p class='hint hint-dashboard-note'>إدارة العملاء والمعاملات من المتصفح أو من البوت.</p>
+          <div style='text-align:center; margin-bottom:16px;'>
+            <a class='btn btn-secondary' style='display:inline-flex;align-items:center;justify-content:center;gap:6px;' href='https://youtu.be/hlA9VMxBoB4?si=qSNuzV6UnUlPP6H_' target='_blank' rel='noopener'>📺 لمشاهدة طريقة الاستخدام</a>
+          </div>
           {add_form}
           <div class='dashboard-cust-heading-row'>
             <h3 class='web-h3 dashboard-cust-title'>📋 عملائي</h3>
