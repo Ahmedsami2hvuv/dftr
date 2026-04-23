@@ -1547,7 +1547,16 @@ class Handler(BaseHTTPRequestHandler):
             if err:
                 _redirect(self, f"/creditbook/tx/{tid}?err=" + _e(err))
                 return
-            _redirect(self, f"/creditbook/tx/{tid}?flash=tx_upd")
+            db = SessionLocal()
+            try:
+                tx_row = db.query(CustomerTransaction).filter(CustomerTransaction.id == tid).first()
+                cid_after = tx_row.customer_id if tx_row else None
+            finally:
+                db.close()
+            if cid_after:
+                _redirect(self, f"/creditbook/customer/{cid_after}?flash=tx_upd")
+            else:
+                _redirect(self, f"/creditbook/dashboard")
             return
 
         m_tk = re.match(r"^/creditbook/tx/(?P<tid>\d+)/toggle_kind$", path)
@@ -1561,7 +1570,16 @@ class Handler(BaseHTTPRequestHandler):
             if err:
                 _redirect(self, f"/creditbook/tx/{tid}?err=" + _e(err))
                 return
-            _redirect(self, f"/creditbook/tx/{tid}?flash=tx_kind")
+            db = SessionLocal()
+            try:
+                tx_row = db.query(CustomerTransaction).filter(CustomerTransaction.id == tid).first()
+                cid_after = tx_row.customer_id if tx_row else None
+            finally:
+                db.close()
+            if cid_after:
+                _redirect(self, f"/creditbook/customer/{cid_after}?flash=tx_kind")
+            else:
+                _redirect(self, f"/creditbook/dashboard")
             return
 
         m_td = re.match(r"^/creditbook/tx/(?P<tid>\d+)/delete$", path)
