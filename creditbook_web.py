@@ -603,7 +603,7 @@ def render_tx_history_rows_html(user_id: int, q: str | None, csrf_token: str) ->
       <div class='acct-txhist-row'>
         <div class='acct-txhist-row-head'>
           <span class='acct-txhist-badge {badge_class}'>{_html_escape(badge)}</span>
-          <span class='acct-txhist-cust'>{cust_esc}</span>
+          <span class='acct-txhist-cust'>الحساب: {cust_esc}</span>
         </div>
         <div class='acct-txhist-meta'><strong>{_html_escape(kind_ar)}</strong> · {amt_s} د.ع. · <span dir='ltr'>{_html_escape(dt_s)}</span></div>
         {note_html}
