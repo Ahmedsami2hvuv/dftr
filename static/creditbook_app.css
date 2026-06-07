@@ -2274,6 +2274,12 @@ button.sidebar-link.sidebar-install-btn {
 [data-theme="dark"] .acct-txhist-note { color: #c4b5fd; }
 [data-theme="dark"] .acct-summary { color: #f8fafc; }
 [data-theme="dark"] .hint { color: #cbd5e1; }
+[data-theme="dark"] .acct-txhist-details {
+  background: rgba(15, 23, 42, 0.6);
+}
+[data-theme="dark"] .acct-txhist-row {
+  background: rgba(30, 41, 59, 0.72);
+}
 [data-theme="dark"] .btn-outline {
   background: rgba(30, 41, 59, 0.85);
   color: #2dd4bf !important;
