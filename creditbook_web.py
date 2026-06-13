@@ -415,6 +415,96 @@ def _pwa_install_sidebar_script() -> str:
     """
 
 
+def _render_stop_notice_modal() -> str:
+    return """
+    <style>
+      @keyframes stopNoticeFadeIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+    </style>
+    <div id="stop-notice-overlay" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.95);
+      color: #fff;
+      z-index: 999999;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+      font-family: 'Tajawal', sans-serif;
+    ">
+      <div style="
+        max-width: 500px;
+        background: #1e293b;
+        border: 2px solid #ef4444;
+        border-radius: 16px;
+        padding: 32px 24px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        animation: stopNoticeFadeIn 0.3s ease-out;
+      ">
+        <div style="font-size: 48px; margin-bottom: 16px; color: #ef4444;">⚠️</div>
+        <h3 style="font-size: 24px; margin-bottom: 20px; font-weight: 700; color: #f87171; line-height: 1.5;">تنبيه مهم جداً</h3>
+        <p style="font-size: 18px; line-height: 1.8; margin-bottom: 28px; color: #cbd5e1; font-weight: 600;">
+          انقل ديونك لمكان اخر سوف يتم ايقاف الدفتر بسبب عدم ايجاد مستثمر او متبرع او مشتركين
+        </p>
+        <button id="close-stop-notice-btn" style="
+          background: #ef4444;
+          color: #fff;
+          border: none;
+          padding: 12px 36px;
+          font-size: 16px;
+          font-weight: 700;
+          border-radius: 8px;
+          cursor: pointer;
+          font-family: 'Tajawal', sans-serif;
+          transition: background 0.2s ease;
+          box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);
+        " onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+          إغلاق
+        </button>
+      </div>
+    </div>
+    <script>
+    (function() {
+      var overlay = document.getElementById('stop-notice-overlay');
+      var closeBtn = document.getElementById('close-stop-notice-btn');
+      if (!overlay || !closeBtn) return;
+
+      function checkNotice() {
+        var closedTime = localStorage.getItem('stop_notice_closed_time');
+        if (!closedTime) {
+          overlay.style.display = 'flex';
+        } else {
+          var diff = Date.now() - parseInt(closedTime, 10);
+          if (diff >= 3600000) { // 1 hour in ms
+            overlay.style.display = 'flex';
+          } else {
+            overlay.style.display = 'none';
+          }
+        }
+      }
+
+      closeBtn.addEventListener('click', function() {
+        overlay.style.display = 'none';
+        localStorage.setItem('stop_notice_closed_time', Date.now().toString());
+      });
+
+      checkNotice();
+    })();
+    </script>
+    """
+
+
+
+
 def wrap_creditbook_app_shell(
     user: User,
     favicon_href: str,
@@ -553,6 +643,7 @@ def wrap_creditbook_app_shell(
           }}
         }})();
         </script>
+        {_render_stop_notice_modal()}
         {_pwa_register_sw_script()}
         {_pwa_install_sidebar_script()}
       </body>
@@ -826,6 +917,7 @@ def render_login_page(
           <p style='margin-top:16px;text-align:center'><a class='btn btn-secondary' style='display:inline-flex;align-items:center;justify-content:center;gap:6px;' href='https://youtu.be/hlA9VMxBoB4?si=qSNuzV6UnUlPP6H_' target='_blank' rel='noopener'>📺 طريقة الاستخدام (فيديو)</a></p>
           {f"<p style='margin-top:16px;text-align:center'><a class='btn btn-bot' href='https://t.me/{BOT_USERNAME}' target='_blank' rel='noopener'>فتح البوت في تيليجرام</a></p>" if BOT_USERNAME else ""}
         </div>
+        {_render_stop_notice_modal()}
         {_pwa_register_sw_script()}
       </body>
     </html>
@@ -881,6 +973,7 @@ def render_register_page(
             <a class='btn btn-secondary' href='/creditbook/login'>◀ لديك حساب؟ تسجيل الدخول</a>
           </p>
         </div>
+        {_render_stop_notice_modal()}
         {_pwa_register_sw_script()}
       </body>
     </html>
